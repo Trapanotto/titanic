@@ -129,27 +129,32 @@ function skylight(parent, x0, x1, z0, z1, y, { coam = 0.4, rise = 0.5, bars = 0.
   for (const x of [x0 + 0.01, x1 - 0.01]) parent.add(mk(gableGeo(w, rise), W, x, y + coam, zc));
 }
 
+// Straight member of section w (x) by t between two points given as [z, y] in the side plane, at x.
+function beamZY(w, t, x, a, b, ext = 0) {
+  const dz = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dz, dy);
+  return boxG(w, t, L + ext, 0, 0, 0, Math.atan2(-dy, dz)).translate(x, (a[1] + b[1]) / 2, (a[0] + b[0]) / 2);
+}
+
 // ---------- benches (teak slats on cast-iron ends) ----------
 let BENCH = null;
 function benchGeos() {
   if (BENCH) return BENCH;
   const wood = [], iron = [];
-  for (let k = 0; k < 5; k++) wood.push(boxG(1.8, 0.028, 0.085, 0, 0.43, 0.2 - k * 0.1));
-  for (let k = 0; k < 4; k++) { const b = boxG(1.8, 0.085, 0.026, 0, 0, 0); b.rotateX(0.22); b.translate(0, 0.53 + k * 0.11, -0.25 - k * 0.026); wood.push(b); }
-  // cast-iron end frame: scroll profile with arm rest, extruded
-  const sh = new THREE.Shape();
-  sh.moveTo(0.24, 0); sh.lineTo(0.3, 0); sh.quadraticCurveTo(0.22, 0.2, 0.24, 0.41); sh.lineTo(0.22, 0.6); sh.quadraticCurveTo(0.28, 0.66, 0.2, 0.68);
-  sh.quadraticCurveTo(0.0, 0.64, -0.12, 0.6); sh.lineTo(-0.2, 0.62); sh.quadraticCurveTo(-0.34, 0.9, -0.3, 0.98); sh.lineTo(-0.36, 0.98);
-  sh.quadraticCurveTo(-0.38, 0.7, -0.26, 0.42); sh.quadraticCurveTo(-0.34, 0.2, -0.36, 0); sh.lineTo(-0.29, 0); sh.quadraticCurveTo(-0.24, 0.2, -0.2, 0.4);
-  sh.lineTo(0.18, 0.4); sh.quadraticCurveTo(0.2, 0.2, 0.24, 0);
-  const hole = new THREE.Path(); hole.absellipse(0.0, 0.52, 0.09, 0.06, 0, TAU, true); sh.holes.push(hole);
-  for (const dx of [-0.86, 0.86]) {
-    const g = new THREE.ExtrudeGeometry(sh, { depth: 0.035, bevelEnabled: false, curveSegments: 4 });
-    g.rotateY(Math.PI / 2); g.translate(dx - 0.0175, 0, 0);
-    iron.push(g);
+  for (let k = 0; k < 5; k++) wood.push(boxG(1.8, 0.028, 0.085, 0, 0.43, 0.2 - k * 0.1));               // seat slats
+  for (let k = 0; k < 4; k++) wood.push(boxG(1.8, 0.085, 0.026, 0, 0, 0, 0.22).translate(0, 0.53 + k * 0.11, -0.25 - k * 0.026)); // back slats
+  wood.push(boxG(1.84, 0.035, 0.06, 0, 0.935, -0.335));                                                  // top rail
+  // cast-iron end frames: front leg, rear leg continuing as back post, seat bearer, arm rest on a scroll support
+  for (const x of [-0.86, 0.86]) {
+    iron.push(beamZY(0.04, 0.05, x, [0.24, 0], [0.2, 0.415]));
+    iron.push(beamZY(0.04, 0.05, x, [-0.31, 0], [-0.225, 0.415]));
+    iron.push(beamZY(0.04, 0.05, x, [-0.225, 0.4], [-0.335, 0.93], 0.02));
+    iron.push(beamZY(0.04, 0.045, x, [-0.24, 0.395], [0.22, 0.395], 0.03));
+    iron.push(beamZY(0.04, 0.035, x, [0.2, 0.41], [0.235, 0.63]));
+    iron.push(beamZY(0.06, 0.03, x, [-0.275, 0.655], [0.27, 0.635]));                                    // arm rest
+    iron.push(beamZY(0.03, 0.03, x, [-0.1, 0.4], [0.02, 0.64]), beamZY(0.03, 0.03, x, [0.14, 0.4], [0.02, 0.64])); // V brace
+    iron.push(boxG(0.07, 0.02, 0.09, x, 0.01, 0.24), boxG(0.07, 0.02, 0.09, x, 0.01, -0.31));           // feet
   }
-  iron.push(boxG(0.05, 0.03, 0.42, 0, 0.405, -0.02)); // centre bearer
-  iron.push(boxG(0.04, 0.43, 0.04, 0, 0.2, 0.18));
+  iron.push(boxG(0.04, 0.03, 0.44, 0, 0.4, -0.01), boxG(1.72, 0.03, 0.03, 0, 0.2, -0.04));              // centre bearer, stretcher
   BENCH = { wood: merge(wood), iron: merge(iron) };
   return BENCH;
 }
@@ -160,28 +165,34 @@ export function bench(world, parent, x, y, z, s) {
   world.addCollider(x - 0.92, y, z - s * 0.34, x + 0.92, y + 0.9, z + s * 0.3);
 }
 
-// ---------- deck chairs (instanced, slatted, with leg rest) ----------
+// ---------- deck chairs (instanced): the classic folding teak steamer chair with a long leg rest ----------
 function chairGeos() {
   const parts = [], sling = [], rug = [];
-  const b = (arr, w, h, d, x, y, z, rx = 0) => { arr.push(boxG(w, h, d, 0, 0, 0, rx).translate(x, y, z)); };
-  const A = 0.957;
+  // side profile, [z, y]: z = 0 at the wall side, feet towards +z
+  const TOP = [-0.2, 1.0], HIP = [0.26, 0.33], KNEE = [0.88, 0.4], FOOT = [1.56, 0.3];
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const ARM0 = lerp(HIP, TOP, 0.5), ARM1 = [0.84, 0.62];
   for (const s of [-1, 1]) {
-    b(parts, 0.04, 0.045, 0.72, s * 0.27, 0.36, 0.62);                       // seat rail
-    b(parts, 0.04, 0.045, 0.62, s * 0.27, 0.3, 1.25, -0.25);                   // leg rest rail
-    b(parts, 0.04, 0.36, 0.04, s * 0.27, 0.18, 0.3);
-    b(parts, 0.04, 0.34, 0.04, s * 0.27, 0.15, 1.5);
-    b(parts, 0.04, 0.045, 0.78, s * 0.27, 0.645, 0.085, A);                    // back rail
-    b(parts, 0.05, 0.03, 0.6, s * 0.3, 0.58, 0.48);                           // arm rest
-    b(parts, 0.035, 0.22, 0.035, s * 0.3, 0.47, 0.72);
+    const x = s * 0.27;
+    parts.push(beamZY(0.035, 0.045, x, HIP, TOP, 0.04));                 // back stile
+    parts.push(beamZY(0.035, 0.045, x, HIP, KNEE, 0.03));                // seat rail
+    parts.push(beamZY(0.035, 0.045, x, KNEE, FOOT, 0.03));               // leg-rest rail
+    parts.push(beamZY(0.035, 0.04, x, [0.12, 0], [0.3, 0.36]));          // rear leg
+    parts.push(beamZY(0.035, 0.04, x, [0.9, 0], ARM1, 0.02));            // front leg, carries the arm
+    parts.push(beamZY(0.035, 0.035, x, [1.5, 0], [1.52, 0.3]));          // foot leg
+    parts.push(beamZY(0.06, 0.028, s * 0.285, ARM0, ARM1, 0.08));        // arm rest from back stile to front leg
   }
-  b(parts, 0.58, 0.04, 0.04, 0, 0.955, -0.135);
-  b(parts, 0.58, 0.04, 0.04, 0, 0.27, 1.52);
-  for (let k = 0; k < 5; k++) b(sling, 0.5, 0.016, 0.085, 0, 0.385, 0.3 + k * 0.11);             // seat slats
-  for (let k = 0; k < 6; k++) { const t = (k + 0.5) / 6; b(sling, 0.5, 0.016, 0.1, 0, 0.36 + 0.58 * t, 0.29 - 0.42 * t, A); } // back slats
-  for (let k = 0; k < 4; k++) b(sling, 0.5, 0.016, 0.1, 0, 0.34 - k * 0.03, 0.98 + k * 0.13, -0.25);  // leg rest slats
-  // folded steamer rug draped over the leg rest
-  const r = boxG(0.5, 0.05, 0.42, 0, 0, 0, -0.2).translate(0, 0.36, 1.08);
-  rug.push(r, boxG(0.52, 0.16, 0.035, 0, 0.29, 1.3), boxG(0.06, 0.03, 0.42, 0.2, 0.395, 1.08, -0.2));
+  for (const [z, y] of [TOP, [0.14, 0.06], [0.9, 0.06], [1.5, 0.08], FOOT]) parts.push(boxG(0.575, 0.035, 0.035, 0, y, z)); // cross bars
+  const slats = (a, b, n, lift) => {
+    const ang = Math.atan2(-(b[1] - a[1]), b[0] - a[0]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), w = (L / n) * 0.72;
+    for (let k = 0; k < n; k++) { const q = lerp(a, b, (k + 0.5) / n); sling.push(boxG(0.505, 0.014, w, 0, 0, 0, ang).translate(0, q[1] + lift, q[0])); }
+  };
+  slats(HIP, TOP, 8, 0.0); slats(HIP, KNEE, 6, 0.028); slats(KNEE, FOOT, 7, 0.028);
+  // steamer rug: lies folded on the leg rest and hangs over its end
+  const ra = Math.atan2(-(FOOT[1] - KNEE[1]), FOOT[0] - KNEE[0]);
+  rug.push(boxG(0.5, 0.035, 0.6, 0, 0, 0, ra).translate(0, 0.395, 1.2));
+  rug.push(boxG(0.46, 0.03, 0.3, 0, 0, 0, ra).translate(0, 0.428, 1.12));
+  rug.push(boxG(0.5, 0.2, 0.03, 0, 0.245, 1.585));
   return { wood: merge(parts), sling: merge(sling), rug: merge(rug) };
 }
 
@@ -382,7 +393,7 @@ export function buildGear(world, parent) {
       o.position.set(x + jit * 0.05, y, s * zHead);
       o.rotation.set(0, (s > 0 ? 0 : Math.PI) + jit * 0.06, 0);
       o.updateMatrix();
-      inst.add(G.wood, mats.oak, o.matrix); inst.add(G.sling, mats.wicker, o.matrix);
+      inst.add(G.wood, mats.oak, o.matrix); inst.add(G.sling, mats.pine, o.matrix);
       if (i % 3 === 1) inst.add(G.rug, i % 2 ? mats.blanket : mats.fabricGreen, o.matrix);
     });
   }
