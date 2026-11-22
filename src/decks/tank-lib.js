@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { mats } from '../core/materials.js';
 import { DECK_Y, ZONE_LEN, SLAB, hullHalfWidth } from '../core/constants.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Batch, LINING_INSET } from '../interior/kit.js';
 
 export const DECK = 'tank';
@@ -78,6 +79,99 @@ export class Instancer {
     this.map.clear();
   }
 }
+
+// ------------------------------------------------------------------------------------------------ geometry stamping
+
+const _sp = new THREE.Vector3(), _sn = new THREE.Vector3(), _snm = new THREE.Matrix3();
+/**
+ * Push a THREE.BufferGeometry, transformed by m4, into a Batch / TBatch bucket. uv: 'world' (metres, box-projected – for
+ * tiled textures) or 'geo' (keep the geometry's own uv – dials, unit textures).
+ */
+export function stamp(b, mat, geo, m4, uv = 'world', zx) {
+  const P = geo.attributes.position, N = geo.attributes.normal, U = geo.attributes.uv, I = geo.index;
+  if (zx === undefined) zx = m4.elements[12];
+  const bk = b._bucket(mat, zx), base = bk.pos.length / 3;
+  _snm.getNormalMatrix(m4);
+  const flip = m4.determinant() < 0;
+  for (let i = 0; i < P.count; i++) {
+    _sp.fromBufferAttribute(P, i).applyMatrix4(m4);
+    _sn.fromBufferAttribute(N, i).applyMatrix3(_snm).normalize();
+    bk.pos.push(_sp.x, _sp.y, _sp.z); bk.nor.push(_sn.x, _sn.y, _sn.z);
+    if (uv === 'geo' && U) bk.uv.push(U.getX(i), U.getY(i));
+    else {
+      const ax = Math.abs(_sn.x), ay = Math.abs(_sn.y), az = Math.abs(_sn.z);
+      if (ay >= ax && ay >= az) bk.uv.push(_sp.x, _sp.z); else if (ax > az) bk.uv.push(_sp.z, _sp.y); else bk.uv.push(_sp.x, _sp.y);
+    }
+  }
+  const n = I ? I.count : P.count;
+  for (let t = 0; t < n; t += 3) {
+    const a = I ? I.getX(t) : t, c1 = I ? I.getX(t + 1) : t + 1, c2 = I ? I.getX(t + 2) : t + 2;
+    if (flip) bk.idx.push(base + a, base + c2, base + c1); else bk.idx.push(base + a, base + c1, base + c2);
+  }
+  b.tris += n / 3;
+}
+const _e = new THREE.Euler(), _mq = new THREE.Quaternion(), _ms = new THREE.Vector3(), _mp = new THREE.Vector3();
+/** Matrix: translate (x,y,z), rotate Euler (rx, ry, rz, order 'YXZ'), scale (sx, sy, sz). */
+export function M4(x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) {
+  _e.set(rx, ry, rz, 'YXZ'); _mq.setFromEuler(_e);
+  return new THREE.Matrix4().compose(_mp.set(x, y, z), _mq, _ms.set(sx, sy, sz));
+}
+/** Matrix that maps local +y onto the unit direction d, placed at p. */
+export function M4dir(p, d, s = 1) {
+  _mq.setFromUnitVectors(UP, _mp.set(d[0], d[1], d[2]).normalize());
+  return new THREE.Matrix4().compose(new THREE.Vector3(p[0], p[1], p[2]), _mq, _ms.set(s, s, s));
+}
+const GC = new Map();
+/** cached geometry */
+export function gcache(key, make) { let g = GC.get(key); if (!g) GC.set(key, (g = make())); return g; }
+/** Lathe around local y: prof [[r, y], ...] (bottom → top for an outward-facing solid). */
+export function latheGeo(prof, seg = 16) {
+  return gcache('L' + seg + JSON.stringify(prof), () => {
+    const g = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(Math.max(r, 1e-4), y)), seg);
+    g.computeVertexNormals();
+    return g;
+  });
+}
+/** lathe stamped with its axis along local direction: 'x' | 'y' | 'z' (profile y runs along +axis), centred at p */
+export function latheAt(b, mat, prof, axis, p, seg = 16) {
+  const g = latheGeo(prof, seg);
+  const m = axis === 'x' ? M4(p[0], p[1], p[2], 0, 0, -Math.PI / 2) : axis === 'z' ? M4(p[0], p[1], p[2], Math.PI / 2, 0, 0) : axis === '-x' ? M4(p[0], p[1], p[2], 0, 0, Math.PI / 2) : M4(p[0], p[1], p[2]);
+  stamp(b, mat, g, m);
+}
+/** hexagonal nut + washer with its axis along d at p (lying on a surface whose normal is d) */
+export function nut(b, p, d, r = 0.03, mat = mats.iron) {
+  stamp(b, mat, gcache('nut' + r, () => { const g = new THREE.CylinderGeometry(r, r, r * 1.1, 6); g.translate(0, r * 0.75, 0); return g; }), M4dir(p, d));
+  stamp(b, mat, gcache('wash' + r, () => { const g = new THREE.CylinderGeometry(r, r * 1.45, r * 0.4, 6, 1, true); return g; }), M4dir(p, d));
+}
+const RIVET = new THREE.ConeGeometry(0.017, 0.013, 5, 1); RIVET.translate(0, 0.004, 0); RIVET.computeVertexNormals();
+/** rivet head (cone) at p, outward direction d */
+export function rivet(b, p, d, mat = mats.steelDark, s = 1) { stamp(b, mat, RIVET, M4dir(p, d, s)); }
+/** rivet row along a straight line p→q on a surface with normal d, pitch */
+export function rivetLine(b, p, q, d, pitch = 0.1, mat = mats.steelDark, s = 1) {
+  const L = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]), n = Math.max(1, Math.round(L / pitch));
+  for (let i = 0; i <= n; i++) { const t = i / n; rivet(b, [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t], d, mat, s); }
+}
+/** rivets on a circle around the x axis at x, centre (cy, cz), radius r, angles a0..a1 from the top (towards +z) */
+export function rivetArcX(b, x, cy, cz, r, a0, a1, pitch = 0.1, mat = mats.steelDark) {
+  const n = Math.max(1, Math.round(((a1 - a0) * r) / pitch));
+  for (let i = 0; i <= n; i++) { const a = a0 + ((a1 - a0) * i) / n, c = Math.cos(a), s = Math.sin(a); rivet(b, [x, cy + r * c, cz + r * s], [0, c, s], mat); }
+}
+
+// open-mesh grating (alpha tested) for gallery floors and stokehold platforms
+const gratTex = (() => {
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.clearRect(0, 0, 128, 128); x.fillStyle = '#4a4c4f';
+  for (let i = 0; i < 128; i += 16) { x.fillRect(i, 0, 5, 128); }
+  for (let j = 0; j < 128; j += 32) { x.fillRect(0, j, 128, 4); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  t.repeat.set(1 / 0.4, 1 / 0.4);
+  return t;
+})();
+/** open-mesh steel grating (module-level material, created once) */
+export const gratingMat = new THREE.MeshStandardMaterial({ map: gratTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.55, metalness: 0.7, color: 0x9a9c9e });
+gratingMat.name = 'tank_grating';
 
 // ------------------------------------------------------------------------------------------------ tubes
 
@@ -161,12 +255,22 @@ export function column(b, mat, x, z, y0, y1, r, opts = {}) { tube(b, mat, 'y', [
  * Caged bulkhead lamp. dir: '+x'|'-x'|'+z'|'-z' = direction it faces (mounted on a wall behind it), or null = pendant
  * hanging from `hang` (y of the ceiling). Registers world.addLamp.
  */
+const LAMP_GLOBE = latheGeo([[0, -0.11], [0.05, -0.1], [0.075, -0.06], [0.08, -0.01], [0.07, 0.04], [0.05, 0.075], [0, 0.08]], 10);
+const LAMP_GUARD = (() => {
+  const parts = [];
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2, pts = [[0.06, 0.09], [0.1, 0.04], [0.105, -0.04], [0.085, -0.1], [0.03, -0.135]].map(([r, y]) => new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
+    parts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 6, 0.006, 3, false));
+  }
+  for (const [r, y] of [[0.103, 0.0], [0.09, -0.08]]) { const t = new THREE.TorusGeometry(r, 0.006, 3, 14); t.rotateX(Math.PI / 2); t.translate(0, y, 0); parts.push(t); }
+  const base = new THREE.CylinderGeometry(0.07, 0.085, 0.05, 10); base.translate(0, 0.11, 0); parts.push(base);
+  const cap = new THREE.CylinderGeometry(0.015, 0.03, 0.03, 6); cap.translate(0, -0.14, 0); parts.push(cap);
+  return mergeGeometries(parts.map((g) => g.toNonIndexed()), false);
+})();
 export function cageLamp(b, world, x, y, z, opts = {}) {
   const dir = opts.dir ?? null, s = 0.09;
-  b.box(mats.lampGlow, x - s * 0.8, y - s, z - s * 0.8, x + s * 0.8, y + s, z + s * 0.8, 'xXzZy');
-  b.box(mats.iron, x - s * 1.25, y + s, z - s * 1.25, x + s * 1.25, y + s + 0.05, z + s * 1.25);
-  b.box(mats.iron, x - 0.03, y - s - 0.04, z - 0.03, x + 0.03, y - s, z + 0.03);
-  for (const [dx, dz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) b.box(mats.iron, x + dx * s * 1.05 - 0.008, y - s - 0.02, z + dz * s * 1.05 - 0.008, x + dx * s * 1.05 + 0.008, y + s, z + dz * s * 1.05 + 0.008, 'xXzZ');
+  stamp(b, mats.lampGlow, LAMP_GLOBE, M4(x, y, z));
+  stamp(b, mats.iron, LAMP_GUARD, M4(x, y, z));
   if (dir) {
     const sx = dir === '+x' ? -1 : dir === '-x' ? 1 : 0, sz = dir === '+z' ? -1 : dir === '-z' ? 1 : 0, l = 0.2;
     b.box(mats.iron, Math.min(x, x + sx * l) - 0.025, y + 0.02, Math.min(z, z + sz * l) - 0.025, Math.max(x, x + sx * l) + 0.025, y + 0.07, Math.max(z, z + sz * l) + 0.025);
@@ -208,9 +312,18 @@ export function railZs(b, world, segs, x, y, o) { for (const [a, c] of segs) rai
 
 /** Walkable steel plate / grating (top at y) + addFloor. */
 export function plate(b, world, x0, x1, z0, z1, y, opts = {}) {
-  const t = opts.t ?? 0.06, m = opts.mat ?? mats.steelFloor;
-  b.box(m, x0, y - t, z0, x1, y, z1, 'Y');
-  b.box(mats.steelDark, x0, y - t, z0, x1, y, z1, 'xXzZy');
+  const t = opts.t ?? 0.06, grate = opts.grating !== false && !opts.mat;
+  if (grate) {
+    // open-mesh grating in a flat-bar frame, bearer bars every 0.6 m underneath
+    b.box(gratingMat, x0, y - 0.004, z0, x1, y - 0.002, z1, 'Y');
+    b.box(mats.steelDark, x0, y - t, z0, x1, y, z1, 'xXzZ');
+    const alongX = x1 - x0 >= z1 - z0;
+    if (alongX) for (let x = x0 + 0.6; x < x1 - 0.1; x += 0.6) b.box(mats.steelDark, x - 0.012, y - t, z0, x + 0.012, y - 0.005, z1, 'xXy');
+    else for (let z = z0 + 0.6; z < z1 - 0.1; z += 0.6) b.box(mats.steelDark, x0, y - t, z - 0.012, x1, y - 0.005, z + 0.012, 'zZy');
+  } else {
+    b.box(opts.mat ?? mats.steelFloor, x0, y - t, z0, x1, y, z1, 'Y');
+    b.box(mats.steelDark, x0, y - t, z0, x1, y, z1, 'xXzZy');
+  }
   // supporting angle bars under the edges
   b.box(mats.steelDark, x0, y - t - 0.14, z0, x1, y - t, z0 + 0.08, 'xXzZy');
   b.box(mats.steelDark, x0, y - t - 0.14, z1 - 0.08, x1, y - t, z1, 'xXzZy');

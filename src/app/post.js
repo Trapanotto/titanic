@@ -111,13 +111,56 @@ void main() {
 }
 `;
 
+// ---- auto exposure: log-average luminance (centre weighted) -> temporally adapted 1x1 value ----
+const LUM_FRAG = /* glsl */ `
+uniform sampler2D tSrc;
+uniform vec2 uTexel;
+varying vec2 vUv;
+float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+void main() {
+  float s = 0.0;
+  for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
+    vec2 o = (vec2(float(i), float(j)) - 0.5) * uTexel * 2.0;
+    s += log2(clamp(luma(texture2D(tSrc, vUv + o).rgb), 1e-4, 64.0));
+  }
+  gl_FragColor = vec4(s * 0.25, 0.0, 0.0, 1.0);
+}`;
+const ADAPT_FRAG = /* glsl */ `
+uniform sampler2D tLum, tPrev;
+uniform float uDt, uReset;
+varying vec2 vUv;
+void main() {
+  float s = 0.0, w = 0.0;
+  // mip level 4 of the 256x128 log-luminance target = 16 x 8 texels, each the mean of 16 x 16
+  for (int j = 0; j < 8; j++) for (int i = 0; i < 16; i++) {
+    vec2 uv = (vec2(float(i), float(j)) + 0.5) / vec2(16.0, 8.0);
+    vec2 q = (uv - 0.5) * vec2(1.6, 2.0);
+    float wi = 1.0 - 0.75 * smoothstep(0.15, 1.0, dot(q, q));   // centre weighted
+    s += textureLod(tLum, uv, 4.0).r * wi; w += wi;
+  }
+  float cur = s / w;
+  float prev = texture2D(tPrev, vec2(0.5)).r;
+  // faster towards brighter (pupil closes), slower towards darker
+  float rate = cur > prev ? 2.2 : 1.1;
+  float a = uReset > 0.5 ? 1.0 : 1.0 - exp(-uDt * rate);
+  gl_FragColor = vec4(mix(prev, cur, a), 0.0, 0.0, 1.0);
+}`;
+const AE_GLSL = /* glsl */ `
+uniform sampler2D tAdapt;
+uniform vec4 uAE; // key (log2 reference luminance), min, max, strength
+float autoExposure() {
+  float l = texture2D(tAdapt, vec2(0.5)).r;
+  return clamp(exp2((uAE.x - l) * uAE.w), uAE.y, uAE.z);
+}`;
+
 const DOWN_FRAG = /* glsl */ `
 uniform sampler2D tSrc;
 uniform vec2 uTexel; // source texel
 uniform float uFirst, uThreshold, uKnee, uExposure;
+${AE_GLSL}
 varying vec2 vUv;
 vec3 pre(vec3 c) {
-  c *= uExposure;
+  c *= uExposure * autoExposure();
   float br = max(c.r, max(c.g, c.b));
   float soft = clamp(br - uThreshold + uKnee, 0.0, 2.0 * uKnee);
   soft = soft * soft / (4.0 * uKnee + 1e-4);
@@ -162,6 +205,7 @@ uniform vec2 uAOTexel, uRes;
 uniform float uUseAO, uAOStrength, uUseBloom, uBloom, uUseRays, uRays, uExposure, uTime;
 uniform float uHaze, uHazeMax, uContrast, uSaturation, uVignette, uGrain, uDebug;
 uniform vec3 uHazeColor, uSunColor, uLift, uGain;
+${AE_GLSL}
 varying vec2 vUv;
 
 vec3 RRTAndODTFit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
@@ -177,6 +221,7 @@ float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 
 void main() {
   vec3 col = texture2D(tScene, vUv).rgb;
+  float ex = uExposure * autoExposure();
   float d = texture2D(tDepth, vUv).x;
   float z = d >= 0.99999 ? 1e5 : -viewZ(d);
   if (uUseAO > 0.5 && d < 0.99999) {
@@ -192,7 +237,7 @@ void main() {
     float w01 = (1.0 - f.x) * f.y / (abs(s01.y - z) / tol + 0.05);
     float w11 = f.x * f.y / (abs(s11.y - z) / tol + 0.05);
     float ao = (s00.x * w00 + s10.x * w10 + s01.x * w01 + s11.x * w11) / (w00 + w10 + w01 + w11);
-    float bright = smoothstep(2.0, 8.0, luma(col) * uExposure);
+    float bright = smoothstep(2.0, 8.0, luma(col) * ex);
     col *= mix(1.0, ao, uAOStrength * (1.0 - bright));
     if (uDebug > 0.5 && uDebug < 1.5) { gl_FragColor = vec4(vec3(ao), 1.0); return; }
   }
@@ -202,8 +247,9 @@ void main() {
     col = mix(col, uHazeColor, f);
   }
   if (uUseRays > 0.5) col += uSunColor * texture2D(tRays, vUv).r * uRays;
-  if (uUseBloom > 0.5) col += texture2D(tBloom, vUv).rgb * uBloom / max(uExposure, 1e-3);
-  col = aces(col * uExposure);
+  if (uUseBloom > 0.5) col += texture2D(tBloom, vUv).rgb * uBloom / max(ex, 1e-3);
+  col = aces(col * ex);
+  if (uDebug > 1.5) { gl_FragColor = vec4(vec3(autoExposure() * 0.25), 1.0); return; }
   // grade (display-referred)
   col = col * uGain + uLift * (1.0 - col);
   float l = luma(col);
@@ -246,7 +292,12 @@ export class PostPipeline {
       rays: 0, sunColor: new THREE.Color(1, 0.9, 0.75), sunDir: new THREE.Vector3(0.5, 0.5, 0.7).normalize(),
       contrast: 1.04, saturation: 1.0, vignette: 0.25, grain: 0.012,
       lift: new THREE.Color(0, 0, 0), gain: new THREE.Color(1, 1, 1),
+      // auto exposure: key = log2 of the scene luminance that needs no correction, limits of the correction factor,
+      // strength 0..1 (0 = off, fixed exposure)
+      aeKey: -2, aeMin: 0.5, aeMax: 2, aeStrength: 0,
     };
+    this._lastCam = new THREE.Vector3(1e9, 0, 0);
+    this.aeReset = true;
     this.quality = null;
     this.preset = null;
     this.time = 0;
@@ -287,13 +338,22 @@ export class PostPipeline {
     for (let i = 0; i < p.bloomLevels; i++) { this.down.push(rt(1, 1)); this.up.push(rt(1, 1)); }
     const proj = { value: new THREE.Vector4() };
     this.uProj = proj;
+    this.rtLum = rt(256, 128, { minFilter: THREE.LinearMipmapLinearFilter, generateMipmaps: true });
+    this.rtLum.texture.generateMipmaps = true;
+    this.rtAdapt = [rt(1, 1, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }), rt(1, 1, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter })];
+    this.adaptIdx = 0;
+    this.aeReset = true;
+    const uAE = { value: new THREE.Vector4(-2, 1, 1, 0) }, tAdapt = { value: this.rtAdapt[0].texture };
+    this.uAE = uAE; this.tAdapt = tAdapt;
+    this.mLum = mat(LUM_FRAG, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } });
+    this.mAdapt = mat(ADAPT_FRAG, { tLum: { value: this.rtLum.texture }, tPrev: { value: null }, uDt: { value: 0 }, uReset: { value: 1 } });
     this.mAO = mat(AO_FRAG, { tDepth: { value: this.depth }, uProj: proj, uTexel: { value: new THREE.Vector2() }, uRadius: { value: 0.7 }, uIntensity: { value: 1.2 } }, { SAMPLES: p.ao || 8 });
     this.mBlur = mat(BLUR_FRAG, { tAO: { value: null }, uDir: { value: new THREE.Vector2() } });
     this.mRays = mat(RAYS_FRAG, { tDepth: { value: this.depth }, uSun: { value: new THREE.Vector2() }, uAspect: { value: 1 } });
-    this.mDown = mat(DOWN_FRAG, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uFirst: { value: 0 }, uThreshold: { value: 1 }, uKnee: { value: 0.5 }, uExposure: { value: 1 } });
+    this.mDown = mat(DOWN_FRAG, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uFirst: { value: 0 }, uThreshold: { value: 1 }, uKnee: { value: 0.5 }, uExposure: { value: 1 }, tAdapt, uAE });
     this.mUp = mat(UP_FRAG, { tSrc: { value: null }, tAdd: { value: null }, uTexel: { value: new THREE.Vector2() }, uAddK: { value: 1 } });
     this.mFinal = mat(FINAL_FRAG, {
-      tScene: { value: this.rtScene.texture }, tDepth: { value: this.depth }, uProj: proj,
+      tScene: { value: this.rtScene.texture }, tDepth: { value: this.depth }, uProj: proj, tAdapt, uAE,
       tAO: { value: this.rtAO.texture }, tBloom: { value: this.up.length ? this.up[0].texture : null }, tRays: { value: this.rtRays.texture },
       uAOTexel: { value: new THREE.Vector2() }, uRes: { value: new THREE.Vector2() },
       uUseAO: { value: p.ao > 0 ? 1 : 0 }, uAOStrength: { value: 0.8 }, uUseBloom: { value: p.bloomLevels > 0 ? 1 : 0 }, uBloom: { value: 0.05 },
@@ -304,12 +364,14 @@ export class PostPipeline {
   }
 
   _dispose() {
-    for (const k of ['rtScene', 'rtAO', 'rtAO2', 'rtRays']) { this[k]?.dispose(); this[k] = null; }
+    for (const k of ['rtScene', 'rtAO', 'rtAO2', 'rtRays', 'rtLum']) { this[k]?.dispose(); this[k] = null; }
+    for (const t of this.rtAdapt || []) t.dispose();
+    this.rtAdapt = null;
     this.depth?.dispose(); this.depth = null;
     for (const t of this.down || []) t.dispose();
     for (const t of this.up || []) t.dispose();
     this.down = []; this.up = [];
-    for (const k of ['mAO', 'mBlur', 'mRays', 'mDown', 'mUp', 'mFinal']) { this[k]?.dispose(); this[k] = null; }
+    for (const k of ['mAO', 'mBlur', 'mRays', 'mDown', 'mUp', 'mFinal', 'mLum', 'mAdapt']) { this[k]?.dispose(); this[k] = null; }
   }
 
   resize() {
@@ -331,6 +393,15 @@ export class PostPipeline {
     this.mFinal.uniforms.uAOTexel.value.set(1 / hw, 1 / hh);
     this.mFinal.uniforms.uRes.value.set(w, h);
     this.mRays.uniforms.uAspect.value = w / h;
+  }
+
+  /** Debug: adapted log2 luminance and the resulting auto-exposure factor. */
+  readAE() {
+    if (!this.rtAdapt) return null;
+    const b = new Uint16Array(4);
+    this.renderer.readRenderTargetPixels(this.rtAdapt[this.adaptIdx], 0, 0, 1, 1, b);
+    const l = THREE.DataUtils.fromHalfFloat(b[0]), P = this.params;
+    return { logLum: l, factor: Math.min(P.aeMax, Math.max(P.aeMin, Math.pow(2, (P.aeKey - l) * P.aeStrength))) };
   }
 
   _pass(material, target) {
@@ -357,6 +428,19 @@ export class PostPipeline {
       const pm = cam.projectionMatrix.elements;
       this.uProj.value.set(pm[0], pm[5], cam.near, cam.far);
       const F = this.mFinal.uniforms;
+      // 1b. auto exposure (log-average luminance, adapted over time; reset on teleports)
+      if (cam.position.distanceToSquared(this._lastCam) > 25) this.aeReset = true;
+      this._lastCam.copy(cam.position);
+      this.uAE.value.set(P.aeKey, P.aeMin, P.aeMax, P.aeStrength);
+      this.mLum.uniforms.tSrc.value = this.rtScene.texture;
+      this.mLum.uniforms.uTexel.value.set(1 / this.rtScene.width, 1 / this.rtScene.height);
+      this._pass(this.mLum, this.rtLum);
+      const A = this.mAdapt.uniforms, src = this.rtAdapt[this.adaptIdx], dst = this.rtAdapt[1 - this.adaptIdx];
+      A.tPrev.value = src.texture; A.uDt.value = Math.min(dt, 0.1); A.uReset.value = this.aeReset || dt <= 0 ? 1 : 0;
+      this._pass(this.mAdapt, dst);
+      this.adaptIdx = 1 - this.adaptIdx;
+      this.tAdapt.value = dst.texture;
+      this.aeReset = false;
       // 2. AO (half res) + separable bilateral blur
       if (this.preset.ao > 0 && P.aoStrength > 0.01) {
         this.mAO.uniforms.uRadius.value = P.aoRadius;

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { applyNightToMaterials, mats } from '../core/materials.js';
-import { MACHINERY_X, DECK_Y, deckAboveY } from '../core/constants.js';
+import { applyNightToMaterials, mats, lightingUniforms } from '../core/materials.js';
+import { MACHINERY_X, DECK_Y, deckAboveY, deckAtY } from '../core/constants.js';
+import { bakeLampVolume, createHalos, isExteriorLamp } from './shiplights.js';
 import { createSky, createInteriorEnvMaterial } from './sky.js';
 import { createOcean } from './ocean.js';
 import { createSmoke } from './smoke.js';
@@ -20,14 +21,16 @@ const STAR_DIR = new THREE.Vector3(0.18, 1.0, 0.12).normalize(); // diffuse star
 const SUN_COLOR = new THREE.Color(0xfff0dc);
 const STAR_COLOR = new THREE.Color(0x7f96c8);
 const SUN_INTENSITY = 3.3, STAR_INTENSITY = 0.22;
-const HEMI_DAY = 0.5, HEMI_NIGHT = 0.28;
+const HEMI_DAY = 0.5, HEMI_NIGHT = 0.5;
 const ENV_DAY = 0.95, ENV_NIGHT = 0.8, ENV_INSIDE = 0.26, ENV_MACHINE = 0.2;
 const FOG_DAY = 0.00016, FOG_NIGHT = 0.0004;
 const AMB_FIRST = 0.05, AMB_OTHER = 0.045, AMB_MACHINE = 0.035;
 const SHADOW_HALF = 55, SHADOW_DIST = 260, SHADOW_STEP = 3;
-const POOL = 14, LAMP_EVERY = 0.12;
-const LAMP_DAY_OUT = 0.6, LAMP_NIGHT_OUT = 14, LAMP_INSIDE = 9;
-const RANGE_INSIDE = 9, RANGE_OUT = 15;
+const POOL = 12, SH_POOL = 2, LAMP_EVERY = 0.12;     // plain lamp lights + shadow-casting lamp lights (fixed counts)
+const LAMP_DAY_OUT = 0.6, LAMP_NIGHT_OUT = 14, LAMP_INSIDE = 9, LAMP_MACHINE = 1.35, VOL_NIGHT = 13;
+const RANGE_INSIDE = 9, RANGE_OUT = 15, RANGE_MACHINE = 13;
+const SH_RANGE = 9, SH_NEAR = 0.3, SH_EVERY = 0.1, SH_MAP = { niedrig: 256, mittel: 512, hoch: 512 };
+const OTHER_ROOM = 5;   // squared-distance penalty of lamps outside the camera's room
 const BUCKET = 8, BUCKET_X0 = -168, BUCKETS = 42, LAMP_SEARCH = 30;
 // share of the sky light that reaches into the interior, per deck (windows / skylights / open doors)
 const DAYLIGHT = { boat: 0.55, A: 0.45, B: 0.35, C: 0.16, D: 0.07, E: 0.03, F: 0.02, G: 0.015, orlop: 0.01, tank: 0.01 };
@@ -42,18 +45,23 @@ function grade(o) {
   return {
     exposure: 1, contrast: 1.05, saturation: 1, vignette: 0.25, grain: 0.012,
     lift: C(0, 0, 0), gain: C(1, 1, 1), bloom: 0.1, bloomThreshold: 1.8, bloomKnee: 0.7,
-    haze: 0, hazeMax: 0.3, hazeColor: C(0, 0, 0), aoStrength: 0.8, aoRadius: 0.7, aoIntensity: 1.2, rays: 0, ...o,
+    haze: 0, hazeMax: 0.3, hazeColor: C(0, 0, 0), aoStrength: 0.8, aoRadius: 0.7, aoIntensity: 1.2, rays: 0,
+    aeKey: -2, aeMin: 1, aeMax: 1, aeStrength: 0, ...o,
   };
 }
+// auto exposure per situation (log2 scene luminance that needs no correction, correction limits, strength):
+// small white cabins / corridors are exposed down so the paint keeps its relief, dark machinery spaces up
+const AE_ROOM = { aeKey: -2.6, aeMin: 0.55, aeMax: 1.6, aeStrength: 0.55 };
+const AE_MACHINE = { aeKey: -3.8, aeMin: 0.7, aeMax: 2.6, aeStrength: 0.65 };
 const GRADES = {
   day: grade({ exposure: 1.0, contrast: 1.07, saturation: 1.03, vignette: 0.2, grain: 0.008, lift: C(0.0, 0.004, 0.012), gain: C(0.985, 1.0, 1.025), bloom: 0.08, bloomThreshold: 2.4, aoStrength: 0.65, aoRadius: 1.1, aoIntensity: 1.0, rays: 0.32 }),
   night: grade({ exposure: 1.55, contrast: 1.12, saturation: 0.92, vignette: 0.38, grain: 0.022, lift: C(0.0, 0.005, 0.016), gain: C(1.02, 0.99, 0.95), bloom: 0.2, bloomThreshold: 1.0, bloomKnee: 0.6, aoStrength: 0.6, aoRadius: 0.9 }),
-  first: grade({ exposure: 1.3, contrast: 1.07, saturation: 1.02, vignette: 0.3, grain: 0.012, lift: C(0.012, 0.006, 0.0), gain: C(1.03, 0.995, 0.93), bloom: 0.14, bloomThreshold: 1.5, haze: 0.022, hazeMax: 0.22, hazeColor: C(0.11, 0.075, 0.042), aoStrength: 0.95, aoRadius: 0.95, aoIntensity: 1.45 }),
-  other: grade({ exposure: 1.25, contrast: 1.06, saturation: 0.9, vignette: 0.32, grain: 0.015, lift: C(0.004, 0.006, 0.007), gain: C(1.0, 1.0, 0.96), bloom: 0.12, bloomThreshold: 1.5, haze: 0.014, hazeMax: 0.18, hazeColor: C(0.07, 0.062, 0.05), aoStrength: 0.95, aoRadius: 0.85, aoIntensity: 1.45 }),
-  machine: grade({ exposure: 1.55, contrast: 1.14, saturation: 0.9, vignette: 0.4, grain: 0.026, lift: C(0.006, 0.006, 0.006), gain: C(1.02, 1.0, 0.95), bloom: 0.18, bloomThreshold: 1.3, haze: 0.03, hazeMax: 0.4, hazeColor: C(0.05, 0.044, 0.036), aoStrength: 1.0, aoRadius: 0.9, aoIntensity: 1.45 }),
-  boiler: grade({ exposure: 1.6, contrast: 1.16, saturation: 0.98, vignette: 0.42, grain: 0.03, lift: C(0.014, 0.006, 0.0), gain: C(1.07, 0.96, 0.84), bloom: 0.24, bloomThreshold: 1.2, haze: 0.045, hazeMax: 0.5, hazeColor: C(0.085, 0.04, 0.015), aoStrength: 1.0, aoRadius: 0.9, aoIntensity: 1.45 }),
+  first: grade({ exposure: 1.3, contrast: 1.07, saturation: 1.02, vignette: 0.3, grain: 0.012, lift: C(0.012, 0.006, 0.0), gain: C(1.03, 0.995, 0.93), bloom: 0.14, bloomThreshold: 1.5, haze: 0.022, hazeMax: 0.22, hazeColor: C(0.11, 0.075, 0.042), aoStrength: 0.95, aoRadius: 0.95, aoIntensity: 1.45, ...AE_ROOM }),
+  other: grade({ exposure: 1.25, contrast: 1.06, saturation: 0.9, vignette: 0.32, grain: 0.015, lift: C(0.004, 0.006, 0.007), gain: C(1.0, 1.0, 0.96), bloom: 0.12, bloomThreshold: 1.5, haze: 0.014, hazeMax: 0.18, hazeColor: C(0.07, 0.062, 0.05), aoStrength: 0.95, aoRadius: 0.85, aoIntensity: 1.45, ...AE_ROOM }),
+  machine: grade({ exposure: 1.55, contrast: 1.1, saturation: 0.9, vignette: 0.38, grain: 0.026, lift: C(0.008, 0.008, 0.008), gain: C(1.02, 1.0, 0.95), bloom: 0.18, bloomThreshold: 1.3, haze: 0.022, hazeMax: 0.3, hazeColor: C(0.05, 0.044, 0.036), aoStrength: 0.9, aoRadius: 0.9, aoIntensity: 1.35, ...AE_MACHINE }),
+  boiler: grade({ exposure: 1.6, contrast: 1.12, saturation: 0.98, vignette: 0.4, grain: 0.03, lift: C(0.016, 0.008, 0.002), gain: C(1.07, 0.96, 0.84), bloom: 0.24, bloomThreshold: 1.2, haze: 0.035, hazeMax: 0.38, hazeColor: C(0.085, 0.04, 0.015), aoStrength: 0.9, aoRadius: 0.9, aoIntensity: 1.35, ...AE_MACHINE }),
 };
-const NUM_KEYS = ['exposure', 'contrast', 'saturation', 'vignette', 'grain', 'bloom', 'bloomThreshold', 'bloomKnee', 'haze', 'hazeMax', 'aoStrength', 'aoRadius', 'aoIntensity', 'rays'];
+const NUM_KEYS = ['exposure', 'contrast', 'saturation', 'vignette', 'grain', 'bloom', 'bloomThreshold', 'bloomKnee', 'haze', 'hazeMax', 'aoStrength', 'aoRadius', 'aoIntensity', 'rays', 'aeKey', 'aeMin', 'aeMax', 'aeStrength'];
 const COL_KEYS = ['lift', 'gain', 'hazeColor'];
 
 export async function build(world) {
@@ -110,7 +118,8 @@ export async function build(world) {
   scene.add(sun, sun.target);
 
   const hemiDaySky = new THREE.Color(0xa9c6f0), hemiDayGround = new THREE.Color(0x4a4840);
-  const hemiNightSky = new THREE.Color(0x1a2850), hemiNightGround = new THREE.Color(0x040508);
+  // night: star light from above, warm bounce of the ship's own deck lighting from below
+  const hemiNightSky = new THREE.Color(0x1c2a52), hemiNightGround = new THREE.Color(0x2a1d12);
   const hemi = new THREE.HemisphereLight(hemiDaySky.clone(), hemiDayGround.clone(), HEMI_DAY);
   hemi.name = 'skyLight';
   const ambWarm = new THREE.Color(0xffc68c), ambMachine = new THREE.Color(0xff9a52), ambOther = new THREE.Color(0xffd8b0);
@@ -118,16 +127,31 @@ export async function build(world) {
   interiorAmbient.name = 'interiorAmbient';
   scene.add(hemi, interiorAmbient);
 
-  // pool of lamp lights (no shadows), physically based inverse-square falloff with a soft range cut-off
+  // pool of lamp lights, physically based inverse-square falloff with a soft range cut-off. The first SH_POOL lights
+  // cast (cube-map) shadows: they take the strongest lamps of the camera's own room; their shadow maps are only
+  // re-rendered when they move to another lamp, with only the zone meshes around them as casters.
   const slots = [];
-  for (let i = 0; i < POOL; i++) {
+  for (let i = 0; i < SH_POOL + POOL; i++) {
+    const shadow = i < SH_POOL;
     const light = new THREE.PointLight(0xffd9a0, 0, RANGE_INSIDE, 2);
-    light.name = 'lampPool' + i;
-    light.castShadow = false;
+    light.name = (shadow ? 'lampShadow' : 'lampPool') + i;
+    light.castShadow = shadow;
+    if (shadow) {
+      const s = light.shadow;
+      s.mapSize.set(SH_MAP[world.quality] || 512, SH_MAP[world.quality] || 512);
+      s.camera.near = SH_NEAR; s.camera.far = SH_RANGE;
+      s.bias = -0.004; s.normalBias = 0.025; s.radius = 1.5;
+      s.autoUpdate = false; s.needsUpdate = false;
+    }
     light.position.set(0, -50, 0);
     scene.add(light);
-    slots.push({ light, lamp: -1, k: 0, want: false, base: 1, flick: 0, seed: i * 1.731 });
+    slots.push({ light, shadow, lamp: -1, k: 0, want: false, base: 1, flick: 0, seed: i * 1.731, room: 1, roomT: 1, dirty: false });
   }
+  const shSlots = slots.slice(0, SH_POOL), plainSlots = slots.slice(SH_POOL);
+
+  // exterior lamps at night: baked volume + glow sprites (see shiplights.js)
+  const halos = createHalos();
+  scene.add(halos.points);
 
   // ---------- PBR environment maps ----------
   let envDay = null, envNight = null, envInside = null, envMachine = null;
@@ -185,7 +209,7 @@ export async function build(world) {
   const UP = new THREE.Vector3(0, 1, 0);
   let lastTx = NaN, lastTz = NaN, lastDir = -1, shadowTimer = 0, shadowStale = true;
   setShadowSize(world.quality || 'hoch');
-  function updateSun(cam, n, ins, dt) {
+  function updateSun(cam, n, ins, dt, hold) {
     const dirKey = n < 0.5 ? 0 : 1;
     const tx = Math.round(cam.x / SHADOW_STEP) * SHADOW_STEP, tz = Math.round(cam.z / SHADOW_STEP) * SHADOW_STEP;
     let need = false;
@@ -208,7 +232,7 @@ export async function build(world) {
     if (shadowTimer <= 0) need = true;
     // deep inside the hull the sun does not matter: skip the shadow-map pass, refresh once when it does again
     const skip = ins > 0.98 && daylight < 0.25;
-    if (skip) { if (need) shadowStale = true; }
+    if (skip || hold) { if (need) shadowStale = true; }
     else if (need || shadowStale) { sun.shadow.needsUpdate = true; shadowTimer = dirKey ? 1.5 : 0.5; shadowStale = false; }
     const dayK = Math.max(0, 1 - 2 * n), nightK = Math.max(0, 2 * n - 1);
     sun.intensity = (SUN_INTENSITY * dayK + STAR_INTENSITY * nightK) * lerp(1, daylight * 0.5, ins);
@@ -218,103 +242,229 @@ export async function build(world) {
   // ---------- lamp pool ----------
   let lampCount = -1;
   let bucketStart = new Int32Array(BUCKETS + 1), bucketItems = new Int32Array(0);
-  const bestI = new Int32Array(POOL), bestD = new Float32Array(POOL), taken = new Uint8Array(POOL), pending = new Int32Array(POOL);
-  let nBest = 0, nPending = 0, lampTimer = 0;
+  let lampRoom = new Int32Array(0), lampExt = new Uint8Array(0);
+  const NB = POOL + SH_POOL;
+  const bestI = new Int32Array(NB), bestD = new Float32Array(NB), taken = new Uint8Array(NB);
+  const pending = new Int32Array(NB), shWant = new Int32Array(SH_POOL), shPending = new Int32Array(SH_POOL);
+  let nBest = 0, nPending = 0, nShWant = 0, nShPending = 0, lampTimer = 0, camRoom = -1, camDeck = 'boat';
   const bucketOf = (x) => Math.max(0, Math.min(BUCKETS - 1, Math.floor((x - BUCKET_X0) / BUCKET)));
   const tmpC = new THREE.Color(), tmpC2 = new THREE.Color();
+  const inMachinery = (x, y) => x > MACHINERY_X[0] && x < MACHINERY_X[1] && y < DECK_Y.F;
 
-  function indexLamps() { // only when the number of lamps changed
+  // rooms (world.rooms, filled by the interior kit) per deck, for "which room is this point in"
+  let roomsByDeck = null, roomCount = -1;
+  function indexRooms() {
+    const rooms = world.rooms || [];
+    roomCount = rooms.length;
+    roomsByDeck = {};
+    rooms.forEach((r, i) => { (roomsByDeck[r.deck] ||= []).push(i); });
+  }
+  function roomOf(deck, x, z) {
+    const list = roomsByDeck?.[deck];
+    if (!list) return -1;
+    const rooms = world.rooms;
+    let best = -1, bestA = Infinity;
+    for (const i of list) {
+      const r = rooms[i];
+      if (x < r.x0 - 0.05 || x > r.x1 + 0.05 || z < r.z0 - 0.05 || z > r.z1 + 0.05) continue;
+      const a = (r.x1 - r.x0) * (Math.min(r.z1, 30) - Math.max(r.z0, -30));
+      if (a < bestA) { bestA = a; best = i; }
+    }
+    return best;
+  }
+  const lampDeck = (L) => (inMachinery(L.x, L.y) ? 'tank' : deckAtY(L.y - 0.5));
+
+  function indexLamps() { // only when the number of lamps / rooms changed
     const lamps = world.lamps;
     lampCount = lamps.length;
+    if ((world.rooms?.length ?? 0) !== roomCount) indexRooms();
     bucketStart.fill(0);
     if (bucketItems.length < lampCount) bucketItems = new Int32Array(lampCount + 256);
     for (let i = 0; i < lampCount; i++) bucketStart[bucketOf(lamps[i].x) + 1]++;
     for (let b = 0; b < BUCKETS; b++) bucketStart[b + 1] += bucketStart[b];
     const cursor = bucketStart.slice(0, BUCKETS);
     for (let i = 0; i < lampCount; i++) bucketItems[cursor[bucketOf(lamps[i].x)]++] = i;
+    lampRoom = new Int32Array(lampCount); lampExt = new Uint8Array(lampCount);
+    for (let i = 0; i < lampCount; i++) {
+      const L = lamps[i];
+      lampExt[i] = isExteriorLamp(L) ? 1 : 0;
+      lampRoom[i] = lampExt[i] ? -2 : roomOf(lampDeck(L), L.x, L.z);
+    }
     for (const s of slots) if (s.lamp >= lampCount) { s.lamp = -1; s.want = false; }
   }
 
-  function selectLamps(cam) {
+  function selectLamps(cam, n, ins) {
     const lamps = world.lamps;
-    if (lamps.length !== lampCount) indexLamps();
+    if (lamps.length !== lampCount || (world.rooms?.length ?? 0) !== roomCount) indexLamps();
     nBest = 0;
-    // only lamps of the camera's own deck: without shadows, lamps under the floor / above the ceiling would leak
-    const deck = world.state.deck in DECK_Y ? world.state.deck : 'boat';
-    const y0 = DECK_Y[deck] - 0.25, y1 = deckAboveY(deck) + 0.1;
+    // only lamps of the camera's own deck: lamps under the floor / above the ceiling would leak
+    camDeck = inMachinery(cam.x, cam.y - 1.2) ? 'tank' : (world.state.deck in DECK_Y ? world.state.deck : 'boat');
+    camRoom = ins > 0.5 ? roomOf(camDeck, cam.x, cam.z) : -1;
+    const y0 = DECK_Y[camDeck] - 0.25, y1 = deckAboveY(camDeck) + 0.1;
+    const vK = camDeck === 'tank' ? 1.5 : 4;            // other heights count several times as far (tall machinery spaces less)
+    const skipExt = n > 0.5;                            // at night the exterior lamps come from the baked volume
     const j0 = bucketStart[bucketOf(cam.x - LAMP_SEARCH)], j1 = bucketStart[bucketOf(cam.x + LAMP_SEARCH) + 1];
     for (let j = j0; j < j1; j++) {
       const idx = bucketItems[j], L = lamps[idx];
       if (L.y < y0 || L.y > y1) continue;
-      const dx = L.x - cam.x, dy = (L.y - cam.y) * 4, dz = L.z - cam.z; // other decks count four times as far
-      const d = dx * dx + dy * dy + dz * dz;
+      if (skipExt && lampExt[idx]) continue;
+      const dx = L.x - cam.x, dy = (L.y - cam.y) * vK, dz = L.z - cam.z;
+      let d = dx * dx + dy * dy + dz * dz;
+      if (camRoom >= 0 && lampRoom[idx] !== camRoom) d *= OTHER_ROOM;
       if (d > 1500) continue;
-      if (nBest < POOL || d < bestD[nBest - 1]) {
-        let p = nBest < POOL ? nBest++ : POOL - 1;
+      if (nBest < NB || d < bestD[nBest - 1]) {
+        let p = nBest < NB ? nBest++ : NB - 1;
         while (p > 0 && bestD[p - 1] > d) { bestD[p] = bestD[p - 1]; bestI[p] = bestI[p - 1]; p--; }
         bestD[p] = d; bestI[p] = idx;
       }
     }
+    // shadow lights: the nearest lamps of the camera's own room (indoors only)
+    nShWant = 0;
+    if (ins > 0.5) {
+      for (let q = 0; q < nBest && nShWant < SH_POOL; q++) {
+        const idx = bestI[q];
+        if (bestD[q] > 64 || lampExt[idx]) continue;
+        if (camRoom >= 0 && lampRoom[idx] !== camRoom) continue;
+        shWant[nShWant++] = idx;
+      }
+    }
+    const isSh = (idx) => { for (let q = 0; q < nShWant; q++) if (shWant[q] === idx) return true; return false; };
+    // shadow slots keep their lamp if still wanted
+    nShPending = 0;
+    for (const s of shSlots) s.want = s.lamp >= 0 && isSh(s.lamp);
+    for (let q = 0; q < nShWant; q++) if (!shSlots.some((s) => s.want && s.lamp === shWant[q])) shPending[nShPending++] = shWant[q];
+    // plain slots: everything else (a lamp owned by a shadow slot is not lit twice)
+    const shOwned = (idx) => shSlots.some((s) => s.lamp === idx && (s.want || s.k > 0));
     taken.fill(0);
-    for (const s of slots) {
+    for (const s of plainSlots) {
       s.want = false;
       if (s.lamp < 0) continue;
-      for (let q = 0; q < nBest; q++) if (bestI[q] === s.lamp) { s.want = true; taken[q] = 1; break; }
+      for (let q = 0; q < nBest; q++) if (bestI[q] === s.lamp && !isSh(s.lamp)) { s.want = true; taken[q] = 1; break; }
     }
     nPending = 0;
-    for (let q = 0; q < nBest; q++) if (!taken[q]) pending[nPending++] = bestI[q];
+    for (let q = 0; q < nBest && nPending < POOL; q++) if (!taken[q] && !isSh(bestI[q]) && !shOwned(bestI[q])) pending[nPending++] = bestI[q];
+    for (const s of slots) if (s.lamp >= 0) s.roomT = camRoom < 0 || lampRoom[s.lamp] === camRoom ? 1 : 0.5;
+  }
+
+  function assign(s, idx) {
+    const L = world.lamps[idx];
+    if (!L) { s.lamp = -1; return; }
+    s.lamp = idx; s.want = true;
+    // keep the point light well below the fixture / ceiling (no burnt hot spots on the ceiling)
+    const drop = lampExt[idx] ? 0.22 : 0.4;
+    s.light.position.set(L.x, L.y - drop, L.z);
+    tmpC.set(L.color ?? 0xffd9a0);
+    s.light.color.copy(tmpC);
+    // fire / furnace glows flicker strongly, a few electric lamps very slightly
+    s.flick = tmpC.r > 0.9 && tmpC.b < 0.4 ? 1 : ((idx * 2654435761) >>> 0) % 11 === 0 ? 0.12 : 0;
+    s.base = Number.isFinite(L.intensity) ? L.intensity : 1;
+    if (s.flick === 1) s.base *= 1.6;
+    s.roomT = camRoom < 0 || lampRoom[idx] === camRoom ? 1 : 0.5;
+    s.room = s.roomT;
+    if (s.shadow) s.dirty = true;
   }
 
   function updateLamps(cam, dt, n, ins) {
     lampTimer -= dt;
-    if (lampTimer <= 0) { lampTimer = LAMP_EVERY; selectLamps(cam); }
-    const scale = lerp(lerp(LAMP_DAY_OUT, LAMP_NIGHT_OUT, n), LAMP_INSIDE, ins);
-    const range = lerp(RANGE_OUT, RANGE_INSIDE, ins);
-    const lamps = world.lamps;
-    let next = 0;
+    if (lampTimer <= 0) { lampTimer = LAMP_EVERY; selectLamps(cam, n, ins); }
+    const mach = machineLin;
+    const scale = lerp(lerp(LAMP_DAY_OUT, LAMP_NIGHT_OUT, n), LAMP_INSIDE * lerp(1, LAMP_MACHINE, mach), ins);
+    const range = lerp(RANGE_OUT, lerp(RANGE_INSIDE, RANGE_MACHINE, mach), ins);
+    let next = 0, shNext = 0;
     for (const s of slots) {
       if (s.want) {
         s.k = Math.min(1, s.k + dt * 3);
       } else {
         s.k = Math.max(0, s.k - dt * 4);
         if (s.k === 0) {
-          if (next < nPending) {
-            const idx = pending[next++], L = lamps[idx];
-            if (L) {
-              s.lamp = idx; s.want = true;
-              s.light.position.set(L.x, L.y - 0.22, L.z); // keep the point light off the ceiling (no burnt hot spots)
-              tmpC.set(L.color ?? 0xffd9a0);
-              s.light.color.copy(tmpC);
-              // fire / furnace glows flicker strongly, a few electric lamps very slightly
-              s.flick = tmpC.r > 0.9 && tmpC.b < 0.4 ? 1 : ((idx * 2654435761) >>> 0) % 11 === 0 ? 0.12 : 0;
-              s.base = Number.isFinite(L.intensity) ? L.intensity : 1;
-              if (s.flick === 1) s.base *= 1.6;
-            }
-          } else {
-            s.lamp = -1;
-          }
+          if (s.shadow) { if (shNext < nShPending) assign(s, shPending[shNext++]); else s.lamp = -1; }
+          else if (next < nPending) assign(s, pending[next++]);
+          else s.lamp = -1;
         }
       }
+      s.room = approach(s.room, s.roomT, dt * 1.5);
       let f = 1;
       if (s.flick > 0) {
         const t = time * (s.flick === 1 ? 9 : 23) + s.seed * 10;
         const w = Math.sin(t) * 0.5 + Math.sin(t * 2.31 + 1.7) * 0.3 + Math.sin(t * 5.13 + 0.4) * 0.2;
         f = 1 - s.flick * 0.28 * (0.5 + 0.5 * w);
       }
-      s.light.intensity = smooth(s.k) * s.base * scale * f;
-      s.light.distance = range;
+      s.light.intensity = s.lamp < 0 ? 0 : smooth(s.k) * s.base * scale * f * s.room;
+      s.light.distance = s.shadow ? Math.min(range, SH_RANGE) : range;
     }
-    if (next > 0) { // remove the lamps that were just assigned from the pending list
-      for (let q = next; q < nPending; q++) pending[q - next] = pending[q];
-      nPending -= next;
+    if (next > 0) { for (let q = next; q < nPending; q++) pending[q - next] = pending[q]; nPending -= next; }
+    if (shNext > 0) { for (let q = shNext; q < nShPending; q++) shPending[q - shNext] = shPending[q]; nShPending -= shNext; }
+  }
+
+  // ---------- shadow casters for the lamp shadows ----------
+  // The static scene is baked per zone. Only zone meshes near a shadow light cast into its cube map; the exterior
+  // casters (hull, superstructure) are switched off in the frames where a lamp shadow map is rendered, and the sun
+  // shadow is never rendered in the same frame.
+  let castersReady = false, extCasters = [], zoneCasters = new Map(), activeZones = new Set(), mode = 'sun', shTimer = 0;
+  const NO_CAST = new Set(['glass', 'lampGlow', 'fire', 'navRed', 'navGreen', 'windowLit']);
+  function prepareCasters() {
+    castersReady = true;
+    extCasters = [];
+    const walk = (o) => {
+      if (o === world.interior) return;
+      if ((o.isMesh || o.isPoints) && o.castShadow) extCasters.push(o);
+      for (const c of o.children) walk(c);
+    };
+    walk(scene);
+    for (const g of world.zones.values()) {
+      const list = [];
+      g.traverse((o) => {
+        if (!o.isMesh) return;
+        o.receiveShadow = true;
+        o.castShadow = false;
+        const m = o.material;
+        if (Array.isArray(m) || !m || m.transparent || NO_CAST.has(m.name) || !(m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) return;
+        list.push(o);
+      });
+      zoneCasters.set(g, list);
     }
+  }
+  function setMode(m, lights) {
+    if (m === 'sun') {
+      for (const o of extCasters) o.castShadow = true;
+      for (const g of activeZones) for (const o of zoneCasters.get(g)) o.castShadow = false;
+      activeZones.clear();
+    } else {
+      for (const o of extCasters) o.castShadow = false;
+      const want = new Set();
+      for (const s of lights) {
+        const p = s.light.position;
+        for (const g of world.zones.values()) {
+          const u = g.userData;
+          if (p.x + SH_RANGE < u.x0 || p.x - SH_RANGE > u.x1 || p.y + SH_RANGE < u.yMin || p.y - SH_RANGE > u.yMax + 0.4) continue;
+          want.add(g);
+        }
+      }
+      for (const g of activeZones) if (!want.has(g)) for (const o of zoneCasters.get(g)) o.castShadow = false;
+      for (const g of want) if (!activeZones.has(g)) for (const o of zoneCasters.get(g)) o.castShadow = true;
+      activeZones = want;
+    }
+    mode = m;
+  }
+  /** Returns true if lamp shadow maps are rendered this frame (the sun shadow must then wait). */
+  function updateLampShadows(dt) {
+    if (!castersReady) return false;
+    if (mode !== 'sun') setMode('sun');
+    shTimer -= dt;
+    if (shTimer > 0) return false;
+    const due = shSlots.filter((s) => s.dirty && s.lamp >= 0);
+    if (!due.length) return false;
+    setMode('lamp', due);
+    for (const s of due) { s.dirty = false; s.light.shadow.needsUpdate = true; }
+    shTimer = SH_EVERY;
+    return true;
   }
 
   // ---------- situation ----------
   const sit = { machine: 0, firstCls: 0 };
   function situation(cam) {
     const d = world.state.deck;
-    sit.machine = (d === 'tank' && cam.x > MACHINERY_X[0] && cam.x < MACHINERY_X[1]) ? 1 : 0;
+    sit.machine = inMachinery(cam.x, cam.y - 1.2) ? 1 : 0;
     sit.firstCls = !sit.machine && (d === 'boat' || d === 'A' || d === 'B' || d === 'C' || d === 'D') && cam.x > -38 ? 1 : 0;
     return sit;
   }
@@ -361,7 +511,17 @@ export async function build(world) {
     time += dt;
     const cam = world.camera;
     if (cam) camPos.copy(cam.position);
-    if (world.quality !== lastQuality) { lastQuality = world.quality; setShadowSize(lastQuality); }
+    if (world.quality !== lastQuality) {
+      lastQuality = world.quality;
+      setShadowSize(lastQuality);
+      const ms = SH_MAP[lastQuality] || 512;
+      for (const s of shSlots) {
+        if (s.light.shadow.mapSize.x === ms) continue;
+        s.light.shadow.mapSize.set(ms, ms);
+        if (s.light.shadow.map) { s.light.shadow.map.dispose(); s.light.shadow.map = null; }
+        s.dirty = true;
+      }
+    }
 
     nightLin = approach(nightLin, nightTarget, dt / 2.0);
     insideLin = approach(insideLin, world.state.inside ? 1 : 0, dt / 0.6);
@@ -381,15 +541,23 @@ export async function build(world) {
     const pxScale = h / (2 * Math.tan((fov * Math.PI) / 360));
 
     // lights
-    const sunI = updateSun(camPos, n, ins, dt);
+    updateLamps(camPos, dt, n, ins);
+    const lampShadowFrame = updateLampShadows(dt);
+    const sunI = updateSun(camPos, n, ins, dt, lampShadowFrame);
     const dayIn = lerp(1, daylight, ins);
+    // the ship's own exterior lighting at night (baked lamp volume, window glow, lamp sprites)
+    lightingUniforms.uShipVolK.value = VOL_NIGHT * n;
+    lightingUniforms.uWinGlow.value = n * (1 - ins);
+    lightingUniforms.uShipAmb.value.setRGB(0.046, 0.036, 0.026).multiplyScalar(n * (1 - ins));
+    halos.points.visible = n > 0.01;
+    halos.material.uniforms.uK.value = n * 6;
+    halos.material.uniforms.uScale.value = pxScale;
     hemi.color.lerpColors(hemiDaySky, hemiNightSky, n);
     hemi.groundColor.lerpColors(hemiDayGround, hemiNightGround, n);
     hemi.intensity = lerp(HEMI_DAY, HEMI_NIGHT, n) * dayIn;
     const amb = lerp(lerp(AMB_OTHER, AMB_FIRST, firstLin), AMB_MACHINE, machineLin);
     interiorAmbient.color.copy(ambOther).lerp(ambWarm, firstLin).lerp(ambMachine, machineLin);
     interiorAmbient.intensity = amb * ins;
-    updateLamps(camPos, dt, n, ins);
     let fireI = 0, allI = 1e-3;
     for (const s of slots) { allI += s.light.intensity; if (s.flick === 1) fireI += s.light.intensity; }
     fireLin = approach(fireLin, Math.min(1, (fireI / allI) * 2.5), dt / 1.5);
@@ -433,6 +601,21 @@ export async function build(world) {
     // rooms with lots of daylight (boat deck / A deck) keep part of the cool exterior grade
     blendGrade(dt, n, ins * (1 - 0.75 * daylight * (1 - n)));
   }
+
+  // once every module is built and baked (called by the app before the first frame)
+  world.onAfterBake = () => {
+    try {
+      const t0 = performance.now();
+      world.exterior.updateMatrixWorld(true);
+      const nLamps = bakeLampVolume(world.lamps);
+      halos.rebuild(world);
+      prepareCasters();
+      lampCount = -1; // re-index lamps (rooms are known now)
+      console.info(`[environment] ${nLamps} exterior lamps baked, casters prepared in ${(performance.now() - t0).toFixed(0)} ms`);
+    } catch (e) {
+      console.warn('[environment] after-bake setup failed', e);
+    }
+  };
 
   update(0);
   return { update };

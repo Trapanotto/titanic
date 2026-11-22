@@ -4,7 +4,7 @@ import { mats } from '../core/materials.js';
 import { DECK_Y, STAIRS, MACHINERY_ACCESS, SLAB, ceilingY } from '../core/constants.js';
 import { Batch, kitMats, overlap } from './batch.js';
 import { def, place } from './props-core.js';
-import { ceilingLight, ceilingRose } from './props-decor.js';
+import { ceilingLight, ceilingRose, chandelier, pilaster, sconce } from './props-decor.js';
 
 const RISER = 0.18;
 const RAIL_H = 0.92;
@@ -13,44 +13,69 @@ const T = 0.04; // half thickness of closure walls
 /** The +x end of each MACHINERY_ACCESS opening is the open (step-off) end; the other three sides get a railing. */
 export const MACHINERY_ACCESS_OPEN_END = '+x';
 
+/** Width of the panelled wall / gallery band along the long sides of an imperial well (inside `lane`). */
+export const IMP_BAND = 0.08;
+export const isImperial = (st) => st.type === 'imperial';
+/**
+ * Plan geometry of an imperial (split) staircase, see constants.js: back = aft face of the pier, x0 = landing back
+ * wall, xl = front edge of the half-landing, xf = foot / arrival line, hw = outer half width (= keep-out), hwi = inner
+ * half width of the well (= floor hole), cw = half width of the central flight, side flights cw + gap .. hwi.
+ */
+export function imperialPlan(st) {
+  return { back: st.back, x0: st.x0, xl: st.x0 + st.landing, xf: st.x1, hw: st.lane, hwi: st.lane - IMP_BAND, cw: st.cw, g: st.gap, gc: st.cw + st.gap / 2, zc: st.zc };
+}
+
 let _flights = null;
-/** All flights of all stairs with their geometry (see constants.js for the convention). */
+/**
+ * All flights of all stairs with their geometry (see constants.js for the convention). Scissor stairs: one entry per
+ * flight. Imperial stairs: one entry per deck interval (`type: 'imperial'`, central flight + landing + two side flights,
+ * fields of imperialPlan() plus y0, ym = half-landing height, y1).
+ */
 export function stairFlights() {
   if (_flights) return _flights;
   _flights = [];
   for (const st of STAIRS) {
     for (let k = 0; k < st.decks.length - 1; k++) {
+      const base = { st, k, from: st.decks[k], to: st.decks[k + 1], y0: DECK_Y[st.decks[k]], y1: DECK_Y[st.decks[k + 1]], first: k === 0, last: k === st.decks.length - 2 };
+      if (isImperial(st)) { _flights.push({ ...base, type: 'imperial', ym: (base.y0 + base.y1) / 2, ...imperialPlan(st) }); continue; }
       const even = k % 2 === 0;
       _flights.push({
-        st, k, from: st.decks[k], to: st.decks[k + 1], y0: DECK_Y[st.decks[k]], y1: DECK_Y[st.decks[k + 1]],
+        ...base, type: 'scissor',
         xb: even ? st.x0 : st.x1, xt: even ? st.x1 : st.x0, dir: even ? 1 : -1, side: even ? -1 : 1,
         z0: even ? st.zc - st.lane : st.zc, z1: even ? st.zc : st.zc + st.lane,
-        zo: even ? st.zc - st.lane : st.zc + st.lane, zc: st.zc, last: k === st.decks.length - 2,
+        zo: even ? st.zc - st.lane : st.zc + st.lane, zc: st.zc,
       });
     }
   }
   return _flights;
 }
 
-/** Openings in the FLOOR of `deck`: lane rectangle of every flight arriving from below (+ machinery access on F). */
+/** well rectangle (floor hole) of an imperial interval */
+const wellRect = (f) => ({ id: f.st.id, x0: f.x0, x1: f.xf, z0: f.zc - f.hwi, z1: f.zc + f.hwi });
+
+/** Openings in the FLOOR of `deck`: lane rectangle of every flight arriving from below / imperial well (+ machinery access on F). */
 export function stairHoles(deck) {
-  const out = stairFlights().filter((f) => f.to === deck).map((f) => ({ id: f.st.id, x0: f.st.x0, x1: f.st.x1, z0: f.z0, z1: f.z1 }));
+  const out = stairFlights().filter((f) => f.to === deck).map((f) => (f.type === 'imperial' ? wellRect(f) : { id: f.st.id, x0: f.st.x0, x1: f.st.x1, z0: f.z0, z1: f.z1 }));
   if (deck === 'F') for (const m of MACHINERY_ACCESS) out.push({ id: m.id, x0: m.x0, x1: m.x1, z0: m.z0, z1: m.z1 });
   return out;
 }
-/** Lane rectangles occupied by the (enclosed) flights that RISE from `deck`. */
+/** Rectangles occupied by the flights that RISE from `deck` (scissor: the enclosed lane; imperial: the whole well). */
 export function stairSolids(deck) {
-  return stairFlights().filter((f) => f.from === deck).map((f) => ({ id: f.st.id, x0: f.st.x0, x1: f.st.x1, z0: f.z0, z1: f.z1 }));
+  return stairFlights().filter((f) => f.from === deck).map((f) => (f.type === 'imperial' ? wellRect(f) : { id: f.st.id, x0: f.st.x0, x1: f.st.x1, z0: f.z0, z1: f.z1 }));
 }
-/** Rectangles deck layouts must keep free of walls and furniture (both lanes, +2 m in x, +0.3 m in z). */
+/** Rectangles deck layouts must keep free of walls and furniture (scissor: both lanes, +2 m in x, +0.3 m in z; imperial: `keep`). */
 export function stairKeepouts(deck) {
-  const out = STAIRS.filter((s) => s.decks.includes(deck)).map((s) => ({ id: s.id, x0: s.x0 - 2, x1: s.x1 + 2, z0: s.zc - s.lane - 0.3, z1: s.zc + s.lane + 0.3 }));
+  const out = STAIRS.filter((s) => s.decks.includes(deck)).map((s) => (isImperial(s)
+    ? { id: s.id, x0: s.keep.x0, x1: s.keep.x1, z0: s.zc - s.keep.hw, z1: s.zc + s.keep.hw }
+    : { id: s.id, x0: s.x0 - 2, x1: s.x1 + 2, z0: s.zc - s.lane - 0.3, z1: s.zc + s.lane + 0.3 }));
   if (deck === 'F') for (const m of MACHINERY_ACCESS) out.push({ id: m.id, x0: m.x0 - 0.4, x1: m.x1 + 1.6, z0: m.z0 - 0.4, z1: m.z1 + 0.4 });
   return out;
 }
-/** Landing points (free floor at both ends of each stair) on a deck: [{id,x,z}]. */
+/** Landing points (free floor at both ends of each scissor stair, in front of the foot of an imperial one) on a deck: [{id,x,z}]. */
 export function stairLandings(deck) {
-  return STAIRS.filter((s) => s.decks.includes(deck)).flatMap((s) => [{ id: s.id, x: s.x0 - 1, z: s.zc }, { id: s.id, x: s.x1 + 1, z: s.zc }]);
+  return STAIRS.filter((s) => s.decks.includes(deck)).flatMap((s) => (isImperial(s)
+    ? [{ id: s.id, x: s.x1 + 1.0, z: s.zc }]
+    : [{ id: s.id, x: s.x0 - 1, z: s.zc }, { id: s.id, x: s.x1 + 1, z: s.zc }]));
 }
 /** true if `rect` {x0,x1,z0,z1} does not touch a stair keep-out of `deck`; otherwise warns (with `label`) and returns false. */
 export function assertClear(deck, rect, label = 'rect') {
@@ -162,6 +187,7 @@ function railX(world, deck, b, S, xa, ya, xe, ye, zz, cut = null) {
   }
   const l = Math.hypot(dx, dy);
   b.sweep(S.rail, RAIL[S.newel === 'grand' ? 'grand' : 'oak'], [xa, ya + RAIL_H, zz], [dx / l, dy / l, 0], [0, 0, 1], [0, 1, 0], l, [true, true]);
+  if (level) for (const [x, s] of [[xa, -Math.sign(dx)], [xc, Math.sign(dx)]]) b.wallZ(S.rail, x, zz - 0.05, zz + 0.05, ya, ya + 0.05, s); // ends of the base rail
   if (!level) {
     if (S.infill === 'baluster') {
       const n = Math.max(1, Math.round(L / 0.14)), h = Math.round((RAIL_H - S.cl - 0.035) * 20) / 20;
@@ -282,58 +308,402 @@ function fixture(world, deck, x, z, cy, grand) {
   world.addLamp({ x, y: cy - 0.3, z, intensity: grand ? 1.3 : 1 });
 }
 
-/** bronze cherub holding a torch lamp (newel of the A-deck grand staircase) – origin = top of the newel */
-const cherubLamp = def('cherubLamp', [0.3, 0.3, 0.95], (p) => {
+
+// ------------------------------------------------------------------------------------------------ figures and art
+
+/** soften a relief part: squash it towards the wall plane x = 0 (relief depth factor k) */
+const flat = (m, k) => { m.position.x *= k; m.scale.x *= k; return m; };
+
+/**
+ * Bronze cherub (putto) holding a torch lamp on the newel at the foot of the central flight – origin = top of the newel,
+ * faces +x. Figure ≈ 0.76 m from plinth to the top of the curls, torch flame at ≈ 1.25 m.
+ */
+const cherubLamp = def('cherubLamp2', [0.36, 0.36, 1.3], (p) => {
   const B = kitMats.bronze;
-  p.lathe(B, [[0, 0], [0.1, 0], [0.1, 0.02], [0.08, 0.04], [0.07, 0.07], [0.09, 0.09], [0, 0.09]], 0, 0, 0, 16);
-  // legs (one forward), torso, head with curls, arms – the raised right arm holds the torch
-  p.loft(B, [[-0.03, 0.09, 0.03], [-0.035, 0.16, 0.035], [-0.02, 0.22, 0.03], [-0.01, 0.28, 0.025]], [0.022, 0.026, 0.03, 0.034], 8);
-  p.loft(B, [[0.05, 0.1, -0.03], [0.04, 0.15, -0.035], [0.0, 0.2, -0.03], [-0.01, 0.27, -0.025]], [0.02, 0.025, 0.03, 0.034], 8);
-  p.pil(B, 0.13, 0.16, 0.12, -0.01, 0.25, 0, 0.7, 0.8, 5, 12);
-  p.pil(B, 0.1, 0.07, 0.11, 0.0, 0.38, 0, 0.8, 0.8, 4, 10);
-  p.s(B, 0.062, 0.0, 0.47, 0, 1, 1.05, 1, false);
-  for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; p.s(B, 0.022, Math.cos(a) * 0.045 - 0.01, 0.5 + Math.sin(a * 2) * 0.01, Math.sin(a) * 0.045, 1, 1, 1); }
-  p.loft(B, [[0.0, 0.42, -0.055], [0.04, 0.5, -0.07], [0.07, 0.6, -0.06], [0.09, 0.68, -0.04]], [0.022, 0.02, 0.018, 0.016], 7);
-  p.loft(B, [[0.0, 0.42, 0.055], [0.05, 0.38, 0.08], [0.09, 0.34, 0.07]], [0.022, 0.019, 0.016], 7);
-  // wings (feathered, extruded) on the back
-  for (const s of [-1, 1]) {
-    const w = p.extZ(B, [[0, 0], [0.05, 0.03], [0.1, 0.1], [0.13, 0.19], [0.1, 0.16], [0.08, 0.17], [0.06, 0.13], [0.04, 0.13], [0.02, 0.08]], 0.012, -0.05, 0.36, s * 0.04, 0.004);
-    w.rotation.set(0, Math.PI + s * 0.5, 0.2);
+  p.lathe(B, [[0, 0], [0.13, 0], [0.13, 0.025], [0.11, 0.045], [0.095, 0.08], [0.115, 0.1], [0.12, 0.115], [0, 0.115]], 0, 0, 0, 24);
+  const y0 = 0.115;
+  // legs (weight on the left leg, right leg a little forward), plump feet
+  p.loft(B, [[-0.02, y0 + 0.02, 0.05], [-0.018, y0 + 0.1, 0.052], [-0.012, y0 + 0.17, 0.056], [-0.005, y0 + 0.24, 0.058], [0, y0 + 0.31, 0.055]], [0.03, 0.036, 0.046, 0.058, 0.066], 14);
+  p.loft(B, [[0.07, y0 + 0.02, -0.055], [0.062, y0 + 0.09, -0.058], [0.045, y0 + 0.16, -0.06], [0.022, y0 + 0.24, -0.058], [0.005, y0 + 0.31, -0.055]], [0.029, 0.035, 0.046, 0.058, 0.066], 14);
+  p.s(B, 0.036, -0.0, y0 + 0.02, 0.05, 1.7, 0.6, 1.05, false); p.s(B, 0.034, 0.1, y0 + 0.02, -0.055, 1.7, 0.6, 1.05, false);
+  for (const z of [-0.055, 0.055]) p.s(B, 0.05, 0.02, y0 + 0.17, z, 1, 0.8, 1, false); // knees
+  // chubby belly, chest, shoulders
+  p.s(B, 0.135, 0.0, y0 + 0.36, 0, 0.82, 0.95, 1.0, false);
+  p.s(B, 0.115, 0.0, y0 + 0.47, 0, 0.78, 0.85, 1.05, false);
+  for (const z of [-0.095, 0.095]) p.s(B, 0.048, -0.005, y0 + 0.515, z, 1, 0.9, 1, false);
+  p.c(B, 0.045, 0.06, 0, y0 + 0.54, 0, 12);
+  // head: face, cheeks, nose, curls
+  const hy = y0 + 0.655;
+  p.s(B, 0.1, 0.005, hy, 0, 0.98, 1.04, 0.94, false);
+  for (const z of [-0.042, 0.042]) p.s(B, 0.034, 0.072, hy - 0.03, z, 0.7, 0.8, 0.8, false);
+  p.s(B, 0.016, 0.1, hy - 0.005, 0, 1, 0.8, 0.8, false);
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2, ring = i % 2;
+    p.s(B, 0.034 - ring * 0.006, -0.01 + Math.cos(a) * (0.06 + ring * 0.015), hy + 0.06 + Math.sin(a * 2) * 0.012 - ring * 0.02, Math.sin(a) * (0.07 + ring * 0.012), 1, 1, 1, false);
   }
-  // torch with glass flame
-  p.lathe(mats.gold, [[0, 0], [0.012, 0], [0.01, 0.14], [0.03, 0.17], [0.035, 0.19], [0, 0.19]], 0.09, 0.66, -0.04, 10);
-  p.lathe(mats.lampGlow, [[0, 0], [0.03, 0], [0.042, 0.04], [0.035, 0.09], [0.015, 0.13], [0, 0.15]], 0.09, 0.85, -0.04, 12);
+  // arms: right arm (−z) raised high with the torch, left arm lowered gathering the drapery
+  p.loft(B, [[0.0, y0 + 0.52, -0.11], [0.02, y0 + 0.6, -0.15], [0.04, y0 + 0.7, -0.165], [0.05, y0 + 0.8, -0.15], [0.055, y0 + 0.86, -0.135]], [0.044, 0.038, 0.034, 0.032, 0.03], 12);
+  p.s(B, 0.032, 0.055, y0 + 0.875, -0.13, 1, 1, 1, false);
+  p.loft(B, [[0.0, y0 + 0.51, 0.11], [0.025, y0 + 0.44, 0.15], [0.055, y0 + 0.38, 0.15], [0.085, y0 + 0.35, 0.12]], [0.044, 0.038, 0.034, 0.03], 12);
+  p.s(B, 0.03, 0.09, y0 + 0.345, 0.11, 1, 1, 1, false);
+  // drapery sash from the left hand across the hips and over the right shoulder
+  p.tube(B, [[0.09, y0 + 0.34, 0.1], [0.11, y0 + 0.3, 0.02], [0.1, y0 + 0.33, -0.08], [0.06, y0 + 0.45, -0.12], [0.0, y0 + 0.55, -0.1], [-0.08, y0 + 0.5, -0.05], [-0.1, y0 + 0.3, -0.02]], 0.022, 24, 6);
+  // feathered wings on the back
+  for (const s of [-1, 1]) {
+    for (const [sc, yo, d] of [[1, 0, 0], [0.72, -0.05, 0.02]]) {
+      const w = p.extX(B, [[0, 0], [0.07, 0.06], [0.15, 0.16], [0.2, 0.28], [0.21, 0.36], [0.17, 0.31], [0.16, 0.34], [0.12, 0.27], [0.1, 0.29], [0.07, 0.21], [0.045, 0.21], [0.02, 0.12]].map(([a, b]) => [-s * a * sc, b * sc]), 0.014, -0.075 - d, y0 + 0.43 + yo, s * 0.035, 0.004);
+      w.rotation.y -= s * 0.55; // (extX: outline a → world −z; swept back a little)
+    }
+  }
+  // torch: fluted gilt holder and a cut-glass flame
+  p.lathe(mats.gold, [[0, 0], [0.018, 0], [0.014, 0.05], [0.014, 0.17], [0.035, 0.2], [0.05, 0.24], [0.046, 0.255], [0, 0.255]], 0.055, y0 + 0.83, -0.13, 12);
+  p.rev(kitMats.cutGlass, [{ o: 0.0, y: y0 + 1.08, m: 0 }, { o: 0.05, y: y0 + 1.1, m: 0.005 }, { o: 0.058, y: y0 + 1.15, m: 0.006 }, { o: 0.04, y: y0 + 1.21, m: 0.004 }, { o: 0.0, y: y0 + 1.26, m: 0 }], { seg: 16, k: 8 }, 0.055, 0, -0.13);
 });
 
-/** "Honour and Glory crowning Time": carved relief panel w × h with clock, two winged figures, laurel, carved frame; faces +x */
-const honourGlory = def('honourGlory', (o) => [o.w ?? 2, 0.2, o.h ?? 1.3], (p, o) => {
-  const w = o.w ?? 2, h = o.h ?? 1.3, W = mats.oak, Dk = mats.woodDark;
-  p.b(W, 0.03, h, w, 0.015, 0, 0);
-  // carved frame (moulded) and broken pediment
-  for (const [y, sy] of [[0, 0.07], [h - 0.07, 0.07]]) p.bb(W, 0.06, sy, w + 0.14, 0.03, y, 0, 0.015);
-  for (const s of [-1, 1]) p.bb(W, 0.06, h, 0.07, 0.03, 0, s * (w / 2 + 0.035), 0.015);
-  p.extX(W, [[-w / 2 - 0.07, 0], [w / 2 + 0.07, 0], [w / 2 + 0.07, 0.05], [0.25, 0.22], [0.18, 0.18], [w / 2 - 0.05, 0.05], [-w / 2 + 0.05, 0.05], [-0.18, 0.18], [-0.25, 0.22], [-w / 2 - 0.07, 0.05]], 0.08, 0.04, h, 0, 0.008);
-  // clock: carved case, dial, hands
-  const cy = h * 0.55;
-  p.latheX(W, [[0, 0], [0.24, 0], [0.25, 0.02], [0.22, 0.05], [0.2, 0.06], [0, 0.06]], 0.03, cy, 0, 24);
-  p.latheX(mats.gold, [[0.17, 0], [0.19, 0.005], [0.18, 0.015], [0.16, 0.012]], 0.09, cy, 0, 24);
-  p.cx(kitMats.clockFace, 0.165, 0.006, 0.093, cy, 0, 24);
-  const hand = (len, a, t) => { const m = p.b(Dk, 0.004, len, t, 0.1, 0, 0); m.position.set(0.1, cy + (Math.cos(a) * len) / 2, (-Math.sin(a) * len) / 2); m.rotation.x = -a; };
-  hand(0.11, -0.9, 0.012); hand(0.14, 0.75, 0.008);
-  // two winged robed figures (layered relief): robes, heads, wings, raised arms holding a wreath over the clock
-  for (const s of [-1, 1]) {
-    const zc = s * w * 0.27;
-    p.extX(Dk, [[-0.13, 0.08], [0.13, 0.08], [0.1, 0.35], [0.07, 0.6], [0.04, 0.72], [-0.04, 0.72], [-0.07, 0.6], [-0.1, 0.35]].map(([a, b]) => [a * -s, b * h / 1.3]), 0.05, 0.05, 0, zc, 0.012);
-    p.extX(W, [[-0.1, 0.12], [0.1, 0.12], [0.08, 0.38], [0.05, 0.6], [-0.05, 0.6], [-0.08, 0.38]].map(([a, b]) => [a * -s, b * h / 1.3]), 0.03, 0.08, 0, zc, 0.008);
-    p.s(W, 0.06, 0.08, 0.8 * h / 1.3, zc, 0.8, 1.1, 0.9, false);
-    const wing = p.extX(W, [[0, 0], [0.12, 0.08], [0.22, 0.25], [0.26, 0.42], [0.2, 0.36], [0.17, 0.4], [0.13, 0.32], [0.09, 0.33], [0.05, 0.22]].map(([a, b]) => [a * s, b]), 0.025, 0.045, 0.55 * h / 1.3, zc + s * 0.06, 0.006);
-    void wing;
-    p.loft(W, [[0.09, 0.62 * h / 1.3, zc - s * 0.04], [0.1, 0.75 * h / 1.3, zc - s * 0.14], [0.1, 0.85 * h / 1.3, zc - s * 0.25]], 0.024, 6);
+/** one robed, winged allegorical figure in high relief (Honour s = −1 with book and stylus, Glory s = +1 with palm) */
+function reliefFigure(p, s, fz, y0, hold, K = 0.55) {
+  const W = mats.oak, x = 0.1;
+  const parts = [];
+  // gown flaring to the ground, with three deep folds
+  parts.push(p.loft(W, [[x, y0, fz], [x, y0 + 0.18, fz + s * 0.01], [x, y0 + 0.4, fz + s * 0.015], [x, y0 + 0.58, fz], [x, y0 + 0.7, fz - s * 0.01]], [0.2, 0.17, 0.14, 0.115, 0.1], 16));
+  for (const [dz, a] of [[-0.09, 0.06], [0, 0.11], [0.09, 0.06]]) parts.push(p.tube(W, [[x + 0.15, y0 + 0.01, fz + dz * 1.4], [x + 0.13, y0 + 0.2, fz + dz * 1.15], [x + 0.11, y0 + 0.42, fz + dz], [x + 0.09 + a * 0.1, y0 + 0.6, fz + dz * 0.7]], 0.02, 10, 5));
+  // bodice, shoulders, neck, head with a knot of hair
+  parts.push(p.loft(W, [[x, y0 + 0.68, fz - s * 0.01], [x, y0 + 0.78, fz - s * 0.015], [x, y0 + 0.86, fz - s * 0.01]], [0.1, 0.09, 0.085], 16));
+  parts.push(p.s(W, 0.1, x, y0 + 0.875, fz - s * 0.012, 0.75, 0.42, 1.25, false));
+  parts.push(p.c(W, 0.028, 0.07, x, y0 + 0.88, fz - s * 0.02, 10));
+  parts.push(p.s(W, 0.068, x + 0.005, y0 + 1.0, fz - s * 0.03, 0.95, 1.12, 0.9, false));
+  parts.push(p.s(W, 0.044, x - 0.03, y0 + 1.045, fz + s * 0.015, 1, 0.9, 1, false));
+  parts.push(p.tube(W, [[x + 0.03, y0 + 1.05, fz - s * 0.09], [x + 0.05, y0 + 1.07, fz - s * 0.03], [x + 0.03, y0 + 1.06, fz + s * 0.03]], 0.012, 8, 4));
+  // the inner arm reaches up and holds the laurel wreath over the clock
+  parts.push(p.loft(W, [[x + 0.01, y0 + 0.86, fz - s * 0.09], [x + 0.04, y0 + 0.95, fz - s * 0.17], [x + 0.05, y0 + 1.02, fz - s * 0.24], [x + 0.05, y0 + 1.07, fz - s * 0.31]], [0.034, 0.03, 0.027, 0.024], 10));
+  parts.push(p.loft(W, [[x + 0.04, y0 + 0.88, fz - s * 0.17], [x + 0.08, y0 + 0.86, fz - s * 0.2], [x + 0.08, y0 + 0.92, fz - s * 0.24]], [0.05, 0.035, 0.02], 8, true)); // hanging sleeve
+  // the outer arm: Honour holds an open book and writes, Glory lowers a palm branch
+  parts.push(p.loft(W, [[x + 0.01, y0 + 0.85, fz + s * 0.09], [x + 0.05, y0 + 0.74, fz + s * 0.12], [x + 0.1, y0 + 0.66, fz + s * 0.07]], [0.034, 0.03, 0.026], 10));
+  if (hold === 'book') {
+    const bk = p.b(W, 0.03, 0.2, 0.16, x + 0.13, y0 + 0.56, fz + s * 0.03); bk.rotation.z = 0.15;
+    parts.push(bk, p.b(mats.gold, 0.008, 0.18, 0.004, x + 0.146, y0 + 0.57, fz + s * 0.03));
+    parts.push(p.loft(W, [[x + 0.12, y0 + 0.62, fz - s * 0.08], [x + 0.15, y0 + 0.68, fz - s * 0.02]], 0.008, 6));
+  } else {
+    parts.push(p.loft(W, [[x + 0.1, y0 + 0.66, fz + s * 0.07], [x + 0.12, y0 + 0.4, fz + s * 0.16], [x + 0.12, y0 + 0.12, fz + s * 0.2]], 0.01, 6));
+    for (let i = 0; i < 9; i++) { const t = i / 8, yy = y0 + 0.62 - t * 0.48; for (const d of [-1, 1]) { const lf = p.extX(W, [[0, 0], [0.012, 0.005], [0.07, 0.02], [0.012, 0.012]], 0.008, x + 0.12, yy, fz + s * (0.08 + t * 0.12)); lf.rotation.x = d * 0.6 + Math.PI; parts.push(lf); } }
   }
-  // laurel wreath over the clock and garland below
-  for (let i = 0; i <= 12; i++) { const a = Math.PI * (0.15 + (0.7 * i) / 12), lf = p.extX(mats.gold, [[-0.012, 0], [0.012, 0], [0.006, 0.05], [0, 0.06], [-0.006, 0.05]], 0.006, 0.1, cy + Math.sin(a) * 0.3, Math.cos(a) * 0.3, 0); lf.rotation.x = a - Math.PI / 2; }
-  for (let i = 0; i <= 10; i++) { const t = i / 10, z = -w * 0.3 + w * 0.6 * t, y = 0.14 + 0.06 * Math.sin(Math.PI * t); p.s(W, 0.028, 0.06, y, z, 1, 0.8, 1); }
+  // two-tiered spread wings behind the shoulder, pointing outwards and up
+  for (const [sc, yo] of [[1, 0], [0.75, -0.08]]) {
+    parts.push(p.extX(W, [[0, 0], [0.09, 0.08], [0.2, 0.22], [0.28, 0.4], [0.3, 0.55], [0.24, 0.47], [0.22, 0.52], [0.17, 0.41], [0.14, 0.44], [0.1, 0.31], [0.065, 0.32], [0.03, 0.17]].map(([a, b]) => [-s * a * sc * 0.8, b * sc]), 0.03, 0.04, y0 + 0.74 + yo, fz + s * 0.06, 0.008)); // (extX: outline a → world −z)
+  }
+  for (const m of parts) if (Math.abs(m.rotation.y) < 1e-6) flat(m, K); // extruded parts are thin already
+}
+
+/**
+ * "Honour and Glory crowning Time" (Charles Wilson's carved panel on the landing between A deck and the boat deck):
+ * oak relief w × h with carved frame and pediment, the clock in the centre and two winged figures crowning it with a
+ * laurel wreath. Origin = bottom centre on the wall, faces +x. figures:false → carved clock panel with garlands only.
+ */
+const honourGlory = def('honourGlory2', (o) => [o.w ?? 1.6, 0.3, (o.h ?? 1.5) + 0.3], (p, o) => {
+  const w = o.w ?? 1.6, h = o.h ?? 1.5, W = mats.oak, Dk = mats.woodDark, Gd = mats.gold;
+  p.b(Dk, 0.03, h, w, 0.015, 0, 0);
+  p.bb(W, 0.08, 0.09, w + 0.2, 0.04, -0.03, 0, 0.015);
+  p.bb(W, 0.07, 0.08, w + 0.16, 0.035, h - 0.06, 0, 0.012);
+  for (const s of [-1, 1]) {
+    p.bb(W, 0.08, h, 0.09, 0.04, 0, s * (w / 2 + 0.045), 0.012);
+    for (let i = 0; i < 6; i++) p.s(Gd, 0.018, 0.085, 0.15 + (i * (h - 0.3)) / 5, s * (w / 2 + 0.045), 0.6, 1, 1); // gilt bead on the stiles
+  }
+  for (const y of [0.06, h - 0.075]) p.b(Gd, 0.06, 0.014, w, 0.035, y, 0);
+  for (const s of [-1, 1]) p.b(Gd, 0.06, h - 0.12, 0.014, 0.035, 0.06, s * (w / 2 - 0.007));
+  // broken scroll pediment with a gilt cartouche
+  p.extX(W, [[-w / 2 - 0.1, 0], [w / 2 + 0.1, 0], [w / 2 + 0.1, 0.06], [0.3, 0.26], [0.2, 0.22], [w / 2 - 0.06, 0.06], [-w / 2 + 0.06, 0.06], [-0.2, 0.22], [-0.3, 0.26], [-w / 2 - 0.1, 0.06]], 0.09, 0.045, h + 0.02, 0, 0.01);
+  for (const s of [-1, 1]) p.t(W, 0.05, 0.016, 0.09, h + 0.24, s * 0.26, 'x', 12, 4);
+  p.s(Gd, 0.075, 0.09, h + 0.2, 0, 0.45, 1.15, 0.85, false);
+  // the clock: carved case, gilt bezel, dial, hands
+  const cy = h * (o.figures === false ? 0.55 : 0.52), R = 0.2;
+  p.latheX(W, [[0, 0], [R + 0.08, 0], [R + 0.09, 0.03], [R + 0.06, 0.08], [R + 0.03, 0.09], [0, 0.09]], 0.03, cy, 0, 28);
+  p.latheX(Gd, [[R - 0.01, 0], [R + 0.025, 0.01], [R + 0.015, 0.025], [R - 0.02, 0.02]], 0.12, cy, 0, 28);
+  p.cx(kitMats.clockFace, R, 0.006, 0.123, cy, 0, 28);
+  const hand = (len, a, t) => { const m = p.b(Dk, 0.005, len, t, 0.13, 0, 0); m.position.set(0.13, cy + (Math.cos(a) * len) / 2, (-Math.sin(a) * len) / 2); m.rotation.x = -a; };
+  hand(0.12, -0.9, 0.014); hand(0.16, 0.75, 0.009);
+  // laurel wreath crowning the clock, garland swag below
+  const wy = cy + R + 0.17;
+  p.t(Gd, 0.12, 0.016, 0.1, wy, 0, 'x', 20, 5);
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2, lf = p.extX(Gd, [[-0.014, 0], [0.014, 0], [0.007, 0.05], [0, 0.06], [-0.007, 0.05]], 0.008, 0.11, wy + Math.sin(a) * 0.12, Math.cos(a) * 0.12, 0);
+    lf.rotation.x = a - Math.PI / 2 + 0.6;
+  }
+  for (let i = 0; i <= 10; i++) { const t = i / 10; p.s(W, 0.03, 0.07, cy - R - 0.17 - 0.07 * Math.sin(Math.PI * t), -0.25 + 0.5 * t, 0.9, 0.8, 1, false); }
+  if (o.figures === false) {
+    for (const s of [-1, 1]) for (let i = 0; i < 7; i++) p.s(W, 0.035, 0.07, cy - 0.3 + i * 0.1, s * (R + 0.2 + Math.sin(i) * 0.02), 0.8, 1.2, 0.9, false);
+    return;
+  }
+  reliefFigure(p, -1, -w * 0.3, 0.1, 'book');
+  reliefFigure(p, 1, w * 0.3, 0.1, 'palm');
 });
+
+/** gilt newel lamp with three cut-glass tulips (newel caps at the foot of the central flights) – origin = newel top */
+const newelLamp = def('newelLamp', [0.32, 0.32, 0.75], (p) => {
+  const G = mats.gold;
+  p.lathe(kitMats.bronze, [[0, 0], [0.09, 0], [0.09, 0.02], [0.05, 0.05], [0.03, 0.1], [0.025, 0.36], [0.04, 0.39], [0.025, 0.42], [0, 0.42]], 0, 0, 0, 16);
+  for (let i = 0; i < 2; i++) {
+    const a = i * Math.PI + Math.PI / 2, c = Math.cos(a), s = -Math.sin(a);
+    p.loft(G, [[0, 0.36, 0], [c * 0.07, 0.4, s * 0.07], [c * 0.13, 0.43, s * 0.13], [c * 0.14, 0.47, s * 0.14]], 0.01, 6);
+    p.rev(kitMats.cutGlass, [{ o: 0.015, y: 0.47, m: 0 }, { o: 0.05, y: 0.52, m: 0.006 }, { o: 0.055, y: 0.58, m: 0.006 }, { o: 0.035, y: 0.6, m: 0 }], { seg: 12, k: 6, capBottom: true, capTop: true }, c * 0.14, 0, s * 0.14);
+  }
+  p.rev(kitMats.cutGlass, [{ o: 0.015, y: 0.42, m: 0 }, { o: 0.06, y: 0.5, m: 0.007 }, { o: 0.065, y: 0.6, m: 0.007 }, { o: 0.04, y: 0.66, m: 0 }], { seg: 14, k: 7, capBottom: true, capTop: true }, 0, 0, 0);
+  p.lathe(G, [[0, 0], [0.02, 0], [0.01, 0.06], [0, 0.07]], 0, 0.66, 0, 8);
+});
+
+/** gilt-framed oil painting on a wall x = const facing +x. cell: quadrant of kitMats.paintings (0 sea, 1 landscape, 2 portrait, 3 still life) */
+function painting(b, x, yc, zc, w, h, cell = 0) {
+  const u0 = (cell % 2) * 0.5, v0 = cell < 2 ? 0.5 : 0, F = 0.09;
+  b.poly(kitMats.paintings, [[x + 0.035, yc - h / 2, zc + w / 2], [x + 0.035, yc - h / 2, zc - w / 2], [x + 0.035, yc + h / 2, zc - w / 2], [x + 0.035, yc + h / 2, zc + w / 2]], [1, 0, 0],
+    [[u0, v0], [u0 + 0.5, v0], [u0 + 0.5, v0 + 0.5], [u0, v0 + 0.5]]);
+  const G = mats.gold;
+  for (const s of [-1, 1]) {
+    b.box(G, x, yc + s * (h / 2) - (s < 0 ? F : 0), zc - w / 2 - F, x + 0.06, yc + s * (h / 2) + (s > 0 ? F : 0), zc + w / 2 + F, 'XyYzZ');
+    b.box(G, x, yc - h / 2, zc + s * (w / 2) - (s < 0 ? F : 0), x + 0.06, yc + h / 2, zc + s * (w / 2) + (s > 0 ? F : 0), 'XzZ');
+  }
+  b.box(G, x + 0.06, yc - h / 2 - 0.02, zc - w / 2 - 0.02, x + 0.075, yc - h / 2, zc + w / 2 + 0.02, 'XyY');
+  b.box(G, x + 0.06, yc + h / 2, zc - w / 2 - 0.02, x + 0.075, yc + h / 2 + 0.02, zc + w / 2 + 0.02, 'XyY');
+}
+
+// ------------------------------------------------------------------------------------------------ imperial stairs
+
+const D_SOFF = 0.32; // depth of a flight below its pitch line (strings / soffit)
+const LAND_T = 0.3;  // thickness of a half-landing
+const BEAM = 0.36;   // depth of the moulded downstand beams round the well openings (below the upper floor)
+const ENTAB = [[0, -0.12], [0.06, -0.12], [0.06, -0.08], [0.04, -0.05], [0.02, -0.01], [0, 0]];
+const DADO = [[0, 0], [0.025, 0.005], [0.03, 0.02], [0.018, 0.035], [0, 0.04]];
+
+/** treads, risers, moulded nosings with brass strips, red runner with brass stair rods: from (xb, y0) to (xt, y1) */
+function stepRun(b, S, xb, xt, z0, z1, y0, y1) {
+  const dir = Math.sign(xt - xb), rise = y1 - y0, run = Math.abs(xt - xb);
+  const N = Math.max(2, Math.round(rise / 0.175)), r = rise / N, g = run / (N - 1);
+  const c0 = z0 + 0.24, c1 = z1 - 0.24;
+  for (let i = 0; i < N; i++) {
+    const xa = xb + dir * i * g, xe = xa + dir * g, yt = y0 + (i + 1) * r;
+    b.wallZ(S.riser, xa, z0, z1, yt - r, yt, -dir);
+    b.wallZ(mats.carpetRed, xa - dir * 0.004, c0, c1, yt - r, yt - 0.03, -dir);
+    b.prism(mats.brass, [xa - dir * 0.014, yt - r + 0.016, c0 - 0.03], [xa - dir * 0.014, yt - r + 0.016, c1 + 0.03], 0.008, 5);
+    if (i === N - 1) break; // the last riser rises onto the landing / deck
+    b.flat(S.tread, xa, xe, z0, z1, yt);
+    b.sweep(S.tread, NOSE, [xa, yt, z0], [0, 0, 1], [-dir, 0, 0], [0, 1, 0], z1 - z0, [true, true]);
+    b.box(S.nosing, Math.min(xa, xa + dir * 0.045), yt + 0.003, z0 + 0.03, Math.max(xa, xa + dir * 0.045), yt + 0.007, z1 - 0.03, 'xXYzZ');
+    b.flat(mats.carpetRed, xa + dir * 0.05, xe - dir * 0.01, c0, c1, yt + 0.004);
+  }
+}
+
+/** oak string board 0.06 thick centred on z = zs along a flight, moulded with a gilt bead; clipFoot: sits on the floor at xb */
+function stringBoard(b, S, xb, xt, y0, y1, zs, clipFoot = false) {
+  const dir = Math.sign(xt - xb), k = (y1 - y0) / Math.abs(xt - xb), cl = S.cl;
+  const xs = clipFoot ? xb + dir * (D_SOFF / k) : xb, ys = clipFoot ? y0 : y0 - D_SOFF;
+  const outline = [[xb, y0 + cl], [xt, y1 + cl], [xt, y1 - D_SOFF], [xs, ys], ...(clipFoot ? [[xb, y0]] : [])];
+  for (const s of [-1, 1]) b.poly(S.rail, outline.map(([x, y]) => [x, y, zs + s * 0.03]), [0, 0, s]);
+  b.poly(S.rail, [[xs, ys, zs - 0.03], [xt, y1 - D_SOFF, zs - 0.03], [xt, y1 - D_SOFF, zs + 0.03], [xs, ys, zs + 0.03]], [dir * (y1 - y0), -Math.abs(xt - xb), 0]);
+  b.wallZ(S.rail, xb, zs - 0.03, zs + 0.03, clipFoot ? y0 : y0 - D_SOFF, y0 + cl, -dir); // end grain at the foot / head
+  b.wallZ(S.rail, xt, zs - 0.03, zs + 0.03, y1 - D_SOFF, y1 + cl, dir);
+  const xg = clipFoot ? xb + dir * (0.16 / k) : xb, yg = clipFoot ? y0 : y0 - 0.16;
+  for (const s of [-1, 1]) b.bar(mats.gold, [xg, yg, zs + s * 0.034], [xt, y1 - 0.16, zs + s * 0.034], 0.008, 0.018);
+}
+
+/** plaster soffit under a flight between two strings, with two oak ribs */
+function soffit(b, xb, xt, y0, y1, z0, z1) {
+  const dir = Math.sign(xt - xb), run = Math.abs(xt - xb), rise = y1 - y0, yb = y0 - D_SOFF + 0.05, ye = y1 - D_SOFF + 0.05;
+  b.poly(mats.plaster, [[xb, yb, z0], [xt, ye, z0], [xt, ye, z1], [xb, yb, z1]], [dir * rise, -run, 0]);
+  for (const z of [z0 + (z1 - z0) / 3, z0 + (2 * (z1 - z0)) / 3]) b.bar(mats.oak, [xb, yb - 0.035, z], [xt, ye - 0.035, z], 0.05, 0.035);
+}
+
+/** balustrade along a flight: capping on the string, sheared iron scroll panels, moulded handrail */
+function slopeBalustrade(world, deck, b, S, xb, y0, xt, y1, zz) {
+  const zone = world.zone(deck, (xb + xt) / 2), run = Math.abs(xt - xb), rise = y1 - y0, dir = Math.sign(xt - xb);
+  b.bar(S.rail, [xb, y0 + S.cl, zz], [xt, y1 + S.cl, zz], 0.1, 0.035);
+  b.wallZ(S.rail, xb, zz - 0.05, zz + 0.05, y0 + S.cl, y0 + S.cl + 0.035, -dir); b.wallZ(S.rail, xt, zz - 0.05, zz + 0.05, y1 + S.cl, y1 + S.cl + 0.035, dir);
+  const n = Math.max(1, Math.round(run / 0.75)), sdx = (xt - xb) / n, sdy = rise / n;
+  for (let i = 0; i < n; i++) shear(zone, ironPanel(), xb + sdx * i, y0 + sdy * i + S.cl + 0.035, zz, sdx, sdy, RAIL_H - S.cl - 0.04);
+  railX(world, deck, b, S, xb, y0, xt, y1, zz);
+}
+
+/** panelled oak wall face in the plane z = zz (facing nz) or x = xx (facing nx) with dado rail, fielded panels and cornice */
+function panelWall(b, plane, a0, a1, y0, y1, n, o = {}) {
+  const P = (a, y, off = 0) => (plane.axis === 'z' ? [a, y, plane.c + n * off] : [plane.c + n * off, y, a]);
+  const A = plane.axis === 'z' ? [1, 0, 0] : [0, 0, 1], O = plane.axis === 'z' ? [0, 0, n] : [n, 0, 0];
+  const L = a1 - a0;
+  if (L < 0.05 || y1 - y0 < 0.1) return;
+  b.poly(mats.oakPanel, [P(a0, y0), P(a1, y0), P(a1, y1), P(a0, y1)], O);
+  const dado = Math.min(0.9, (y1 - y0) * 0.4);
+  b.sweep(mats.oak, DADO, P(a0, y0 + dado), A, O, [0, 1, 0], L, [true, true]);
+  { const p = P(a0, y0), q = P(a1, y0 + 0.14, 0.02); b.box(mats.oak, Math.min(p[0], q[0]), p[1], Math.min(p[2], q[2]), Math.max(p[0], q[0]), q[1], Math.max(p[2], q[2]), plane.axis === 'z' ? (n < 0 ? 'xXYz' : 'xXYZ') : (n < 0 ? 'zZYx' : 'zZYX')); } // skirting
+  const nb = Math.max(1, Math.round(L / (o.pitch ?? 0.85))), pw = L / nb;
+  const skip = o.skip ?? [];
+  for (let i = 0; i < nb; i++) {
+    const am = a0 + pw * (i + 0.5);
+    if (pw - 0.14 > 0.15 && dado - 0.3 > 0.15) b.fielded(mats.oak, P(am, y0 + 0.14 + (dado - 0.2) / 2, 0.002), A, O, [0, 1, 0], pw - 0.14, dado - 0.3, 0.012, 0.04);
+    const u0 = y0 + dado + 0.15, u1 = Math.min(y1 - 0.25, y0 + dado + 1.6);
+    if (u1 - u0 > 0.3 && !skip.some(([s, e]) => am > s && am < e)) b.fielded(mats.oak, P(am, (u0 + u1) / 2, 0.002), A, O, [0, 1, 0], pw - 0.16, u1 - u0, 0.012, 0.05);
+  }
+  if (o.cornice !== false) {
+    b.sweep(mats.oak, ENTAB.map(([u, v]) => [u * 0.8, v + 0.12]), P(a0, y1 - 0.12), A, O, [0, 1, 0], L, [true, true]);
+    b.sweep(mats.gold, [[0, 0], [0.052, 0], [0.052, 0.012], [0, 0.012]], P(a0, y1 - 0.135), A, O, [0, 1, 0], L, [true, true]);
+  }
+}
+
+/** which work of art hangs on the back wall of a half-landing */
+function landingArt(f) {
+  if (f.last) return f.st.id === 'grandFwd' ? 'honour' : 'clock';
+  if (f.st.id === 'grandFwd' && f.from === 'D') return null; // the Aubusson tapestry of the Reception Room (d-hero.js)
+  return 'painting';
+}
+/** decks on which a bronze cherub stands on the port newel at the foot of the central flight */
+const cherubOn = (st, deck) => deck === 'A' || (st.id === 'grandFwd' && deck === 'D');
+
+function buildImperial(world, st, B) {
+  const S = STYLE.grand, P = imperialPlan(st), ivs = stairFlights().filter((f) => f.st === st);
+  const { back, x0, xl, xf, hw, hwi, cw, g, gc, zc } = P;
+  const yLow = DECK_Y[st.decks[0]], top = st.decks[st.decks.length - 1], yTop = DECK_Y[top], yCeil = ceilingY(top);
+
+  for (const f of ivs) {
+    const bl = B(f.from), bu = B(f.to), { y0, ym, y1 } = f;
+    const yNext = f.last ? yCeil : ivs[f.k + 1].ym - LAND_T;
+
+    // ---- central flight (foot at xf on the lower deck, climbing aft to the landing)
+    stepRun(bl, S, xf, xl, zc - cw, zc + cw, y0, ym);
+    for (const s of [-1, 1]) {
+      const zs = zc + s * (cw - 0.03);
+      stringBoard(bl, S, xf, xl, y0, ym, zs, f.first);
+      slopeBalustrade(world, f.from, bl, S, xf, y0, xl, ym, zs);
+    }
+    if (!f.first) soffit(bl, xf, xl, y0, ym, zc - cw + 0.06, zc + cw - 0.06); // (lowest deck: inside the closet)
+    world.addRamp({ x0: xf, x1: xl, z0: zc - cw, z1: zc + cw, y0, y1: ym, axis: 'x' });
+
+    // ---- half-landing: oak floor with carpet field, plaster soffit with gilt frame, moulded front edge
+    bl.flat(S.tread, x0, xl, zc - hwi, zc + hwi, ym);
+    bl.flat(mats.carpetRed, x0 + 0.3, xl - 0.15, zc - hwi + 0.3, zc + hwi - 0.3, ym + 0.004);
+    bl.box(mats.brass, xl - 0.15, ym, zc - hwi + 0.3, xl - 0.12, ym + 0.008, zc + hwi - 0.3, 'XYx');
+    bl.flat(mats.plaster, x0, xl, zc - hwi, zc + hwi, ym - LAND_T, true);
+    bl.wallZ(S.rail, xl, zc - hwi, zc + hwi, ym - LAND_T, ym, 1);
+    bl.sweep(mats.oak, ENTAB, [xl, ym - LAND_T, zc - hwi], [0, 0, 1], [1, 0, 0], [0, 1, 0], 2 * hwi, [true, true]);
+    bl.wallZ(S.rail, xl, zc - hwi, zc + hwi, ym - LAND_T - 0.12, ym - LAND_T, -1); // back of the moulding
+    for (const [a, c, d, e] of [[x0 + 0.25, xl - 0.25, zc - hwi + 0.25, zc - hwi + 0.29], [x0 + 0.25, xl - 0.25, zc + hwi - 0.29, zc + hwi - 0.25], [x0 + 0.25, x0 + 0.29, zc - hwi + 0.25, zc + hwi - 0.25], [xl - 0.29, xl - 0.25, zc - hwi + 0.25, zc + hwi - 0.25]]) {
+      bl.box(mats.gold, a, ym - LAND_T - 0.02, d, c, ym - LAND_T, e, 'xXyzZ');
+    }
+    world.addFloor({ y: ym, x0, x1: xl, z0: zc - hwi, z1: zc + hwi });
+
+    // ---- side flights (landing → upper deck, towards +x)
+    for (const s of [-1, 1]) {
+      const za = zc + s * (cw + g), zb = zc + s * hwi, z0 = Math.min(za, zb), z1 = Math.max(za, zb);
+      stepRun(bl, S, xl, xf, z0, z1, ym, y1);
+      for (const zs of [za + s * 0.03, zb - s * 0.03]) {
+        stringBoard(bl, S, xl, xf, ym, y1, zs);
+        slopeBalustrade(world, f.from, bl, S, xl, ym, xf, y1, zs);
+      }
+      soffit(bl, xl, xf, ym, y1, z0 + 0.06, z1 - 0.06);
+      world.addRamp({ x0: xl, x1: xf, z0, z1, y0: ym, y1, axis: 'x' });
+    }
+
+    // ---- walls of the landing bay: back wall (pier front) with art, inner faces of the side walls
+    panelWall(bl, { axis: 'x', c: x0 }, zc - hwi, zc + hwi, ym, yNext, 1, { pitch: 0.9, skip: [[zc - 1.0, zc + 1.0]] });
+    for (const s of [-1, 1]) panelWall(bl, { axis: 'z', c: zc + s * hwi }, x0, xl, ym, yNext, -s, { pitch: 0.9 });
+    const zone = world.zone(f.from, x0), hP = Math.min(2.5, yNext - ym - 0.05);
+    for (const s of [-1, 1]) {
+      place(zone, pilaster({ h: Math.round(hP * 20) / 20, w: 0.26, mat: 'oak', capital: 'gold' }), x0 + 0.04, ym, zc + s * (hwi - 0.2), 0);
+      const sc = sconce(); sc.position.set(x0 + 0.01, ym + 1.9, zc + s * (hwi - 0.75)); zone.add(sc);
+    }
+    world.addLamp({ x: x0 + 0.7, y: ym + 2.0, z: zc, intensity: 0.9 });
+    const art = landingArt(f), wArt = Math.min(1.6, 2 * hwi - 1.9);
+    if (art === 'honour' || art === 'clock') {
+      place(zone, honourGlory({ w: Math.round(wArt * 20) / 20, h: 1.5, figures: art === 'honour' }), x0 + 0.005, ym + 0.62, zc, 0);
+      if (art === 'honour') {
+        world.addInfo({
+          title: 'Ehre und Ruhm krönen die Zeit', x: xl + 0.6, y: ym + 1.5, z: zc, radius: 3.2,
+          text: 'Auf dem Zwischenpodest zwischen A-Deck und Bootsdeck hing die von Charles Wilson geschnitzte Eichentafel „Honour and Glory crowning Time“: Zwei geflügelte Frauengestalten – die Ehre mit einem Buch, der Ruhm mit einem Palmzweig – krönen die Uhr mit einem Lorbeerkranz. Von hier teilt sich die Treppe in zwei Seitenläufe, die zum Bootsdeck unter die Glaskuppel führen.',
+        });
+      }
+    } else if (art === 'painting') {
+      painting(bl, x0, ym + 1.45, zc, Math.min(1.5, wArt), 1.0, f.k % 2);
+    }
+
+    // ---- rim of the well in the upper deck: moulded oak downstand beams (closed on both faces: the well side carries
+    //      an entablature, the hall side a gilt bead), gallery balustrade on the long sides
+    const yb = y1 - BEAM;
+    for (const s of [-1, 1]) {
+      const zi = zc + s * hwi, zo = zc + s * hw;
+      bu.box(S.wall, xl, yb, Math.min(zi, zo), xf + 0.1, y1, Math.max(zi, zo), 'zZy');
+      bu.sweep(mats.oak, ENTAB, [xl, yb + 0.12, zi], [1, 0, 0], [0, 0, -s], [0, 1, 0], xf - xl, [true, true]);
+      bu.box(mats.gold, xl, yb + 0.1, Math.min(zo, zo + s * 0.012), xf + 0.1, yb + 0.115, Math.max(zo, zo + s * 0.012), 'yYzZX');
+      railX(world, f.to, bu, S, xl, y1, xf, y1, zc + s * (hwi + 0.04));
+    }
+    // forward beam across the well (its aft face stops below the top risers of the side flights)
+    bu.box(S.wall, xf, yb, zc - hw, xf + 0.1, y1, zc + hw, 'Xy');
+    bu.wallZ(S.wall, xf, zc - cw - g, zc + cw + g, yb, y1, -1);
+    for (const s of [-1, 1]) bu.wallZ(S.wall, xf, Math.min(zc + s * (cw + g), zc + s * hwi), Math.max(zc + s * (cw + g), zc + s * hwi), yb, y1 - 0.185, -1);
+    bu.sweep(mats.oak, ENTAB, [xf + 0.1, yb + 0.12, zc - hw], [0, 0, 1], [1, 0, 0], [0, 1, 0], 2 * hw, [true, true]);
+    bu.box(mats.gold, xf + 0.1, yb + 0.1, zc - hw, xf + 0.112, yb + 0.115, zc + hw, 'XyY');
+    newel(world, f.from, S, xl, zc - gc, ym); newel(world, f.from, S, xl, zc + gc, ym);
+
+    // ---- the lowest deck: panelled closet under the first landing and the side flights (arched doors facing the hall)
+    if (f.first) {
+      for (const s of [-1, 1]) {
+        const za = zc + s * cw, zb = zc + s * hwi, yt = y1 - D_SOFF;
+        bl.wallZ(S.wall, xf, Math.min(za, zb), Math.max(za, zb), y0, yt, 1);
+        const zm = (za + zb) / 2, dw = Math.min(0.8, Math.abs(zb - za) - 0.3);
+        bl.fielded(mats.oak, [xf + 0.002, y0 + 0.95, zm], [0, 0, 1], [1, 0, 0], [0, 1, 0], dw, 1.7, 0.014, 0.05);
+        const arc = []; for (let i = 0; i <= 8; i++) { const a = Math.PI * (i / 8); arc.push([xf + 0.03, y0 + 1.8 + Math.sin(a) * dw * 0.5, zm - Math.cos(a) * dw * 0.5]); }
+        for (let i = 0; i < 8; i++) bl.prism(mats.oak, arc[i], arc[i + 1], 0.03, 5);
+        for (const e of [-1, 1]) bl.box(mats.oak, xf, y0, zm + e * dw * 0.5 - 0.04, xf + 0.05, y0 + 1.8, zm + e * dw * 0.5 + 0.04, 'XzZ');
+        bl.box(mats.brass, xf + 0.03, y0 + 1.0, zm - s * (dw * 0.5 - 0.1) - 0.015, xf + 0.07, y0 + 1.12, zm - s * (dw * 0.5 - 0.1) + 0.015);
+        if (yt - y0 > 2.25) bl.fielded(mats.oak, [xf + 0.002, (y0 + 2.12 + yt) / 2, zm], [0, 0, 1], [1, 0, 0], [0, 1, 0], dw, yt - y0 - 2.22, 0.01, 0.04);
+        world.addCollider(xf - 0.06, y0, Math.min(za, zb), xf, y0 + 2.0, Math.max(za, zb));
+        // inner wall of the closet (seen through the central balustrade) and the front of the wall band
+        const zi = zc + s * (cw + g);
+        bl.poly(S.wall, [[xl, y0, zi], [xf, y0, zi], [xf, y1 - D_SOFF, zi], [xl, ym - D_SOFF, zi]], [0, 0, -s]);
+        bl.wallZ(S.wall, xf, Math.min(zc + s * hwi, zc + s * hw), Math.max(zc + s * hwi, zc + s * hw), y0, y1 + S.cl, 1);
+        // outer spandrel under the side flight, up to its string
+        const zo = zc + s * hw;
+        bl.poly(S.wall, [[xl, y0, zo], [xf, y0, zo], [xf, y1 + S.cl, zo], [xl, ym + S.cl, zo]], [0, 0, s]);
+        bl.bar(S.rail, [xl, ym + S.cl, zc + s * (hw - IMP_BAND / 2)], [xf, y1 + S.cl, zc + s * (hw - IMP_BAND / 2)], IMP_BAND + 0.02, 0.03);
+        const n = 3, pw = (xf - xl) / n;
+        for (let i = 0; i < n; i++) {
+          const xa = xl + pw * i + 0.07, xe = xl + pw * (i + 1) - 0.07, topY = ym + ((xa - xl) / (xf - xl)) * (y1 - ym) + S.cl - 0.12;
+          if (topY - (y0 + 0.14) > 0.3) bl.fielded(mats.oak, [(xa + xe) / 2, (topY + y0 + 0.14) / 2, zo + s * 0.002], [1, 0, 0], [0, 0, s], [0, 1, 0], xe - xa, topY - y0 - 0.14, 0.012, 0.045);
+        }
+      }
+    }
+  }
+
+  // ---- per deck: outer faces of the landing bay walls / pier, newels at the foot line, ceiling lamp in front of the foot
+  for (const deck of st.decks) {
+    const Y = DECK_Y[deck], yc = ceilingY(deck), b = B(deck), rises = ivs.some((f) => f.from === deck), zone = world.zone(deck, xf);
+    for (const s of [-1, 1]) {
+      panelWall(b, { axis: 'z', c: zc + s * hw }, back, xl, Y, yc, s, { pitch: 0.95 });
+      b.wallZ(S.rail, xl, Math.min(zc + s * hwi, zc + s * hw), Math.max(zc + s * hwi, zc + s * hw), Y, yc, 1);
+      place(zone, pilaster({ h: Math.round((yc - Y) * 20) / 20, w: 0.2, mat: 'oak', capital: 'gold' }), xl - 0.1, Y, zc + s * (hw + 0.04), s > 0 ? -Math.PI / 2 : Math.PI / 2);
+      // newels: outer corner of the gallery, gap newel between the central and the side flight
+      newel(world, deck, S, xf, zc + s * (hwi + 0.04), Y);
+      const lamp = rises && !(s < 0 && cherubOn(st, deck));
+      newel(world, deck, S, xf, zc + s * gc, Y, lamp || (rises && cherubOn(st, deck)));
+      if (rises && s < 0 && cherubOn(st, deck)) {
+        place(zone, cherubLamp(), xf, Y + 1.08, zc - gc, 0);
+        world.addLamp({ x: xf, y: Y + 2.3, z: zc - gc, intensity: 0.9 });
+      } else if (lamp) {
+        place(zone, newelLamp(), xf, Y + 1.08, zc + s * gc, 0);
+        world.addLamp({ x: xf, y: Y + 1.7, z: zc + s * gc, intensity: 0.5 });
+      }
+    }
+    if (deck !== top) fixture(world, deck, xf + 1.3, zc, yc, true);
+  }
+  // the top deck: balustrade across the head of the central flight, chandelier under the dome
+  const bt = B(top);
+  railZ(world, top, bt, S, xf + 0.04, zc - gc, zc + gc, yTop);
+  world.addCollider(xf - 0.04, yTop, zc - gc, xf + 0.08, yTop + 1.1, zc + gc);
+  const xc = xf - 0.65, yh = yCeil + 0.1, chain = yCeil + 1.6;
+  bt.prism(mats.gold, [xc, chain, zc], [xc, yh, zc], 0.014, 6);
+  const ch = place(world.zone(top, xc), chandelier({ arms: 8 }), xc, yh, zc, 0); ch.scale.setScalar(1.5);
+  world.addLamp({ x: xc, y: yh - 1.0, z: zc, intensity: 1.4 });
+
+  // ---- colliders: pier, wall / gallery bands along both long sides, slots between the central and the side flights
+  world.addCollider(back, yLow, zc - hw, x0, yCeil, zc + hw);
+  for (const s of [-1, 1]) {
+    world.addCollider(back, yLow, zc + s * hwi, xf, yTop + 1.1, zc + s * hw);
+    world.addCollider(xl, yLow, zc + s * cw, xf, yTop + 1.1, zc + s * (cw + g));
+  }
+}
 
 /** Scene module: builds every staircase. */
 export async function build(world) {
@@ -342,30 +712,15 @@ export async function build(world) {
   const batches = new Map();
   const B = (deck) => { let b = batches.get(deck); if (!b) batches.set(deck, (b = new Batch(world, deck))); return b; };
 
-  for (const f of stairFlights()) buildFlight(world, f, B(f.from), B(f.to));
+  for (const f of stairFlights()) if (f.type === 'scissor') buildFlight(world, f, B(f.from), B(f.to));
 
   for (const st of STAIRS) {
+    if (isImperial(st)) { buildImperial(world, st, B); continue; }
     const grand = st.style === 'grand';
     for (const deck of st.decks) {
       const cy = ceilingY(deck);
       fixture(world, deck, st.x0 - 1, st.zc, cy, grand);
       fixture(world, deck, st.x1 + 1, st.zc, cy, grand);
-    }
-    if (grand && st.decks.includes('A')) {
-      const f = stairFlights().find((q) => q.st === st && q.from === 'A');
-      if (f) {
-        place(world.zone('A', f.xb), cherubLamp(), f.xb, f.y0 + 1.08, f.zc, f.dir > 0 ? 0 : Math.PI);
-        world.addLamp({ x: f.xb, y: f.y0 + 2.2, z: f.zc, intensity: 0.9 });
-        if (st.id === 'grandFwd') {
-          // "Honour and Glory crowning Time": carved panel with clock on the wall that closes the top flight
-          const x = f.xt + f.dir * 0.02, zm = (f.z0 + f.z1) / 2, w = Math.min(2.0, f.st.lane - 0.3);
-          place(world.zone('A', x), honourGlory({ w, h: 1.3 }), x, f.y0 + 0.9, zm, f.dir > 0 ? 0 : Math.PI);
-          world.addInfo({
-            title: 'Ehre und Ruhm krönen die Zeit', x: f.xt + f.dir * 1.5, y: f.y0 + 1.5, z: zm, radius: 3.5,
-            text: 'Die geschnitzte Eichenholztafel mit der Uhr war das Herzstück der vorderen Großen Treppe. Zwei allegorische Figuren – Ehre und Ruhm – flankieren das Zifferblatt. Die Treppe verband sechs Decks vom Bootsdeck bis hinunter zum E-Deck und wurde von einer Glaskuppel überspannt.',
-          });
-        }
-      }
     }
   }
 

@@ -1,6 +1,6 @@
 // RMS Titanic – application bootstrap: renderer, module loading, render loop.
 import * as THREE from 'three';
-import { World } from './core/world.js';
+import { World, yieldTask } from './core/world.js';
 import { MODULES } from './modules.js';
 import { SHIP, DECK_Y } from './core/constants.js';
 import { Player } from './app/player.js';
@@ -39,10 +39,25 @@ const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)
 const quality0 = Q_ALIAS[(params.get('q') || '').toLowerCase()] || (coarse ? 'mittel' : 'hoch');
 world.quality = quality0;
 
+/** WebGL 2 test on a throw-away canvas (the real one must be created by three.js with its own attributes). */
+function hasWebGL2() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    if (!gl) return false;
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return true;
+  } catch { return false; }
+}
+const NO_WEBGL2 = 'Dein Browser oder deine Grafikkarte unterstützt WebGL 2 nicht – der Rundgang kann deshalb nicht angezeigt werden. '
+  + 'Bitte verwende eine aktuelle Version von Chrome, Edge, Firefox oder Safari (ab Version 15) und prüfe, ob die '
+  + 'Hardwarebeschleunigung in den Browser-Einstellungen eingeschaltet ist.';
+
 let renderer = null, post = null;
 try {
+  if (!hasWebGL2()) throw new Error('no webgl2');
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  ui.renderer = renderer;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2)); // phones: cap the pixel ratio
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -61,7 +76,9 @@ try {
   }
 } catch (e) {
   console.error('[app] WebGL konnte nicht gestartet werden', e);
-  ui.loadingFatal('WebGL wird von diesem Browser oder Gerät leider nicht unterstützt.');
+  renderer = null;
+  ui.loadingFatal('WebGL 2 wird von diesem Browser oder Gerät leider nicht unterstützt.');
+  ui.showError('WebGL 2 nicht verfügbar', NO_WEBGL2, true);
 }
 
 function resize() {
@@ -92,11 +109,38 @@ function step(dt) {
   if (!contextLost) { if (post) post.render(dt); else renderer.render(scene, camera); }
 }
 
+// Automatic quality fallback: if the frame time stays above ~25 ms for a few seconds, step the preset down (toast);
+// step up again at most once, and never after the user chose a preset with G.
+const autoQ = { on: !flag('noauto'), manual: false, ema: 1 / 60, slow: 0, fast: 0, ups: 0, downs: 0, cool: 5 };
+function autoQuality(raw) {
+  const a = autoQ;
+  if (!a.on || a.manual || !post || ui.modal) return;
+  // frames > 100 ms are hitches (uploads, GC) or a throttled / hidden window – not a slow GPU: ignore them
+  if (raw > 0.1) return;
+  a.ema += (raw - a.ema) * 0.05;
+  if (a.cool > 0) { a.cool -= raw; a.slow = a.fast = 0; return; }
+  a.slow = a.ema > 0.025 ? a.slow + raw : 0;
+  a.fast = a.ema < 0.012 ? a.fast + raw : 0;
+  const i = QUALITY_LEVELS.indexOf(post.quality);
+  let q = null;
+  if (a.slow > 3 && i > 0) { q = QUALITY_LEVELS[i - 1]; a.downs++; }
+  else if (a.fast > 30 && a.downs > 0 && a.ups < 1 && i < QUALITY_LEVELS.length - 1) { q = QUALITY_LEVELS[i + 1]; a.ups++; }
+  if (!q) return;
+  post.setQuality(q);
+  a.cool = 6; a.slow = a.fast = 0; a.ema = 1 / 60;
+  ui.toast(`Grafikqualität automatisch auf „${q}“ ${QUALITY_LEVELS.indexOf(q) > i ? 'erhöht' : 'gesenkt'} (G zum Ändern)`, 3.5);
+}
+debug.autoQuality = autoQ;
+
 function frame(now) {
   raf = requestAnimationFrame(frame);
-  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+  const raw = Math.max(0, (now - last) / 1000);
+  const dt = Math.min(0.05, raw);
   last = now;
+  // after the start: upload the remaining baked chunks in ~3 ms slices (frees their CPU copies)
+  if (!contextLost) { try { world.uploadStep(renderer, 3); } catch (e) { if (loopErrors++ < 5) console.error('[app] upload', e); } }
   step(dt);
+  autoQuality(raw);
 }
 
 function start() {
@@ -111,16 +155,19 @@ function stop() {
 }
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) { stop(); controls.clearKeys(); } else start(); });
+let hideLost = null;
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
   contextLost = true;
   stop();
-  ui.toast('Grafikkontext verloren – wird wiederhergestellt …', 30);
+  controls.clearKeys();
+  hideLost = ui.showError('Grafik unterbrochen',
+    'Die Verbindung zur Grafikkarte ist verloren gegangen (zum Beispiel durch einen Treiber-Neustart oder Speichermangel). '
+    + 'Es wird versucht, sie wiederherzustellen – falls das Bild nicht zurückkommt, lade die Seite bitte neu.', true);
 });
 canvas.addEventListener('webglcontextrestored', () => {
-  contextLost = false;
-  ui.toast('Grafikkontext wiederhergestellt', 2);
-  start();
+  // the baked geometry lives only on the GPU (its CPU copy is released after the upload): start afresh
+  location.reload();
 });
 
 // G: cycle the graphics quality (niedrig -> mittel -> hoch)
@@ -130,9 +177,11 @@ window.addEventListener('keydown', (e) => {
   const tag = e.target?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   const q = QUALITY_LEVELS[(QUALITY_LEVELS.indexOf(post.quality) + 1) % QUALITY_LEVELS.length];
+  autoQ.manual = true; // the user decides from now on
   post.setQuality(q);
   ui.toast?.(`Grafikqualität: ${Q_LABEL[q]}`, 1.8);
 });
+ui.qualityName = () => post?.quality || '';
 debug.setQuality = (q) => { post?.setQuality(Q_ALIAS[q] || q); return post?.quality; };
 
 /** Manual stepping for automated tests (works even when the tab is hidden): __titanic.frame(1/60, 10). */
@@ -140,13 +189,17 @@ debug.frame = (dt = 1 / 60, count = 1) => { if (renderer) for (let i = 0; i < co
 
 // ------------------------------------------------------------------ build
 
-/** Let the browser repaint (falls back to a timer when the tab is hidden and rAF is paused). */
+/**
+ * Let the browser repaint the loading screen. In a hidden tab rAF is paused and timers are clamped to >= 1 s, so
+ * there it only yields to the event loop (MessageChannel, not throttled) – loading continues at full speed.
+ */
 function nextPaint() {
+  if (document.hidden) return yieldTask();
   return new Promise((resolve) => {
     let done = false;
     const go = () => { if (!done) { done = true; resolve(); } };
-    requestAnimationFrame(() => setTimeout(go, 0));
-    setTimeout(go, 80);
+    requestAnimationFrame(() => yieldTask().then(go));
+    setTimeout(go, 100);
   });
 }
 
@@ -154,13 +207,19 @@ async function buildModules() {
   const only = params.get('only')?.split(',').map((s) => s.trim()).filter(Boolean);
   const list = only?.length ? MODULES.filter((m) => only.includes(m.id)) : MODULES;
   const total = list.length + 1.5;
+  const heap = () => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : -1);
+  debug.timings = [];
   for (let i = 0; i < list.length; i++) {
     const m = list[i];
     ui.setProgress(i / total, m.label + ' …');
     await nextPaint();
     try {
+      world.colliderTag = m.id; // exterior colliders (windows!) never occlude the interior
+      const t0 = performance.now();
       const mod = await m.load();
+      const t1 = performance.now();
       const res = await mod.build(world);
+      debug.timings.push({ id: m.id, load: Math.round(t1 - t0), build: Math.round(performance.now() - t1), heap: heap(), at: Math.round(performance.now()) });
       if (typeof res?.update === 'function') updates.push(res.update);
     } catch (e) {
       console.error(`[app] Modul "${m.id}" konnte nicht gebaut werden:`, e);
@@ -171,7 +230,9 @@ async function buildModules() {
   ui.setProgress(list.length / total, 'Das Schiff wird zusammengesetzt …');
   await nextPaint();
   try {
+    const t0 = performance.now();
     await world.bake((p) => ui.setProgress((list.length + p) / total));
+    debug.timings.push({ id: 'bake', build: Math.round(performance.now() - t0), heap: heap(), at: Math.round(performance.now()) });
   } catch (e) {
     console.error('[app] bake fehlgeschlagen:', e);
     debug.errors.push({ id: 'bake', error: e });
@@ -236,9 +297,23 @@ async function main() {
   ui.setProgress(1, 'Leinen los!');
   await nextPaint();
   try {
-    // first frame under the loading screen: compiles shaders, uploads textures
+    world.onAfterBake?.(); // environment: exterior lamp volume, lamp-shadow casters
+  } catch (e) {
+    console.error('[app] onAfterBake fehlgeschlagen:', e);
+  }
+  try {
+    // first frame under the loading screen: compiles shaders, uploads textures; then compile the programs of every
+    // object (also the culled interior zones), so that walking around never stalls on a shader compile
+    const t0 = performance.now();
     world.updateVisibility(camera.position);
+    // compile in parallel (KHR_parallel_shader_compile) while the loading screen keeps animating
+    try {
+      if (renderer.compileAsync) await renderer.compileAsync(scene, camera);
+      else renderer.compile(scene, camera);
+    } catch (e) { console.warn('[app] compile', e); }
     if (post) post.render(0); else renderer.render(scene, camera);
+    debug.timings?.push({ id: 'firstFrame', build: Math.round(performance.now() - t0), at: Math.round(performance.now()) });
+    debug.readyAt = Math.round(performance.now());
   } catch (e) {
     console.error('[app] erster Frame fehlgeschlagen:', e);
   }

@@ -5,10 +5,10 @@
 // class general room and smoking room, steering gear). The well-deck bulkheads (x 78, 94, −90, −106) with their doors
 // belong to the exterior module; rooms touching them leave that wall out.
 import { DECK_Y } from '../core/constants.js';
-import { buildDeckShell, createDeckPlan, basinSmall, bench, showerBath, locker, bunkCrew, workbench, shelves, tableRect, chairDining, pottedPalm, sofa, armchair, tableRound, desk, safe, bookcase, PRESETS } from '../interior/kit.js';
+import { buildDeckShell, createDeckPlan, basinSmall, bench, showerBath, locker, bunkCrew, workbench, shelves, tableRect, chairDining, pottedPalm, sofa, armchair, tableRound, desk, safe, bookcase, PRESETS, writingDesk, picture, clockWall, sconce } from '../interior/kit.js';
 import {
   bay, poster, grandLobby, aftLobby, purserOffice, enquiryOffice, suiteSitting, barberShop, library, promenade,
-  thirdSaloon, barPantry, steeringGear, windlassRoom, carpenter,
+  thirdSaloon, barPantry, steeringGear, windlassRoom, carpenter, crewMess,
 } from './c-hero.js';
 
 const deck = 'C';
@@ -39,6 +39,9 @@ function maidsSaloon(ctx) {
   ctx.fit(armchair({ kind: 'uph', mat: 'fabricBlue' }), ['far:hi', 'right:hi']);
   ctx.fit(bookcase({ w: 1.2, mat: 'mahogany' }), ['right:mid', 'left:mid']);
   ctx.fit(pottedPalm(), ['near:hi'], { collide: false });
+  ctx.fit(writingDesk({ mat: 'mahogany' }), ['near:hi', 'right:lo', 'left:lo']);
+  ctx.mount(picture({ w: 0.7, h: 0.5, v: 1 }), 'far', ctx.W * 0.5, 1.7); ctx.mount(clockWall(), 'near', ctx.W * 0.7, 2.1);
+  ctx.mount(sconce(), 'far', ctx.W * 0.2, 1.8); ctx.mount(sconce(), 'far', ctx.W * 0.8, 1.8);
 }
 function surgery(ctx) {
   ctx.fit(bunkCrew({ tiers: 1, cover: 'linen' }), ['far:mid', 'left:hi']);
@@ -103,10 +106,10 @@ export async function build(world) {
     });
   room('lampen', 'Lampenraum und Bootsmannsstore', 100, 106, LF.z, 99, lampRoom, [dP(103.2, { style: 'steel' })], SVC);
   gang('gang-back', 'Gang unter der Back', 106, 112, -0.7, 0.7, { lamp: 'bulkhead', wall: 'paintWhite' });
-  room('messe-matrosen', 'Mannschaftsmesse (Matrosen)', 106, 112, -99, -0.7, { preset: 'mess', set: true }, [dS(109)], { ...CREW, wall: 'pine',
+  room('messe-matrosen', 'Mannschaftsmesse (Matrosen)', 106, 112, -99, -0.7, crewMess, [dS(109)], { ...CREW, wall: 'pine',
     teleport: { name: 'Mannschaftsmesse', group: 'Besatzung' },
     info: { title: 'Mannschaftsmessen unter der Back', text: 'Unter der Back lagen die Messen der Decksmannschaft und der Heizer. Die Männer aßen an langen Tischen mit festen Bänken; das Essen kam aus der benachbarten Mannschaftsküche. Für die rund 900 Besatzungsmitglieder gab es keinen gemeinsamen Speisesaal – jede Abteilung hatte ihre eigene Messe.' } });
-  room('messe-heizer', 'Heizermesse', 106, 112, 0.7, 99, { preset: 'mess' }, [dP(109)], { ...CREW, wall: 'pine' });
+  room('messe-heizer', 'Heizermesse', 106, 112, 0.7, 99, crewMess, [dP(109)], { ...CREW, wall: 'pine' });
   const WL = { x0: 112, x1: 119 };
   room('ankerspill', 'Ankerspill-Maschinenraum', WL.x0, WL.x1, -99, 99, () => windlassRoom(plan, WL), [dA(0, { w: 0.9, style: 'steel' }), dF(0, { w: 0.9, style: 'steel' })], {
     ...SVC, wall: 'steel', floor: 'steelFloor', teleport: { name: 'Ankerspill-Maschinenraum', group: 'Besatzung', x: WL.x0 + 1.0, z: 0, yaw: 0 },
@@ -148,13 +151,14 @@ export async function build(world) {
     type: 'lobby', cls: 'first', stairs: true, walls: 'none', wall: 'oakPanel', floor: 'linoCream', lamp: 'bowl',
     info: { title: 'Große Treppe auf dem C-Deck', x: 38.4, z: 4.0, radius: 5, text: 'Auf dem C-Deck öffnete sich die vordere Große Treppe zu einer weiten Halle mit Eichentäfelung und einem Boden aus cremefarbenen und roten Linoleumfliesen. Hier lagen das Zahlmeisterbüro und das Auskunftsbüro, die erste Anlaufstelle der Passagiere nach dem Einschiffen. Vor der Treppe fuhren drei elektrische Aufzüge zwischen dem E- und dem A-Deck.' } });
   plan.wall(GL.x1, -CZ0, GL.x1, CZ0, { wall: 'oakPanel' });
-  tp('Große Treppe – C-Deck', '1. Klasse', 38.5, 4.6, 0);
+  tp('Große Treppe – C-Deck', '1. Klasse', 45.0, 0, Math.PI);
   row('p', { x0: GL.x0, x1: GL.x1, z0: -99, z1: -CZ1, count: 3, corridorSide: 'stbd', ...F1, wall: 'damaskGold' });
   room('zahlmeister', 'Zahlmeisterbüro', GL.x0, 42.5, CZ1, 99, purserOffice, [dP(40.2, { style: 'oak' })], {
     type: 'office', cls: 'first', wall: 'oakDado', floor: 'carpetGreen', teleport: { name: 'Zahlmeisterbüro', group: '1. Klasse' },
     info: { title: 'Zahlmeisterbüro', text: 'Zahlmeister Hugh McElroy und seine Gehilfen verwahrten im Tresor dieses Büros Geld, Schmuck und Wertpapiere der Passagiere, gaben Wertmarken aus und wechselten Devisen. Hier gaben die Passagiere auch ihre Marconi-Telegramme auf. In der Unglücksnacht drängten sich Passagiere vor dem Schalter, um ihre Wertsachen zurückzufordern.' } });
   room('auskunft', 'Auskunftsbüro', 42.5, GL.x1, CZ1, 99, enquiryOffice, [dP(47.3, { style: 'oak' })], { type: 'office', cls: 'first', wall: 'oakDado', floor: 'carpetGreen' });
   bay(plan, 43.0, 46.6, CZ1, { sill: 1.05, head: 2.1, neg: 'oakPanel', pos: 'oakPanel', frame: 'mahogany', grille: true, shelf: 0.12 });
+  bay(plan, 41.0, 42.4, CZ1, { sill: 1.05, head: 2.1, neg: 'oakPanel', pos: 'oakPanel', frame: 'mahogany', grille: true, shelf: 0.12 });
 
   // ---------------------------------------------------------------- x 2..37.5  (funnel casings 2: 30.5..37.5, 3: 8.5..15.5)
   for (const s of [-1, 1]) gang(s < 0 ? 'gang-bb-m' : 'gang-stb-m', s < 0 ? 'Kabinengang Backbord (mittschiffs)' : 'Kabinengang Steuerbord (mittschiffs)', 2, GL.x0, s < 0 ? -CZ1 : CZ0, s < 0 ? -CZ0 : CZ1, { handrail: true, floor: 'linoCream', group: '1. Klasse' });
@@ -197,7 +201,7 @@ export async function build(world) {
   room('treppe-achtern', 'Halle der hinteren Großen Treppe (C-Deck)', AL.x0, AL.x1, -CZ1, CZ1, () => aftLobby(plan, AL), [], {
     type: 'lobby', cls: 'first', stairs: true, walls: 'none', wall: 'oakPanel', floor: 'linoCream', lamp: 'bowl',
     info: { title: 'Hintere Große Treppe', x: -5.8, z: -4.0, radius: 5, text: 'Die hintere Große Treppe begann auf dem C-Deck und führte, ebenso prunkvoll wie die vordere, hinauf bis zum Bootsdeck mit seiner eigenen Glaskuppel. Sie erschloss den hinteren Teil der Ersten Klasse mit dem Rauchsalon, dem À-la-carte-Restaurant und dem Café Parisien. Beim Untergang brach das Schiff ungefähr an dieser Stelle auseinander.' } });
-  tp('Große Treppe (achtern) – C-Deck', '1. Klasse', -5.8, -3.6, 0);
+  tp('Große Treppe (achtern) – C-Deck', '1. Klasse', 1.0, 0, Math.PI);
   outside(AL.x0, AL.x1, 2);
 
   // ---------------------------------------------------------------- x −38.5..−6.5  (funnel casing 4: −13.5..−6.5, engine casing −36..−24)
@@ -225,9 +229,9 @@ export async function build(world) {
   for (const z of [-CZC, CZC]) plan.wall(-38.5, z - 0.9, -38.5, z + 0.9, { wall: 'whitePanel', doors: [{ at: z, w: 0.9 }] });
   const LB = { x0: -59, x1: -47.5 };
   const bays = [[-57.3, -55.0], [-54.4, -52.1], [-51.5, -49.2]];
-  room('bibliothek-2', 'Bibliothek 2. Klasse', LB.x0, LB.x1, -WZ, WZ, () => library(plan, LB, WZ, bays),
+  room('bibliothek-2', 'Bibliothek 2. Klasse', LB.x0, LB.x1, -WZ, WZ, (ctx) => library(ctx, LB, WZ, bays),
     [dF(-4.5, { w: 1.4, leaf: false, style: 'mahogany' }), dF(4.5, { w: 1.4, leaf: false, style: 'mahogany' }), dA(-4.5, { w: 1.2, style: 'mahogany' }), dA(4.5, { w: 1.2, style: 'mahogany' })], {
-      type: 'public', cls: 'second', wall: 'mahoganyDado', floor: 'carpetGreen', lamp: 'bowl',
+      type: 'public', cls: 'second', wall: 'libAdam', floor: 'carpetGreen', lamp: false,
       teleport: { name: 'Bibliothek 2. Klasse', group: '2. Klasse', x: -48.4, z: -3.0, yaw: Math.PI },
       info: { title: 'Bibliothek der 2. Klasse', x: -53.3, z: 0, radius: 6, text: 'Die Bibliothek der Zweiten Klasse war mit hellem Bergahorn getäfelt, darunter ein geschnitzter Mahagonisockel; Mahagonimöbel mit grünem Bezug und ein großer Bücherschrank luden zum Lesen und Briefeschreiben ein. Große Fenster gingen auf die verglasten Promenaden an beiden Seiten. Der Lehrer Lawrence Beesley, der hier am Nachmittag des 14. April saß, beschrieb den Raum später in seinem Buch über den Untergang.' } });
   for (const s of [-1, 1]) {
@@ -268,14 +272,14 @@ export async function build(world) {
   }, [], { type: 'lobby', cls: 'third', stairs: true, walls: 'none', wall: 'paintWhite', floor: 'linoRed', lamp: 'bulkhead' });
   tp('Eingangshalle 3. Klasse (achtern)', '3. Klasse', -107.0, -3.4, Math.PI);
   const GR = { x0: -122, x1: -106 }, DOOR3 = -108.6, HATCH = [-121.4, -119.4];
-  room('aufenthalt-3', 'Allgemeiner Aufenthaltsraum 3. Klasse', GR.x0, GR.x1, LP.z, 99, () => thirdSaloon(plan, GR, 1, LP.z, false, DOOR3),
+  room('aufenthalt-3', 'Allgemeiner Aufenthaltsraum 3. Klasse', GR.x0, GR.x1, LP.z, 99, (ctx) => thirdSaloon(ctx, GR, 1, LP.z, false, DOOR3),
     [dP(DOOR3, { w: 1.2, style: 'pine' })], {
-      type: 'public', cls: 'third', walls: ['aft', 'port', 'stbd'], wall: { base: 'whiteDado', dado: 'pine', skirt: 'pine' }, floor: 'linoRed', lamp: 'dome',
+      type: 'public', cls: 'third', walls: ['aft', 'port', 'stbd'], wall: 'third3', floor: 'linoRed', lamp: 'dome',
       teleport: { name: 'Aufenthaltsraum 3. Klasse', group: '3. Klasse', x: DOOR3, z: 6.9, yaw: Math.PI },
       info: { title: 'Allgemeiner Aufenthaltsraum der 3. Klasse', x: -114, z: 7.0, text: 'Der Gesellschaftsraum der Dritten Klasse war mit weiß lackierter Kiefer getäfelt und mit massiven Teakholztischen und -bänken eingerichtet. Ein Klavier sorgte für Musik und Tanz, an den Wänden hingen Plakate der White Star Line. Für viele Auswanderer war dieser Raum komfortabler als alles, was sie aus der Heimat kannten.' } });
-  room('rauchsalon-3', 'Rauchsalon 3. Klasse', GR.x0, GR.x1, -99, -LP.z, () => thirdSaloon(plan, GR, -1, LP.z, true, DOOR3, HATCH),
+  room('rauchsalon-3', 'Rauchsalon 3. Klasse', GR.x0, GR.x1, -99, -LP.z, (ctx) => thirdSaloon(ctx, GR, -1, LP.z, true, DOOR3, HATCH),
     [dS(DOOR3, { w: 1.2, style: 'oak' })], {
-      type: 'public', cls: 'third', walls: ['aft', 'port', 'stbd'], wall: 'oak', floor: 'linoRed', lamp: 'dome',
+      type: 'public', cls: 'third', walls: ['aft', 'port', 'stbd'], wall: 'third3oak', floor: 'linoRed', lamp: 'dome',
       teleport: { name: 'Rauchsalon 3. Klasse', group: '3. Klasse', x: DOOR3, z: -6.9, yaw: Math.PI },
       info: { title: 'Rauchsalon der 3. Klasse', x: -114, z: -7.0, text: 'Der Rauchsalon der Dritten Klasse war mit Eiche getäfelt und mit robusten Bänken, Tischen und Stühlen aus Teak möbliert; Spucknäpfe aus Messing standen auf dem Boden. Durch eine Durchreiche aus der Bar wurden Bier und Spirituosen ausgeschenkt. Der Raum war den Männern vorbehalten, die hier rauchten, Karten spielten und diskutierten.' } });
   bay(plan, HATCH[0], HATCH[1], -LP.z, { sill: 1.0, head: 1.9, neg: 'oak', pos: 'paintWhite', frame: 'oak', shelf: 0.15 });

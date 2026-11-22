@@ -35,7 +35,7 @@ export async function build(world) {
   gang('gang-v-bb', 'Gang G-Deck vorn (Backbord)', 66, 90, -S1, -S0, { handrail: true, lamp: 'bulkhead',
     teleport: { name: 'Kabinen 3. Klasse vorn (G-Deck)', group: '3. Klasse', x: 84, z: -SC, yaw: Math.PI } });
   gang('gang-v-stb', 'Gang G-Deck vorn (Steuerbord)', 66, 90, S0, S1, { handrail: true, lamp: 'bulkhead' });
-  room('squash', 'Squash-Court', 76.6, 85.7, -S0, S0, squashCourt, [dA(0, { style: 'oak' })], {
+  room('squash', 'Squash-Court', 76.6, 85.7, -S0, S0, squashCourt, [dA(0, { style: 'white', glazed: false })], {
     type: 'sport', cls: 'first', wall: 'paintWhite', floor: 'oak', lamp: 'bulkhead', lampPitch: 3.5, group: '1. Klasse',
     teleport: { name: 'Squash-Court', group: '1. Klasse' },
     info: { title: 'Der Squash-Court', text: 'Der Squash-Court der Titanic war 9,1 mal 6,1 Meter groß und reichte im Original über zwei Decks; vom F-Deck aus konnten Zuschauer von einer Galerie zusehen. Passagiere der Ersten Klasse zahlten zwei Schilling für eine halbe Stunde. Trainer war der Profi Frederick Wright, der beim Untergang ums Leben kam.' } });

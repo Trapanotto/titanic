@@ -84,7 +84,7 @@ export function woodPanel({ size = 512, metres = 1.2, base = '#87592e', seed = 7
     const p = panelProfile(d, F, M, BV, true);
     const vertical = d >= F || dx <= dy; // stiles + field: vertical grain, rails: horizontal
     const i = vertical ? x * S + y : y * S + x;
-    const g = woodPixel(G, i, vertical ? x : y, S, 22, o, B, { contrast: 0.2, fleckK: 0.6, poreK: 0.25 });
+    const g = woodPixel(G, i, vertical ? x : y, S, 22, o, B, { contrast: 0.1, fleckK: 0.45, poreK: 0.16 });
     if (d >= F + M + 3) mul(o, 1.04);
     blend(o, DARK, (1 - p.ao) * 0.5);
     o.h = p.h + 0.004 * g.late - 0.01 * g.pore;
@@ -134,17 +134,22 @@ export function pineBoards({ size = 512, metres = 1.6, boards = 8, base = '#c4a5
   });
 }
 
-export function mahoganyFigure({ size = 512, metres = 1.5, base = '#5c2818', seed = 9 } = {}) {
-  const S = size, G = grainFields(S, seed), B = hex(base);
-  const fig = fbm(S, 4, 2, 3, seed + 20);
-  return surface({ size: S, metres, normal: 0.8 }, (x, y, o) => {
+// Polished (French-polished) mahogany: deep red-brown, fine interlocked "ribbon" figure that shows mostly as a change
+// of sheen (roughness) rather than of colour; low-contrast straight grain, fine dark pores.
+export function mahoganyFigure({ size = 512, metres = 1.5, base = '#47251a', seed = 9 } = {}) {
+  const S = size, G = grainFields(S, seed), B = hex(base), DEEP = hex('#381c13'), WARM = hex('#55301f');
+  const fig = fbm(S, 4, 2, 3, seed + 20), drift = fbm(S, 2, 3, 3, seed + 21);
+  return surface({ size: S, metres, normal: 0.6 }, (x, y, o) => {
     const i = y * S + x;
-    const g = woodPixel(G, i, y, S, 40, o, B, { contrast: 0.18, poreK: 0.35 });
-    const ribbon = 0.5 + 0.5 * Math.sin(TAU * (y / S * 7 + fig[i] * 1.5));
-    mul(o, 0.85 + 0.3 * ribbon);
-    o.h = 0.2 * g.late - 0.7 * g.pore;
-    o.rough = 0.3 + 0.12 * g.pore;
-    o.ao = 1 - 0.25 * g.pore;
+    const g = woodPixel(G, i, y, S, 46, o, B, { contrast: 0.07, poreK: 0.12 });
+    // interlocked grain: narrow ribbons (~3 cm) that wander slightly
+    const ribbon = 0.5 + 0.5 * Math.sin(TAU * (y / S * 48 + fig[i] * 2.2));
+    const rib = sstep(0.25, 0.75, ribbon);
+    blend(o, WARM, 0.12 * rib);
+    blend(o, DEEP, 0.18 * (1 - drift[i]));               // slow colour drift across a board
+    o.h = 0.08 * g.late - 0.5 * g.pore + 0.04 * rib;
+    o.rough = 0.3 + 0.08 * (1 - rib) + 0.1 * g.pore;     // the figure shimmers in the sheen
+    o.ao = 1 - 0.15 * g.pore;
   });
 }
 
@@ -333,12 +338,13 @@ export function carpet({ size = 512, metres = 1.0, ground = '#5a1d1c', motif = '
 
 export function linoTiles({ size = 512, metres = 1.2, n = 4, a = '#cbbd98', b = '#7a3b2c', inset = false, rough = 0.42, seed = 27, mottle = 0.06 } = {}) {
   const S = size, q = S / n, A = hex(a), B = hex(b);
-  const sp = vnoise(S, 128, 128, seed), mot = fbm(S, 12, 12, 3, seed + 1), wax = fbm(S, 3, 3, 4, seed + 2), scuff = vnoise(S, 64, 6, seed + 3);
+  const sp = vnoise(S, 128, 128, seed), mot = fbm(S, Math.max(2, Math.round(10 * metres)), Math.max(2, Math.round(10 * metres)), 3, seed + 1), wax = fbm(S, 3, 3, 4, seed + 2), scuff = vnoise(S, 64, 6, seed + 3);
   return surface({ size: S, metres, normal: 1.5 }, (x, y, o) => {
     const i = y * S + x, tx = Math.floor(x / q), ty = Math.floor(y / q);
     const fx = x - tx * q, fy = y - ty * q;
     const even = (tx + ty) % 2 === 0;
-    put(o, even ? A : B, 0.97 + 0.05 * hash2(tx, ty, seed));
+    put(o, even ? A : B, 0.95 + 0.08 * hash2(tx, ty, seed));
+    blend(o, even ? B : A, 0.04);                       // linoleum: the two colours are never pure
     if (inset && even) {
       const cu = Math.abs(fx - q / 2), cv = Math.abs(fy - q / 2);
       if (cu + cv < q * 0.2) put(o, B, 0.95);

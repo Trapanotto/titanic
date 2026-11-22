@@ -8,7 +8,7 @@ import { buildDeckShell, bulkhead, createDeckPlan, bench, shelves, workbench, lo
 import { DINING1, DINING2, dining1Walls, dining2Walls, furnishDining1, furnishDining2 } from './d-saloon.js';
 import {
   RECEPTION, furnishReception, furnishVestibule, furnishGalley, furnishBakery, furnishPastry, furnishButcher, furnishVeg,
-  furnishScullery, furnishSurgery, furnishDispensary, washroom,
+  furnishScullery, furnishSurgery, furnishDispensary, furnishWard, washroom,
 } from './d-hero.js';
 
 const deck = 'D';
@@ -130,10 +130,10 @@ export async function build(world) {
       type: 'public', cls: 'first', stairs: true, casing: true, wall: { base: 'whitePanel', cornice: 'gold' }, ceiling: 'plaster', lamp: 'chandelier',
       teleport: { name: 'Empfangsraum 1. Klasse', group: '1. Klasse', x: 32.2, z: -3.8, yaw: -0.25 },
       info: { title: 'Empfangsraum der 1. Klasse', x: 34, z: 6, radius: 7, text: 'Der Empfangsraum am Fuß der Großen Treppe war im jakobinischen Stil mit weiß lackierter, geschnitzter Holztäfelung ausgestattet. Auf dem Axminster-Teppich standen Korbsessel und kleine Tische; ein Steinway-Flügel sorgte für Musik. Vor dem Dinner trafen sich hier die Passagiere der Ersten Klasse, danach spielte das Bordorchester für die Gäste beim Kaffee.' } });
-  world.addTeleport({ name: 'Große Treppe – D-Deck', deck, x: 42, z: 4.3, yaw: Math.PI / 2, group: '1. Klasse' });
-  world.addInfo({ title: 'Die Große Treppe am D-Deck', x: 42, y: Y + 1.5, z: 3.4, radius: 4, text: 'Die vordere Große Treppe reichte vom Bootsdeck bis hinunter zum E-Deck. Auf dem D-Deck mündete sie in den Empfangsraum, den die Passagiere vor dem Dinner auf dem Weg in den Speisesaal durchquerten. Das schmiedeeiserne Geländer und die Eichenbalustrade wiederholten sich auf jedem Deck.' });
-  world.addInfo({ title: 'Der Aubusson-Wandteppich', x: 38.2, y: Y + 1.5, z: 0, radius: 3, text: 'Gegenüber der Treppe hing im Empfangsraum ein großer französischer Wandteppich aus Aubusson mit einer Jagdszene. Er bildete den Blickfang für alle, die die Treppe herabkamen. Teile ähnlicher Ausstattung des Schwesterschiffs Olympic sind bis heute erhalten.' });
-  world.addInfo({ title: 'Die Aufzüge am D-Deck', x: 45.0, y: Y + 1.5, z: -3.3, radius: 2.5, text: 'Unmittelbar vor der Großen Treppe lagen die drei Aufzüge der Ersten Klasse. Sie verbanden das E-Deck mit dem A-Deck und hatten kunstvoll verzierte Scherengitter aus Schmiedeeisen. Liftboys in Uniform bedienten die Kabinen.' });
+  world.addTeleport({ name: 'Große Treppe – D-Deck', deck, x: 45.0, z: 0, yaw: Math.PI, group: '1. Klasse' });
+  world.addInfo({ title: 'Die Große Treppe am D-Deck', x: 43.6, y: Y + 1.5, z: 3.6, radius: 4, text: 'Die vordere Große Treppe reichte vom Bootsdeck bis hinunter zum E-Deck. Auf dem D-Deck mündete sie in den Empfangsraum: Über die beiden Seitenläufe kamen die Passagiere vom Zwischenpodest herab, am Fuß des Mittellaufs stand auf dem Pfosten ein Bronzecherub mit Fackellampe. Das schmiedeeiserne Geländer mit vergoldeten Rosetten und die Eichenbalustrade wiederholten sich auf jedem Deck.' });
+  world.addInfo({ title: 'Der Aubusson-Wandteppich', x: 43.6, y: Y + 1.5, z: -1.2, radius: 2.5, text: 'Über dem Empfangsraum hing auf dem Zwischenpodest der Treppe ein großer französischer Wandteppich aus Aubusson mit einer Jagdszene. Er bildete den Blickfang für alle, die vom Empfangsraum zur Treppe hinaufsahen. Teile ähnlicher Ausstattung des Schwesterschiffs Olympic sind bis heute erhalten.' });
+  world.addInfo({ title: 'Die Aufzüge am D-Deck', x: 45.0, y: Y + 1.5, z: -3.6, radius: 2.0, text: 'Unmittelbar vor der Großen Treppe lagen die drei Aufzüge der Ersten Klasse. Sie verbanden das E-Deck mit dem A-Deck und hatten kunstvoll verzierte Scherengitter aus Schmiedeeisen. Liftboys in Uniform bedienten die Kabinen.' });
 
   // ============================================================== x −6.5..30.5  First-class Dining Saloon
   dining1Walls(plan);
@@ -189,10 +189,10 @@ export async function build(world) {
   room('wc-2-damen', 'WC Damen 2. Klasse', -74, -68, 1.2, 3.3, 'wc', [dP(-71)], { ...WET, cls: 'second' });
   const HOSP = { type: 'hospital', wall: 'paintWhite', floor: 'linoCream', lamp: 'dome', group: 'Hospital' };
   gang('hosp-gang', 'Gang zum Hospital', -74, -59, S2a, S2b, { wall: 'paintWhite', floor: 'linoCream' });
-  room('hospital', 'Hospital', -74, -66, S2b, 99, { preset: 'hospital', beds: 6 }, [dP(-70.5, { w: 1.2 })], { ...HOSP,
+  room('hospital', 'Hospital', -74, -66, S2b, 99, (ctx) => furnishWard(ctx, 5), [dP(-70.5, { w: 1.2 })], { ...HOSP,
     teleport: { name: 'Hospital', group: '2. Klasse' },
     info: { title: 'Das Bordhospital', text: 'Achtern auf der Steuerbordseite des D-Decks lag das Hospital mit Krankensälen für Männer und Frauen, einer Isolierstation für ansteckende Krankheiten, einer Apotheke und einem Operationsraum. Es wurde vom Schiffsarzt William O’Loughlin und seinem Assistenten John Edward Simpson geleitet. Beide Ärzte kamen beim Untergang ums Leben.' } });
-  room('isolier', 'Isolierstation', -66, -61, S2b, 99, { preset: 'hospital', beds: 2 }, [dP(-63.5)], HOSP);
+  room('isolier', 'Isolierstation', -66, -61, S2b, 99, (ctx) => furnishWard(ctx, 3), [dP(-63.5)], HOSP);
   room('hosp-bad', 'Bad des Hospitals', -61, -59, S2b, 99, 'bathroom', [dP(-60)], { ...HOSP, ...WET });
   room('op', 'Operationsraum', -74, -69, CH + 0.3, S2a, furnishSurgery, [dS(-71.5)], { ...HOSP, wall: 'tile', floor: 'tileWhite' });
   room('apotheke', 'Apotheke', -69, -64, CH + 0.3, S2a, furnishDispensary, [dS(-66.5)], HOSP);

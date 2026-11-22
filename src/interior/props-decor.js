@@ -171,7 +171,7 @@ export const ceilingLight = def('ceilingLight', [0.4, 0.4, 0.2], (p, o) => {
   if (st === 'bowl') { // gilt rose, three chains, cut-glass bowl in a gilt ring
     p.lathe(M.gold, ROSE(0.1), 0, 0, 0, 12);
     for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; p.loft(M.gold, [[Math.cos(a) * 0.05, -0.04, Math.sin(a) * 0.05], [Math.cos(a) * 0.19, -0.2, Math.sin(a) * 0.19]], 0.004, 4, false); }
-    p.lathe(M.gold, [[0.2, -0.2], [0.21, -0.21], [0.2, -0.225], [0.19, -0.215]], 0, 0, 0, 20);
+    p.lathe(M.gold, [[0.2, -0.2], [0.21, -0.21], [0.2, -0.225], [0.19, -0.215], [0.2, -0.2]], 0, 0, 0, 20); // closed ring profile
     p.rev(K.cutGlass, [{ o: 0.02, y: -0.33, m: 0 }, { o: 0.1, y: -0.315, m: 0.006 }, { o: 0.16, y: -0.27, m: 0.008 }, { o: 0.192, y: -0.215, m: 0.004 }], { seg: 24, k: 12, capBottom: true, capTop: true }, 0, 0, 0);
     p.lathe(M.gold, [[0, 0], [0.022, 0], [0.02, -0.03], [0.008, -0.05], [0, -0.06]], 0, -0.32, 0, 8);
   } else if (st === 'bulkhead') {

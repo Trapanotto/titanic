@@ -448,6 +448,18 @@ export class Minimap {
         g.beginPath(); g.moveTo(xm + dir * h, zc); g.lineTo(xm - dir * h * 0.6, zc - wv); g.lineTo(xm - dir * h * 0.6, zc + wv); g.closePath();
         g.fillStyle = up ? '#8a5f14' : '#2c3b50'; g.fill();
       };
+      if (s.type === 'imperial') {
+        // imperial: the central flight climbs from the foot (x1) towards -x to the half-landing; the two side flights
+        // arrive from below at x1 – going down, one walks them towards -x as well
+        const xm = (s.x0 + s.x1) / 2, h = Math.min(len * 0.3, 1.4);
+        const tri = (zc, w, col) => {
+          g.beginPath(); g.moveTo(xm - h, zc); g.lineTo(xm + h * 0.6, zc - w); g.lineTo(xm + h * 0.6, zc + w); g.closePath();
+          g.fillStyle = col; g.fill();
+        };
+        if (i < s.decks.length - 1) tri(s.zc, Math.min(s.cw * 0.6, 0.6), '#8a5f14');
+        if (i > 0) { const zs = (s.cw + s.gap + s.lane) / 2, w = Math.min((s.lane - s.cw - s.gap) * 0.35, 0.5); tri(s.zc - zs, w, '#2c3b50'); tri(s.zc + zs, w, '#2c3b50'); }
+        continue;
+      }
       if (i < s.decks.length - 1) arrow(i, true);
       if (i > 0) arrow(i - 1, false);
     }

@@ -30,9 +30,9 @@ export function canvasTexture(size, metres, draw, seed = 1) {
 const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
 const S = {
   deck: woodPlanks({ size: 1024, metres: 4, planks: 32, base: '#b6a283', seed: 3 }),
-  oak: woodSolid({ base: '#8c5f35', fleck: 0.7, seed: 5, rough: 0.5 }),
-  oakPanel: woodPanel({ base: '#875a30', seed: 7 }),
-  mahogany: mahoganyFigure({ base: '#5e2a1a', seed: 9 }),
+  oak: woodSolid({ base: '#85603a', fleck: 0.5, contrast: 0.13, seed: 5, rough: 0.5 }),
+  oakPanel: woodPanel({ base: '#805c37', seed: 7 }),
+  mahogany: mahoganyFigure({ base: '#44251a', seed: 9 }),
   pine: pineBoards({ base: '#c3a473', seed: 11 }),
   whitePanel: paintedPanel({ base: '#e6e3da', seed: 13 }),
   steel: rivetedSteel({ metres: 2.4, base: '#8b8e90', seed: 15 }),
@@ -40,8 +40,9 @@ const S = {
   carpetRed: carpet({ ground: '#5a1f1d', motif: '#97794a', accent: '#2f3a2c', seed: 21 }),
   carpetGreen: carpet({ ground: '#2c3a2b', motif: '#958452', accent: '#57261f', seed: 23 }),
   carpetBlue: carpet({ ground: '#252e44', motif: '#a09368', accent: '#5a2a25', seed: 25 }),
-  linoCream: linoTiles({ a: '#cbc0a2', b: '#70493e', inset: true, metres: 1.2, seed: 27, mottle: 0.08 }),
-  linoBlue: linoTiles({ a: '#d3ccb8', b: '#4f5c6e', inset: true, metres: 1.2, seed: 29, mottle: 0.08 }),
+  // 30 cm tiles, 8 x 8 per texture (2.4 m repeat, so the mottling / wax sheen does not visibly tile)
+  linoCream: linoTiles({ a: '#bdb193', b: '#784e42', inset: true, metres: 2.4, n: 8, seed: 27, mottle: 0.1 }),
+  linoBlue: linoTiles({ a: '#c9c2ae', b: '#505d6e', inset: true, metres: 2.4, n: 8, seed: 29, mottle: 0.1 }),
   linoRed: linoTiles({ a: '#7f4535', b: '#74402f', metres: 1.0, rough: 0.5, seed: 31, mottle: 0.12 }),
   tileWhite: ceramicTiles({ seed: 33 }),
   steelFloor: treadPlate({ seed: 35 }),
@@ -86,21 +87,98 @@ if (!THREE.ShaderChunk.lights_pars_begin.includes('TITANIC_SOFT_FALLOFF')) {
 function std(opts) { return new THREE.MeshStandardMaterial(opts); }
 function phys(opts) { return new THREE.MeshPhysicalMaterial(opts); }
 
-/** Glass: cheap transparency + env reflections, opacity rises towards grazing angles (fresnel). */
+// ------------------------------------------------------------------ shared lighting uniforms
+// Written by the environment every frame. Fixed set of uniforms -> no shader recompiles.
+//  uWinGlow      warm night glow of window glass seen from outside (0 by day / from inside)
+//  uShipVol*     baked irradiance volume of the exterior deck lamps (night): pools of light on the planking and the
+//                white superstructure, visible from any distance (the real point-light pool only covers ~15 m)
+const placeholderVol = new THREE.Data3DTexture(new Uint8Array(1), 1, 1, 1);
+placeholderVol.format = THREE.RedFormat;
+placeholderVol.needsUpdate = true;
+export const lightingUniforms = {
+  uWinGlow: { value: 0 },
+  uShipVol: { value: placeholderVol },
+  uShipVolK: { value: 0 },
+  uShipVolMax: { value: 3 },
+  uShipVolMin: { value: new THREE.Vector3(0, -1000, 0) },
+  uShipVolInv: { value: new THREE.Vector3(1, 1, 1) },
+  uShipVolColor: { value: new THREE.Color(1.0, 0.78, 0.52) },
+  uShipAmb: { value: new THREE.Color(0, 0, 0) },   // soft overall glow of the lit ship at night (seen from outside)
+};
+
+const WORLDPOS_VERT = /* glsl */ `
+  {
+    vec4 tw = vec4( transformed, 1.0 );
+    #ifdef USE_BATCHING
+      tw = batchingMatrix * tw;
+    #endif
+    #ifdef USE_INSTANCING
+      tw = instanceMatrix * tw;
+    #endif
+    vTitW = ( modelMatrix * tw ).xyz;
+  }`;
+
+/** Adds the exterior lamp volume (night) to a lit material as extra indirect light (affected by AO maps). */
+function shipLampPatch(sh) {
+  Object.assign(sh.uniforms, lightingUniforms);
+  sh.vertexShader = 'varying vec3 vTitW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>' + WORLDPOS_VERT);
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', `#include <common>
+varying vec3 vTitW;
+uniform highp sampler3D uShipVol;
+uniform float uShipVolK, uShipVolMax;
+uniform vec3 uShipVolMin, uShipVolInv, uShipVolColor, uShipAmb;`)
+    .replace('#include <aomap_fragment>', /* glsl */ `
+  if ( uShipVolK > 0.0 ) {
+    vec3 sN = inverseTransformDirection( normal, viewMatrix );
+    if ( abs( vTitW.x ) < 140.0 && abs( vTitW.z ) < 17.0 && vTitW.y > 10.0 ) {
+      // light spilling from hundreds of windows and deck lamps: strongest around the decks, fading up the funnels
+      float gy = 1.0 - 0.7 * smoothstep( 31.0, 52.0, vTitW.y );
+      reflectedLight.indirectDiffuse += material.diffuseColor * uShipAmb * gy * ( 0.75 + 0.25 * sN.y );
+    }
+    vec3 uvw = ( vTitW + sN * 0.3 - uShipVolMin ) * uShipVolInv;
+    if ( all( greaterThan( uvw, vec3( 0.0 ) ) ) && all( lessThan( uvw, vec3( 1.0 ) ) ) ) {
+      float e = texture( uShipVol, uvw ).r;
+      e = e * e * uShipVolMax * uShipVolK * ( 0.62 + 0.38 * max( sN.y, 0.0 ) );
+      reflectedLight.indirectDiffuse += material.diffuseColor * uShipVolColor * ( e * RECIPROCAL_PI );
+      reflectedLight.indirectSpecular += material.specularColor * uShipVolColor * ( e * 0.06 );
+    }
+  }
+  #include <aomap_fragment>`);
+}
+
+/** Glass: cheap transparency + env reflections, opacity rises towards grazing angles (fresnel).
+ *  At night, panes seen from outside glow warm (lit rooms behind them; the interiors far away are culled). */
 function glassMaterial() {
   const m = phys({
     color: 0xd2e2e6, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.14, side: THREE.DoubleSide,
     depthWrite: false, ior: 1.5, specularIntensity: 1, envMapIntensity: 1.6,
   });
   m.onBeforeCompile = (sh) => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', /* glsl */ `
+    sh.uniforms.uWinGlow = lightingUniforms.uWinGlow;
+    sh.vertexShader = 'varying vec3 vTitW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>' + WORLDPOS_VERT);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vTitW;\nuniform float uWinGlow;')
+      .replace('#include <opaque_fragment>', /* glsl */ `
       {
         float fr = pow(1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0), 4.0);
         diffuseColor.a = mix(diffuseColor.a, 0.85, fr);
+        if ( uWinGlow > 0.0 ) {
+          // one value per pane-sized cell: rooms are lit a little differently, a few are dark
+          vec3 cell = floor( vTitW * vec3( 0.55, 0.36, 0.55 ) );
+          float h = fract( sin( dot( cell, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 );
+          float lit = 0.55 + 0.6 * h;
+          lit *= step( 0.07, fract( h * 13.7 ) );
+          float far = smoothstep( 7.0, 26.0, length( vViewPosition ) );
+          float gk = uWinGlow * far;
+          vec3 warm = mix( vec3( 1.0, 0.66, 0.32 ), vec3( 1.0, 0.8, 0.52 ), h ) * 2.4 * lit;
+          outgoingLight = mix( outgoingLight, warm + outgoingLight * 0.3, gk );
+          diffuseColor.a = mix( diffuseColor.a, 0.93, gk );
+        }
       }
       #include <opaque_fragment>`);
   };
-  m.customProgramCacheKey = () => 'titanicGlass1';
+  m.customProgramCacheKey = () => 'titanicGlass2';
   return m;
 }
 
@@ -134,7 +212,7 @@ export const mats = {
   // --- wood ---
   oak: phys(surf({ roughness: 1, clearcoat: 0.25, clearcoatRoughness: 0.3 }, S.oak, 'anro')),
   oakPanel: phys(surf({ roughness: 1, clearcoat: 0.3, clearcoatRoughness: 0.26 }, S.oakPanel, 'anro')),
-  mahogany: phys(surf({ roughness: 1, clearcoat: 0.7, clearcoatRoughness: 0.12 }, S.mahogany, 'anro')),
+  mahogany: phys(surf({ roughness: 1, clearcoat: 0.55, clearcoatRoughness: 0.16 }, S.mahogany, 'anro', 0.7)),
   woodDark: phys(surf({ color: 0x4e3020, roughness: 1, clearcoat: 0.5, clearcoatRoughness: 0.18 }, S.oak, 'anro')),
   pine: std(surf({ roughness: 1 }, S.pine, 'anro')),
   // --- floors ---
@@ -174,6 +252,12 @@ export const mats = {
   navGreen: std({ color: 0x20ff50, emissive: 0x00ff30, emissiveIntensity: 2 }),
 };
 for (const [name, m] of Object.entries(mats)) m.name = name;
+const NO_LAMP_PATCH = new Set(['glass', 'windowLit', 'lampGlow', 'fire', 'navRed', 'navGreen', 'mirror']);
+for (const [name, m] of Object.entries(mats)) {
+  if (NO_LAMP_PATCH.has(name) || !m.isMeshStandardMaterial || m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile) continue;
+  m.onBeforeCompile = shipLampPatch;
+  m.customProgramCacheKey = () => 'titanicLampVol1';
+}
 
 /** Generated textures by surface name (albedo / normal / orm). */
 export const textures = Object.fromEntries(Object.entries(S).map(([k, s]) => [k, s.map]));

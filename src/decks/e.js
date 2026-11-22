@@ -156,8 +156,8 @@ export async function build(world) {
   room('grosse-treppe', 'Halle der Großen Treppe (E-Deck)', LX0, LX1, SR1, PL0, 'empty',
     [dS(39.6, { w: 2.0, leaf: false }), dS(44.4, { w: 2.0, leaf: false }), dP(38.7, { style: 'oak' })], {
       type: 'lobby', cls: 'first', stairs: true, wall: 'oakPanel', floor: 'linoCream', lamp: 'bowl',
-      teleport: { name: 'Große Treppe – E-Deck', group: '1. Klasse', x: 38.5, z: 4.2, yaw: 0 },
-      info: { title: 'Große Treppe auf dem E-Deck', x: 38.6, z: 1.5, radius: 5, text: 'Hier, sechs Decks unter der Glaskuppel, endet die vordere Große Treppe der Ersten Klasse. Auf dem E-Deck war sie schlichter gehalten als weiter oben: Eichentäfelung, ein Fliesenboden aus Linoleum und ein einfacher Treppenantritt. Von der Halle führte die „Park Lane“ zu den Kabinen, und eine Tür verband sie mit dem Arbeitsgang der Besatzung.' } });
+      teleport: { name: 'Große Treppe – E-Deck', group: '1. Klasse', x: 45.2, z: 0, yaw: Math.PI },
+      info: { title: 'Große Treppe auf dem E-Deck', x: 44.2, z: 3.6, radius: 5, text: 'Hier, sechs Decks unter der Glaskuppel, beginnt die vordere Große Treppe der Ersten Klasse. Ihr breiter Mittellauf steigt zu einem Zwischenpodest, von dem zwei Seitenläufe zum nächsten Deck zurückführen – dieselbe Anordnung wiederholt sich bis zum Bootsdeck. Unter dem untersten Podest liegen getäfelte Wandschränke; von der Halle führte die „Park Lane“ zu den Kabinen.' } });
   world.addInfo({ title: 'Aufzüge der 1. Klasse', x: 44.9, y: Y + 1.5, z: 3.4, radius: 3, text: 'Unmittelbar vor der Großen Treppe lagen drei elektrische Personenaufzüge, die das E-Deck mit dem A-Deck verbanden – 1912 ein außergewöhnlicher Luxus auf See. Jede mahagonigetäfelte Kabine hatte ein Sofa und wurde von einem Liftboy bedient. Die Zweite Klasse besaß einen eigenen, vierten Aufzug.' });
   room('stiefel-1', 'Stiefelputzraum', LX1, 50, SR1, 0, { preset: 'store', shelves: 2 }, [dP(48.75)], SVC);
   room('waesche-1', 'Wäschekammer 1. Klasse', LX1, 50, 0, PL0, 'linen', [dS(48.75)], SVC);

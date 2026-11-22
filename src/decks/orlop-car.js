@@ -1,73 +1,175 @@
-// Orlop deck: William Carter's 1912 Renault Type CE Coupé de Ville and its shipping crate, cargo-hold furnishing
-// that keeps walking lanes free, mail-room furnishing.
+// Orlop deck: William Carter's 1912 Renault Type CE Coupé de Ville beside its opened shipping crate with straw,
+// cargo-hold furnishing that keeps walking lanes free (crates, barrels, bales, netted sack piles), mail-room furnishing.
+import * as THREE from 'three';
 import { mats } from '../core/materials.js';
-import { PRESETS, overlap, sackPile, shelves, tableRect, safe, crate, stool, trunk } from '../interior/kit.js';
-import { defProp, carPaint } from './f-util.js';
+import { PRESETS, overlap, sackPile, shelves, tableRect, safe, crate, stool, trunk, def, kitMats } from '../interior/kit.js';
+import { carPaint } from './f-util.js';
+import { bagPile } from './g-hero.js';
+import { gratingMat } from './tank-lib.js';
 
-/** low-poly Renault Type CE Coupé de Ville (1912): sloping bonnet with dashboard radiator, open chauffeur's seat, closed coupé body */
-export const renault = defProp('fgRenault', [1.8, 4.55, 2.1], (p) => {
-  // wheels with wooden artillery spokes, axles, chassis
-  for (const x of [1.45, -1.35]) for (const z of [-0.74, 0.74]) {
-    p.cz(mats.rubber, 0.45, 0.12, x, 0.45, z, 16); p.cz(mats.woodDark, 0.34, 0.13, x, 0.45, z, 12); p.cz(mats.brass, 0.08, 0.17, x, 0.45, z, 8);
-    for (let k = 0; k < 3; k++) p.b(mats.oak, 0.05, 0.66, 0.06, x, 0.12, z).rotation.z = (k * Math.PI) / 3;
-  }
-  for (const x of [1.45, -1.35]) p.cz(mats.iron, 0.03, 1.4, x, 0.45, 0, 6);
-  for (const z of [-0.48, 0.48]) p.b(mats.iron, 4.1, 0.12, 0.07, 0.05, 0.48, z);
-  // mudguards and running boards
-  for (const z of [-0.76, 0.76]) {
-    p.b(mats.iron, 0.95, 0.03, 0.24, 1.45, 0.95, z); p.b(mats.iron, 0.4, 0.03, 0.24, 1.98, 0.8, z).rotation.z = -0.6;
-    p.b(mats.iron, 0.95, 0.03, 0.24, -1.35, 0.95, z); p.b(mats.iron, 0.4, 0.03, 0.24, -1.88, 0.8, z).rotation.z = 0.6;
-    p.b(mats.woodDark, 2.0, 0.04, 0.26, 0.05, 0.6, z * 1.08); p.b(mats.brass, 2.0, 0.01, 0.02, 0.05, 0.64, z * 1.2);
-  }
-  // Renault "coal-scuttle" bonnet sloping down to the front, radiator behind it at the dashboard
-  p.b(carPaint, 1.05, 0.38, 0.86, 1.6, 0.62, 0); p.b(carPaint, 1.1, 0.04, 0.88, 1.6, 0.98, 0).rotation.z = -0.2;
-  for (const z of [-0.44, 0.44]) for (let k = 0; k < 6; k++) p.b(mats.iron, 0.04, 0.2, 0.01, 1.25 + k * 0.12, 0.72, z);
-  p.b(mats.brass, 0.1, 0.62, 1.0, 1.02, 0.6, 0); p.b(mats.iron, 0.02, 0.5, 0.86, 1.075, 0.66, 0);
-  p.b(mats.brass, 0.06, 0.06, 0.06, 1.02, 1.24, 0);
-  for (const z of [-0.42, 0.42]) { p.cx(mats.brass, 0.11, 0.22, 2.2, 1.02, z, 10); p.cx(mats.mirror, 0.09, 0.02, 2.32, 1.02, z, 10); p.b(mats.iron, 0.05, 0.3, 0.03, 2.1, 0.62, z); }
-  p.cx(mats.brass, 0.04, 0.4, 2.0, 0.62, 0, 6);
-  // open chauffeur's compartment: low side panels, leather bench, wheel, levers, horn
-  for (const z of [-0.7, 0.7]) p.b(carPaint, 0.85, 0.42, 0.05, 0.55, 0.62, z);
-  p.b(mats.woodDark, 0.85, 0.03, 1.4, 0.55, 0.62, 0);
-  p.b(mats.leather, 0.5, 0.2, 1.3, 0.48, 0.65, 0); p.b(mats.leather, 0.12, 0.42, 1.36, 0.22, 0.85, 0);
-  p.b(mats.woodDark, 0.06, 0.38, 1.36, 0.98, 0.66, 0);
-  p.c(mats.iron, 0.022, 0.62, 0.84, 0.72, -0.32, 6).rotation.z = 0.55;
-  p.t(mats.woodDark, 0.19, 0.016, 0.7, 1.28, -0.32, 'y', 14).rotation.y = 0;
-  for (const z of [0.5, 0.58]) p.c(mats.brass, 0.012, 0.45, 0.85, 0.62, z, 4);
-  p.cx(mats.brass, 0.03, 0.5, 1.2, 1.2, 0.5, 6); p.s(mats.rubber, 0.06, 0.92, 1.2, 0.5, 1, 1, 1, true);
-  p.t(mats.rubber, 0.42, 0.06, 0.6, 0.98, 0.84, 'z', 16);
-  // enclosed coupé body for the owner: lower body, glazed upper part, roof, coach lamps, door handles
-  p.b(carPaint, 2.1, 0.58, 1.5, -0.85, 0.62, 0);
-  p.b(mats.leather, 0.55, 0.62, 1.52, -1.6, 1.2, 0);
-  p.b(mats.glass, 1.4, 0.54, 1.46, -0.6, 1.22, 0);
-  for (const x of [-1.32, -0.6, 0.15]) for (const z of [-0.74, 0.74]) p.b(carPaint, 0.08, 0.56, 0.04, x, 1.2, z);
-  for (const z of [-0.74, 0.74]) p.b(carPaint, 1.45, 0.06, 0.04, -0.6, 1.2, z);
-  p.b(carPaint, 0.06, 0.56, 1.5, 0.17, 1.2, 0);
-  p.b(mats.leather, 2.25, 0.1, 1.6, -0.82, 1.76, 0); p.b(mats.brass, 1.6, 0.03, 1.4, -0.85, 1.86, 0);
-  p.b(mats.fabricRed, 0.5, 0.42, 1.36, -1.48, 0.86, 0);
-  for (const z of [-0.8, 0.8]) { p.c(mats.brass, 0.06, 0.24, 0.24, 1.32, z, 8); p.b(mats.lampGlow, 0.02, 0.1, 0.06, 0.3, 1.38, z); p.b(mats.brass, 0.1, 0.02, 0.02, -0.5, 1.0, z * 0.95); }
-  p.b(mats.gold, 2.1, 0.02, 0.01, -0.85, 1.05, -0.755); p.b(mats.gold, 2.1, 0.02, 0.01, -0.85, 1.05, 0.755);
-  p.b(mats.iron, 0.3, 0.3, 0.9, -2.1, 0.62, 0);
-});
+const TAU = Math.PI * 2;
+function rng(seed) { let s = (seed * 2654435761) >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+const STRAW = 45;   // atlas cell
 
-/** the opened shipping crate the car travelled in (front +x = open end) */
-export const carCrate = defProp('fgCarCrate', [2.1, 4.9, 2.25], (p) => {
-  p.b(mats.pine, 4.9, 0.14, 2.1); for (const z of [-0.8, 0, 0.8]) p.b(mats.oak, 4.9, 0.1, 0.12, 0, -0.0, z);
+/** artillery wheel lying in the xy plane (axle along z) centred at (x, y, z): tyre, felloe, 12 wooden spokes, brass hub */
+function wheel(p, x, y, z, side) {
+  p.t(mats.rubber, 0.405, 0.058, x, y, z, 'z', 28, 8);
+  p.t(mats.woodDark, 0.335, 0.028, x, y, z, 'z', 24, 4);
+  p.t(mats.iron, 0.348, 0.012, x, y, z, 'z', 24, 3);
+  for (let k = 0; k < 12; k++) { const a = (k / 12) * TAU, m = p.fr(mats.oak, 0.03, 0.022, 0.022, 0.018, 0.28, x, y, z, {}); m.position.set(x + Math.cos(a) * 0.06, y + Math.sin(a) * 0.06, z); m.rotation.z = a - Math.PI / 2; }
+  p.latheZ(mats.brass, [[0, 0], [0.085, 0], [0.085, 0.03], [0.06, 0.05], [0.055, 0.1], [0.035, 0.13], [0, 0.135]], x, y, z - side * 0.06, 12, side);
+  p.cz(mats.woodDark, 0.09, 0.1, x, y, z, 12);
+}
+/** curved mudguard over a wheel (closed arc of thin plates), x = wheel centre */
+function mudguard(p, x, y, z, a0, a1, r = 0.5, w = 0.26) {
+  const n = 9;
+  for (let i = 0; i < n; i++) {
+    const a = a0 + ((a1 - a0) * (i + 0.5)) / n, L = (r * (a1 - a0)) / n + 0.01;
+    const m = p.b(mats.iron, L, 0.012, w, x + Math.cos(a) * r, y + Math.sin(a) * r, z); m.rotation.z = a - Math.PI / 2; m.position.y -= 0.006;
+  }
+}
+
+/** Renault Type CE Coupé de Ville (1912), front +x: coal-scuttle bonnet, radiators behind the engine, open chauffeur's
+ *  seat, closed coupé body with windows and curtains, artillery wheels, mudguards, running boards, lamps, spare tyre. */
+export const renault = def('ghRenault', [1.8, 4.6, 2.12], (p) => {
+  // chassis: frame rails, dumb irons, axles, leaf springs, differential
+  for (const z of [-0.43, 0.43]) { p.bb(mats.iron, 4.0, 0.12, 0.06, 0.1, 0.42, z, 0.01); p.bb(mats.iron, 0.3, 0.08, 0.05, 2.2, 0.4, z, 0.01).rotation.z = 0.25; }
+  for (const [x, k] of [[1.45, 0], [-1.35, 1]]) {
+    p.cz(mats.iron, 0.035, 1.5, x, 0.45, 0, 8);
+    for (const z of [-0.43, 0.43]) for (let i = 0; i < 4; i++) p.bb(mats.iron, 1.0 - i * 0.18, 0.018, 0.05, x, 0.47 + i * 0.019, z, 0.004);
+    if (k) p.s(mats.iron, 0.13, x, 0.45, 0.08, 1, 1, 1, false);
+  }
+  p.cx(mats.iron, 0.03, 2.4, 0.0, 0.42, 0.08, 8);  // propeller shaft
+  // wheels and mudguards
+  for (const x of [1.45, -1.35]) for (const s of [-1, 1]) { wheel(p, x, 0.45, s * 0.78, s); mudguard(p, x, 0.45, s * 0.8, x > 0 ? 0.35 : 0.0, x > 0 ? 2.75 : 2.6); }
+  // running boards with brass edging, linoleum top, tool box; spare tyre on the off side
   for (const s of [-1, 1]) {
-    for (let k = 0; k < 5; k++) p.b(mats.pine, 4.9, 0.3, 0.03, 0, 0.18 + k * 0.42, s * 1.035);
-    for (const x of [-2.4, -0.8, 0.8, 2.4]) p.b(mats.oak, 0.1, 2.1, 0.05, x, 0.14, s * 1.07);
+    p.bb(mats.woodDark, 1.95, 0.035, 0.26, 0.05, 0.56, s * 0.8, 0.006);
+    p.b(mats.rubber, 1.9, 0.004, 0.22, 0.05, 0.596, s * 0.8);
+    p.b(mats.brass, 1.95, 0.02, 0.012, 0.05, 0.56, s * 0.935);
+    for (const x of [0.9, -0.8]) p.b(mats.iron, 0.04, 0.12, 0.3, x, 0.45, s * 0.66);
   }
-  for (let k = 0; k < 7; k++) p.b(mats.pine, 0.03, 2.1, 0.28, -2.435, 0.14, -0.9 + k * 0.3);
-  p.b(mats.pine, 4.9, 0.03, 2.1, 0, 2.22, 0);
-  p.b(mats.paper, 0.01, 0.4, 0.7, -2.46, 1.3, 0);
+  p.bb(mats.woodDark, 0.5, 0.25, 0.2, -0.45, 0.6, -0.8, 0.01);
+  p.t(mats.rubber, 0.405, 0.06, 0.45, 0.98, 0.98, 'z', 28, 8); p.t(mats.iron, 0.34, 0.02, 0.45, 0.98, 0.98, 'z', 20, 3);
+  p.b(mats.leather, 0.05, 0.04, 0.12, 0.45, 1.36, 0.98); p.b(mats.iron, 0.04, 0.5, 0.04, 0.45, 0.6, 0.9);
+  // coal-scuttle bonnet sloping down to the front (extruded side profile), louvres, hinge, filler cap
+  const bon = [[2.3, 0.55], [2.32, 0.7], [2.2, 0.82], [1.85, 0.96], [1.4, 1.06], [1.02, 1.12], [1.02, 0.55]];
+  p.extZ(carPaint, bon, 0.84, 0, 0, 0, 0.01);
+  for (const s of [-1, 1]) for (let k = 0; k < 7; k++) p.b(mats.iron, 0.04, 0.14, 0.012, 1.25 + k * 0.12, 0.7, s * 0.425).rotation.z = 0.1;
+  p.cx(mats.brass, 0.012, 1.32, 1.66, 1.015, 0, 6).rotation.z = Math.PI / 2 - 0.32;
+  p.lathe(mats.brass, [[0, 0], [0.04, 0], [0.04, 0.03], [0, 0.04]], 2.05, 0.9, 0, 10).rotation.z = 0.3;
+  // radiators behind the engine on either side of the dashboard (Renault's characteristic layout)
+  for (const s of [-1, 1]) {
+    p.bb(mats.brass, 0.32, 0.55, 0.04, 0.88, 0.58, s * 0.46, 0.006);
+    for (let k = 0; k < 9; k++) p.b(mats.iron, 0.012, 0.47, 0.03, 0.75 + k * 0.032, 0.62, s * 0.475);
+  }
+  // dashboard (bulkhead) with coil box, oiler, side lamps; acetylene headlamps on forks ahead
+  p.bb(mats.woodDark, 0.06, 0.62, 1.0, 0.72, 0.58, 0, 0.008);
+  p.bb(mats.woodDark, 0.05, 0.12, 0.25, 0.68, 0.95, -0.2, 0.006); p.c(mats.brass, 0.05, 0.12, 0.66, 0.95, 0.2, 10);
+  for (const s of [-1, 1]) {
+    p.latheX(mats.brass, [[0, 0], [0.12, 0], [0.13, 0.04], [0.12, 0.2], [0.07, 0.24], [0, 0.25]], 2.02, 1.0, s * 0.42, 14);
+    p.cx(mats.mirror, 0.11, 0.012, 2.27, 1.0, s * 0.42, 14); p.b(mats.brass, 0.04, 0.35, 0.03, 2.08, 0.66, s * 0.42);
+    p.lathe(mats.brass, [[0, 0], [0.05, 0], [0.06, 0.12], [0.04, 0.2], [0.015, 0.24], [0, 0.25]], 0.74, 1.12, s * 0.55, 10);
+    p.b(mats.lampGlow, 0.01, 0.06, 0.04, 0.8, 1.2, s * 0.55);
+  }
+  // open chauffeur's compartment: low sides, buttoned leather bench, raked steering column and wheel, levers, pedals, horn
+  for (const s of [-1, 1]) p.bb(carPaint, 0.75, 0.38, 0.05, 0.35, 0.6, s * 0.7, 0.008);
+  p.b(mats.woodDark, 0.8, 0.03, 1.4, 0.35, 0.6, 0);
+  p.pil(mats.leather, 0.48, 0.16, 1.3, 0.22, 0.72, 0, 0.35, 0.2, 4, 14, 0.01);
+  p.pil(mats.leather, 0.12, 0.42, 1.34, -0.03, 0.82, 0, 0.4, 0.2, 4, 12, 0.01);
+  for (let i = 0; i < 4; i++) p.s(mats.leather, 0.012, 0.03, 1.0 + (i % 2) * 0.12, -0.45 + i * 0.3, 1, 1, 1);
+  const col = p.c(mats.iron, 0.022, 0.75, 0.75, 0.62, -0.32, 6); col.rotation.z = 0.6;
+  p.t(mats.woodDark, 0.19, 0.018, 0.52, 1.2, -0.32, 'y', 20, 5).rotation.z = 0.6;
+  for (let k = 0; k < 3; k++) { const m = p.b(mats.iron, 0.36, 0.012, 0.016, 0.52, 1.2, -0.32); m.rotation.set(0, (k * Math.PI) / 3, 0.6); }
+  for (const [x, a] of [[0.62, -0.25], [0.5, -0.1]]) { const m = p.c(mats.brass, 0.012, 0.55, x, 0.58, 0.74, 6); m.rotation.x = a; }
+  p.b(mats.brass, 0.25, 0.12, 0.02, 0.55, 0.62, 0.75);
+  for (const z of [-0.4, -0.25, 0.0]) p.b(mats.iron, 0.08, 0.02, 0.05, 0.62, 0.66, z);
+  p.cx(mats.brass, 0.03, 0.55, 1.05, 1.05, 0.62, 8); p.latheX(mats.brass, [[0.03, 0], [0.1, 0.15], [0.105, 0.17], [0, 0.17]], 1.32, 1.05, 0.62, 12);
+  p.s(mats.rubber, 0.07, 0.75, 1.05, 0.62, 1.2, 1, 1, false); p.t(mats.brass, 0.08, 0.012, 0.9, 1.05, 0.62, 'x', 12, 3);
+  // enclosed coupé body: tumblehome lower body with mouldings, door, glazed upper part with frames and curtains, roof
+  const body = [[0.18, 0.56], [-1.95, 0.56], [-2.1, 0.7], [-2.1, 1.0], [-1.98, 1.15], [0.18, 1.15]];
+  p.extZ(carPaint, body, 1.46, 0, 0, 0, 0.02);
+  for (const s of [-1, 1]) {
+    p.b(mats.gold, 2.1, 0.015, 0.008, -0.88, 1.05, s * 0.735); p.b(mats.gold, 2.1, 0.015, 0.008, -0.88, 0.7, s * 0.735);
+    p.b(mats.iron, 0.005, 0.5, 0.005, -0.2, 0.62, s * 0.734); p.b(mats.iron, 0.005, 0.5, 0.005, -1.1, 0.62, s * 0.734);
+    p.b(mats.brass, 0.1, 0.02, 0.025, -0.35, 0.98, s * 0.745); p.s(mats.brass, 0.018, -0.3, 0.98, s * 0.755);
+  }
+  p.b(mats.glass, 1.32, 0.52, 1.42, -0.62, 1.16, 0);
+  for (const x of [0.13, -0.4, -1.28]) for (const s of [-1, 1]) p.b(carPaint, 0.08, 0.56, 0.04, x, 1.14, s * 0.72);
+  for (const s of [-1, 1]) { p.b(carPaint, 1.48, 0.06, 0.04, -0.6, 1.14, s * 0.72); p.b(carPaint, 1.48, 0.06, 0.04, -0.6, 1.66, s * 0.72); }
+  p.b(carPaint, 0.06, 0.56, 1.46, 0.16, 1.14, 0); p.b(mats.glass, 0.01, 0.4, 1.0, 0.19, 1.22, 0);
+  p.b(carPaint, 0.62, 0.56, 1.46, -1.62, 1.14, 0); p.b(mats.glass, 0.01, 0.16, 0.35, -1.93, 1.42, 0);
+  for (const s of [-1, 1]) { // curtains drawn half across the side windows, tassel ties
+    p.b(mats.fabricRed, 0.32, 0.46, 0.01, -1.12, 1.18, s * 0.7); p.b(mats.fabricRed, 0.18, 0.46, 0.01, -0.26, 1.18, s * 0.7);
+    p.s(mats.gold, 0.02, -0.96, 1.36, s * 0.69);
+  }
+  p.pil(mats.fabricRed, 0.5, 0.18, 1.3, -1.6, 0.72, 0, 0.4, 0.2, 4, 12, 0.01);
+  p.pil(mats.fabricRed, 0.14, 0.42, 1.3, -1.85, 0.9, 0, 0.4, 0.2, 4, 12, 0.01);
+  p.bb(mats.leather, 2.32, 0.08, 1.58, -0.83, 1.7, 0, 0.03);
+  p.bb(mats.leather, 2.26, 0.05, 1.5, -0.83, 1.78, 0, 0.02);
+  for (const s of [-1, 1]) p.b(mats.brass, 1.9, 0.02, 0.02, -0.9, 1.86, s * 0.68);
+  for (let k = 0; k < 4; k++) p.b(mats.brass, 0.02, 0.06, 1.38, -1.7 + k * 0.55, 1.8, 0);
+  for (const s of [-1, 1]) { // coach lamps beside the division
+    p.lathe(mats.brass, [[0, 0], [0.04, 0], [0.06, 0.05], [0.06, 0.18], [0.04, 0.22], [0.02, 0.27], [0, 0.28]], 0.24, 1.15, s * 0.78, 10);
+    p.b(mats.lampGlow, 0.02, 0.1, 0.05, 0.3, 1.22, s * 0.78);
+  }
+  // rear: luggage grid, red tail lamp, number plate
+  p.b(mats.iron, 0.3, 0.02, 1.0, -2.25, 0.62, 0); for (const z of [-0.45, 0.45]) p.b(mats.iron, 0.3, 0.2, 0.02, -2.25, 0.62, z);
+  p.lathe(mats.brass, [[0, 0], [0.04, 0], [0.045, 0.1], [0, 0.12]], -2.16, 0.82, 0.55, 8); p.b(mats.navRed, 0.01, 0.04, 0.04, -2.21, 0.86, 0.55);
+  p.b(kitMats.slate, 0.01, 0.12, 0.42, -2.12, 0.62, 0);
 });
 
-/** cargo-hold preset that keeps the given walking lanes (world rectangles) free */
+/** the opened shipping crate (front +x = open end): sides of planed boards with stencils, battens, lid off,
+ *  straw spilling out; the front panel lies on the floor */
+export const carCrate = def('ghCarCrate', [2.4, 5.0, 2.3], (p) => {
+  const r = rng(5);
+  p.b(mats.pine, 4.9, 0.12, 2.1, 0, 0, 0); for (const z of [-0.85, 0, 0.85]) p.b(mats.oak, 4.9, 0.1, 0.14, 0, 0.0, z);
+  for (const s of [-1, 1]) {
+    for (let k = 0; k < 7; k++) p.b(k === 3 ? kitMats.stencil : mats.pine, 4.9, 0.28, 0.025, 0, 0.14 + k * 0.29, s * 1.04);
+    for (const x of [-2.4, -1.2, 0, 1.2, 2.4]) p.b(mats.oak, 0.1, 2.05, 0.04, x, 0.14, s * 1.075);
+    p.b(mats.oak, 4.9, 0.08, 0.04, 0, 2.15, s * 1.075);
+  }
+  for (let k = 0; k < 7; k++) p.b(mats.pine, 0.025, 2.05, 0.28, -2.44, 0.14, -0.86 + k * 0.29);
+  for (const z of [-0.8, 0.8]) p.b(mats.oak, 0.04, 2.05, 0.1, -2.47, 0.14, z);
+  // front panel lying on the floor in front of the crate
+  for (let k = 0; k < 7; k++) p.b(mats.pine, 0.28, 0.025, 2.0, 2.65 + (k - 3) * 0.29 * 0 + 0.0, 0.0, 0).position.set(2.62 + k * 0.0, 0.03, -0.86 + k * 0.29 - 0.0);
+  p.b(mats.oak, 0.1, 0.04, 2.0, 2.62, 0.055, 0).rotation.y = Math.PI / 2;
+  // straw: a matted bed on the crate floor, tufts and loose stalks on the floor in front
+  for (let i = 0; i < 26; i++) { const g = new THREE.SphereGeometry(0.2 + r() * 0.15, 6, 4); g.scale(1.6, 0.35, 1.2); p.ag(STRAW, g, -2.1 + r() * 4.4, 0.13, -0.85 + r() * 1.7); }
+  for (let i = 0; i < 70; i++) { const m = p.ab(STRAW, 0.25 + r() * 0.2, 0.006, 0.01, 2.5 + r() * 1.2, 0.002, -1.1 + r() * 2.2); m.rotation.y = r() * 3; }
+  p.b(mats.paper, 0.01, 0.35, 0.6, -2.46, 1.3, 0.3);
+});
+/** canvas-wrapped bale tied with rope bands */
+const bale = def('ghBale', [1.0, 0.7, 0.7], (p, o) => {
+  p.bb(mats.canvas, 0.7, 0.62, 1.0, 0, 0, 0, 0.08);
+  for (const z of [-0.3, 0, 0.3]) { p.b(mats.rope, 0.72, 0.03, 0.03, 0, 0.6, z); for (const s of [-1, 1]) p.b(mats.rope, 0.03, 0.62, 0.03, s * 0.355, 0, z); }
+  p.b(kitMats.stencil, 0.005, 0.3, 0.45, 0.352, 0.15, 0.0);
+});
+/** pile of sacks and small crates under a rope cargo net, ring bolts */
+const nettedPile = def('ghNetted', [1.6, 1.3, 1.1], (p, o) => {
+  const r = rng(o.v ?? 3);
+  for (const [x, z, k] of [[-0.3, -0.35, 0], [-0.3, 0.35, 1], [0.32, 0, 0], [0, 0, 2]]) {
+    if (k === 1) p.bb(kitMats.stencil, 0.6, 0.55, 0.6, x, 0, z, 0.01); else p.pil(mats.canvas, 0.55, 0.32, 0.8, x, k === 2 ? 0.32 : 0, z, 0.55, 0.45, 4, 10, 0.03).rotation.y = r() * 3;
+  }
+  // net: four sloping planes of open mesh to the floor, rope edge
+  const H = 0.95, w = 0.8, d = 0.65;
+  for (const s of [-1, 1]) {
+    const g1 = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-d - 0.1, 0, s * (w + 0.1)), new THREE.Vector3(d + 0.1, 0, s * (w + 0.1)), new THREE.Vector3(0.2, H, s * 0.1), new THREE.Vector3(-0.2, H, s * 0.1)]);
+    g1.setIndex(s > 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]); g1.computeVertexNormals(); g1.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1.6, 0, 1.0, 1.2, 0.6, 1.2], 2));
+    p.add(g1, gratingMat);
+  }
+  for (const s of [-1, 1]) p.b(mats.rope, 1.5, 0.03, 0.03, 0, 0.0, s * 0.9);
+  for (const s of [-1, 1]) p.t(mats.iron, 0.04, 0.01, s * 0.8, 0.02, 0, 'y', 8, 3);
+});
+
+/** cargo-hold preset that keeps the given walking lanes (world rectangles) free; adds bales and netted piles */
 export function cargoHold(lanes, extra) {
   return (ctx) => {
     const free0 = ctx.free.bind(ctx);
     ctx.free = (u, v, eu, ev) => free0(u, v, eu, ev) && !lanes.some((l) => overlap(l, ctx._rect(u, v, eu, ev), 0.01));
     if (extra) extra(ctx);
+    let k = 0;
+    ctx.grid(3.1, 2.7, (u, v, i, j) => { if ((i + j) % 2 === 0) ctx.put(k++ % 2 ? bale() : nettedPile({ v: i * 3 + j }), u, v, (i + j) % 4 ? 'in' : 'right'); }, 1.2);
     PRESETS.hold(ctx);
   };
 }
@@ -80,10 +182,23 @@ export function renaultHold(lanes) {
     ctx.occupied.push({ x0: x - 2.5, x1: x + 2.5, z0: z - 1.2, z1: z + 1.2 });
     plan.prop(carCrate(), 88.4, -3.3, 0, { collide: false });
     for (const [x0, z0, x1, z1] of [[85.95, -4.4, 90.85, -4.3], [85.95, -2.3, 90.85, -2.2], [85.95, -4.4, 86.05, -2.2]]) world.addCollider(x0, Y, z0, x1, Y + 2.25, z1);
-    ctx.occupied.push({ x0: 85.9, x1: 90.9, z0: -4.45, z1: -2.15 });
-    // chocks, lashing ropes, spare can, the lid of the crate leaning against the hull
-    for (const dx of [1.45, -1.35]) for (const dz of [-0.95, 0.95]) plan.batch.box(mats.oak, x + dx - 0.25, Y, z + dz - 0.08, x + dx + 0.25, Y + 0.12, z + dz + 0.08);
+    ctx.occupied.push({ x0: 85.9, x1: 92.3, z0: -4.45, z1: -2.15 });
+    // wheel chocks, lashing ropes to ring bolts, a petrol can, the lid of the crate leaning against the hull
+    const b = plan.batch;
+    for (const dx of [1.45, -1.35]) for (const dz of [-0.78, 0.78]) for (const e of [-0.42, 0.42]) {
+      const ca = Math.cos(0.08), sa = Math.sin(0.08), cx = x + (dx + e) * ca + dz * sa, cz = z - (dx + e) * sa + dz * ca;
+      b.poly(mats.oak, [[cx - 0.12, Y, cz - 0.08], [cx + 0.12, Y, cz - 0.08], [cx + 0.12, Y, cz + 0.08], [cx - 0.12, Y, cz + 0.08]], [0, 1, 0]);
+      b.box(mats.oak, cx - 0.1, Y, cz - 0.08, cx + 0.1, Y + 0.1, cz + 0.08);
+    }
+    for (const dx of [1.9, -1.9]) for (const s of [-1, 1]) {
+      const p0 = [x + dx, Y + 0.45, z + s * 0.45], p1 = [x + dx * 1.25, Y + 0.02, z + s * 1.35];
+      b.prism(mats.rope, p0, p1, 0.012, 4);
+      b.box(mats.iron, p1[0] - 0.05, Y, p1[2] - 0.05, p1[0] + 0.05, Y + 0.03, p1[2] + 0.05);
+    }
     plan.prop(crate({ s: 0.6 }), 91.8, 3.9, 0.3, { collide: false });
+    b.box(kitMats.fireRed, 91.3, Y, 0.9, 91.55, Y + 0.32, 1.08); b.box(mats.brass, 91.4, Y + 0.32, 0.96, 91.45, Y + 0.36, 1.0);
+    const hw = Math.min(14, plan.halfWidth(93) - 0.05);
+    for (let k = 0; k < 8; k++) b.box(mats.pine, 92.2 + k * 0.3, Y + 0.05, hw - 0.35, 92.47 + k * 0.3, Y + 2.0, hw - 0.32 + 0.025);
     world.addLamp({ x, y: Y + 2.1, z, color: 0xffe2b0, intensity: 1.2 });
   });
 }
@@ -92,7 +207,8 @@ export function renaultHold(lanes) {
 export function mailHold(ctx) {
   ctx.fit(shelves({ kind: 'empty', w: 1.5, mat: 'oak' }), ['far:lo', 'far:hi']);
   ctx.fit(safe(), ['near:hi', 'left:hi']);
-  if (ctx.put(tableRect({ w: 1.6, d: 0.8, mat: 'oak' }), 1.4, Math.min(2.0, ctx.D / 2), 'in')) ctx.put(stool({ mat: 'oak', seat: 'oak' }), 1.4, Math.min(2.0, ctx.D / 2) - 0.65, 'in', { collide: false });
-  ctx.grid(1.6, 1.25, (u, v, i, j) => { if (!((i === 0 && j < 2))) ctx.put(sackPile(), u, v, (i + j) % 2 ? 'in' : 'right'); }, 0.7);
+  if (ctx.put(tableRect({ w: 1.6, d: 0.8, mat: 'oak', items: true }), 1.4, Math.min(2.0, ctx.D / 2), 'in')) ctx.put(stool({ mat: 'oak', seat: 'oak' }), 1.4, Math.min(2.0, ctx.D / 2) - 0.65, 'in', { collide: false });
+  ctx.grid(1.6, 1.25, (u, v, i, j) => { if (!((i === 0 && j < 2))) ctx.put((i + j) % 3 ? bagPile({ v: i * 5 + j }) : sackPile(), u, v, (i + j) % 2 ? 'in' : 'right'); }, 0.7);
   ctx.fit(trunk({ big: true }), ['right:lo', 'left:lo']);
 }
+export { gratingMat };

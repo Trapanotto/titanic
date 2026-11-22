@@ -50,19 +50,45 @@ batching incl. mouldings / raised panels / prisms, extra materials, colour atlas
 
 ## 2. Stairs (already built) – what a deck layout must respect
 
-`src/interior/stairs.js` builds every entry of `STAIRS`: steps, enclosed underside (panelled closure walls, so the lane of a
-flight that **rises** from your deck is a solid block `x0..x1` × lane), balustrades, ramps, colliders, railings on three
-sides of every floor hole, lamps above both landings. Scissor layout: on each deck one lane is the hole of the flight
-arriving from below, the other lane holds the flight going up; people step off / on at the **same x-end** and U-turn there.
+`src/interior/stairs.js` builds every entry of `STAIRS`: steps, balustrades, ramps, colliders, railings round every floor
+hole, lamps. Two layouts:
 
+- **Scissor** (oak / steel stairs): steps, enclosed underside (panelled closure walls, so the lane of a flight that **rises**
+  from your deck is a solid block `x0..x1` × lane), railings on three sides of every floor hole, lamps above both landings. On
+  each deck one lane is the hole of the flight arriving from below, the other lane holds the flight going up; people step
+  off / on at the **same x-end** and U-turn there.
+- **Imperial / split** (`type: 'imperial'` – the two Grand Staircases): per deck interval a wide **central flight** starts
+  on the lower deck at the foot line `x1` and climbs aft to a **half-landing** (x0 .. x0 + landing, full width, at half the
+  deck rise) against a panelled **pier** (`back`..x0) carrying the clock / paintings; two **side flights** return forward and
+  arrive on the upper deck on the same foot line `x1`, where the next central flight starts. The whole footprint
+  `x0..x1 × |z−zc| ≤ lane−0.08` is stacked identically on every deck and is the floor hole (`stairHoles`) of every deck but
+  the lowest; all stepping on/off happens at the **forward edge x1**. Long sides: full-height panelled walls beside the
+  landing bay, galleries with iron balustrades beside the flights (colliders the whole way up); on the top deck a balustrade
+  also closes the head of the central flight. Undersides are open (plaster soffits, moulded oak strings, downstand beams
+  round the well); on the lowest deck the space under the landing and the side flights is a panelled closet with arched
+  doors. Geometry: `imperialPlan(st)` → `{back, x0, xl (landing front), xf (= x1, foot), hw (= lane), hwi (well), cw
+  (central half width), g (slot between central and side flights), gc, zc}`.
+
+  | stair | pier | landing | flights | central | side flights | foot / hall in front |
+  |---|---|---|---|---|---|---|
+  | grandFwd (E…boat) | 37.5..38.3 | 38.3..40.1 | 40.1..42.2 (8 risers per half, going 0.30) | \|z\| ≤ 1.1 | 1.3 ≤ \|z\| ≤ 2.62 | x 42.2; lifts at 45.5 (3.2 m hall) |
+  | grandAft (C…boat) | −6.5..−5.8 | −5.8..−4.2 | −4.2..−2.1 | \|z\| ≤ 0.85 | 1.05 ≤ \|z\| ≤ 2.22 | x −2.1; hall to x 2 |
+
+  Landing art: forward stair – oil paintings (E→D, C→B, B→A), the Aubusson tapestry of the Reception Room on D→C (drawn by
+  `d-hero.js` on the pier face x = 38.3), "Honour and Glory crowning Time" (1.6 m relief, two winged figures ≈ 1.1 m, clock,
+  laurel wreath, pediment) on A→boat with an info point; aft stair – paintings and a carved clock panel on A→boat. Bronze
+  cherub (≈ 0.76 m figure, torch lamp) on the port newel at the foot of the central flight on A (both stairs) and on D
+  (forward stair), gilt three-light newel lamps on the other foot newels, an 8-arm chandelier (×1.5) hanging from the dome
+  over the well on the boat deck. Teleports of the stair halls stand ~3 m forward of the foot, facing aft (yaw π).
 | helper | returns |
 |---|---|
-| `stairHoles(deck)` | `[{id,x0,x1,z0,z1}]` openings in the floor of `deck` (flights arriving from below; on F also `MACHINERY_ACCESS`) – already cut out by `buildDeckShell` |
-| `stairSolids(deck)` | lane rectangles of the flights rising from `deck` (enclosed, not walkable) |
-| `stairKeepouts(deck)` | `[{id,x0,x1,z0,z1}]` = both lanes, +2 m in x, +0.3 m in z. **No walls, no furniture inside.** |
-| `stairLandings(deck)` | `[{id,x,z}]` free points 1 m before both ends of every stair |
+| `stairHoles(deck)` | `[{id,x0,x1,z0,z1}]` openings in the floor of `deck` (scissor: flights arriving from below; imperial: the whole well; on F also `MACHINERY_ACCESS`) – already cut out by `buildDeckShell` |
+| `stairSolids(deck)` | scissor: lane rectangles of the flights rising from `deck` (enclosed, not walkable); imperial: the well above `deck` (no lamps / ceiling overlay there) |
+| `stairKeepouts(deck)` | `[{id,x0,x1,z0,z1}]` = scissor: both lanes, +2 m in x, +0.3 m in z; imperial: the entry `keep` (unchanged old rectangles). **No walls, no furniture inside.** |
+| `stairLandings(deck)` | `[{id,x,z}]` free points 1 m before both ends of every scissor stair / 1 m in front of the foot of an imperial one |
 | `assertClear(deck, rect, label)` | `true` if rect is clear of all keep-outs, else `console.warn` + `false` |
-| `stairFlights()` | all flights with geometry (`from,to,xb,xt,dir,z0,z1,zo,zc,y0,y1`) |
+| `stairFlights()` | all flights: scissor `type:'scissor'` (`from,to,xb,xt,dir,z0,z1,zo,zc,y0,y1`), imperial one entry per deck interval `type:'imperial'` (`from,to,y0,ym,y1` + `imperialPlan` fields) |
+| `imperialPlan(st)`, `isImperial(st)` | plan geometry of an imperial stair (see above) |
 
 Keep-outs per stair (x-range × |z| ≤): grandFwd 37.5..46.5 × 2.7 (E…boat) · grandAft −7..2 × 2.3 (C…boat) · second
 −47.5..−38.5 × 1.9 (F…boat) · secondAft −68..−59 × 1.8 (F…B) · thirdFwd 95..104 × 1.6 (G…C) · thirdAft −116..−107 × 1.6
@@ -75,13 +101,7 @@ The lobby must be reachable from the corridors at **both** x-ends of the stair o
 off on your deck (both ends are used alternately deck by deck – simplest: let the lobby span the whole keep-out and
 have ≥ 1.2 m free floor beside the lanes, i.e. lobby half width ≥ lane + 1.5 m, or open it at both ends).
 
-Grand staircase extras (built by the kit): oak treads with moulded nosing, brass edge strip and red carpet runner; panelled
-spandrels; carved oak newels with gilt rosettes and pineapple finials; sweeping oak handrail; wrought-iron scroll panels with
-gilt rosettes (shared template placed with shear matrices along the pitch); moulded entablature with gilt bead under the
-hole rims; cut-glass bowl lamps with plaster roses at both landings; the bronze cherub holding a torch lamp on the centre
-newel of the A-deck flight; the carved "Honour and Glory crowning Time" relief (two winged robed figures, laurel wreath,
-clock with hands, carved frame and broken pediment) on A deck (forward face of the stair block at x = 44.5, port lane) with
-an info point. Oak stairs (2nd class): turned balusters (~7 per metre), panelled newels with ball caps, oak handrail;
+Grand staircase extras (built by the kit): oak treads with moulded nosing, brass edge strip, red runner with brass stair rods; moulded oak strings with gilt bead; carved oak newels with gilt rosettes and pineapple finials; sweeping oak handrail; wrought-iron scroll panels with gilt rosettes (shared template placed with shear matrices along the pitch); panelled landing bays with pilasters, dado, cornice and sconces; see the imperial notes above. Oak stairs (2nd class): turned balusters (~7 per metre), panelled newels with ball caps, oak handrail;
 steel stairs: chequer treads with angle nosings, pipe rails with stanchions and ball knuckles. A glazed dome prop
 `domeLight({r})` is available for the boat-deck ceiling above the stairs (deck module `boat`).
 

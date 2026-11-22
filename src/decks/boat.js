@@ -9,7 +9,7 @@ import { sidesBut } from './boat-util.js';
 import {
   furnishBridge, furnishWheelhouse, furnishChartRoom, furnishCaptainSitting, furnishCaptainBed, furnishMarconi, furnishSilentRoom,
   furnishOperators, furnishGym, furnishLandingFwd, furnishVestibule, furnishMess, furnishLandingAft, furnishSecondEntrance,
-  furnishSecondVestibule, furnishFanRoom, furnishTankRoom, furnishLiftMachinery, ceilingDetails,
+  furnishSecondVestibule, furnishFanRoom, furnishTankRoom, furnishLiftMachinery, ceilingDetails, furnishOfficer,
 } from './boat-hero.js';
 
 const deck = 'boat';
@@ -56,7 +56,7 @@ export async function build(world) {
 
   // officers' cabins (starboard: chief, first and second officer; port: third to sixth officer)
   const offCab = (id, name, x0, x1, port) => room(id, name, x0, x1, port ? -99 : CO, port ? -CO : 99, {
-    type: 'officer', cls: 'crew', wall: 'whitePanel', floor: 'linoRed', furnish: { preset: 'cabinCrew', officer: true, single: true, berths: 2 },
+    type: 'officer', cls: 'crew', wall: 'whitePanel', floor: 'linoRed', furnish: furnishOfficer,
     doors: [port ? dS(x0 + 0.65, { style: 'oak' }) : dP(x0 + 0.65, { style: 'oak' })],
   });
   offCab('wilde', 'Kabine Chief Officer Henry T. Wilde', 53.23, 55.6, false);
@@ -89,7 +89,7 @@ export async function build(world) {
   room('treppe-vorn', 'Große Treppe – Bootsdeck', XH0, XH1, -HH, HH, {
     type: 'lobby', cls: 'first', stairs: true, wall: { base: 'oakPanel', cornice: 'gold' }, floor: 'linoCream', lamp: false,
     furnish: furnishLandingFwd, doors: [dF(-3.65, { w: 1.1, leaf: false }), dF(3.65, { w: 1.1, leaf: false })],
-    teleport: { name: 'Große Treppe – Bootsdeck', group: '1. Klasse', x: 45.6, z: -1.2, yaw: Math.PI },
+    teleport: { name: 'Große Treppe – Bootsdeck', group: '1. Klasse', x: 45.6, z: 0, yaw: Math.PI },
     info: { title: 'Die Glaskuppel der Großen Treppe', x: 42, z: 3.4, radius: 4, text: 'Über dem obersten Treppenabsatz wölbte sich eine Kuppel aus schmiedeeisernem Gitterwerk und Milchglas, die tagsüber Licht bis tief in das Treppenhaus fallen ließ und abends von innen beleuchtet wurde. Die Treppe mit ihrer Eichenholzvertäfelung im Stil William and Mary war das berühmteste Ausstattungsmerkmal des Schiffes.' },
   });
   plan.opening(38.6, -HH, 45.4, -HH);
@@ -118,7 +118,7 @@ export async function build(world) {
   const MA = -15.9, MF = 17.9, XA0 = -6.5, XA1 = 2;
   room('treppe-achtern', 'Große Treppe (achtern) – Bootsdeck', XA0, XA1, -99, 99, {
     type: 'lobby', cls: 'first', stairs: true, wall: { base: 'oakPanel', cornice: 'gold' }, floor: 'linoCream', lamp: false, furnish: furnishLandingAft,
-    teleport: { name: 'Große Treppe (achtern) – Bootsdeck', group: '1. Klasse', x: 1.2, z: -3.4, yaw: Math.PI },
+    teleport: { name: 'Große Treppe (achtern) – Bootsdeck', group: '1. Klasse', x: 1.0, z: 0, yaw: Math.PI },
     info: { title: 'Die hintere Große Treppe', x: -2.4, z: 3.2, radius: 3.5, text: 'Die hintere Große Treppe führte vom Bootsdeck hinunter bis zum C-Deck und erschloss Lounge, Rauchsalon und die achteren Erste-Klasse-Kabinen. Auch sie trug eine Glaskuppel. Beim Auseinanderbrechen des Schiffes riss die Bruchstelle in der Nähe dieses Treppenhauses auf.' },
   });
   room('ing-rauch', 'Rauchzimmer der Ingenieure', MA, XA0, C, 99, { type: 'mess', cls: 'crew', walls: sidesBut('aft'), wall: { base: 'oakDado' }, floor: 'linoRed', furnish: { preset: 'smoking', fireplace: false, cover: 'leather' }, doors: [dF(5.0)] });

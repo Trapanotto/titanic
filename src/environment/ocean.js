@@ -27,18 +27,30 @@ const WAVES = [
   [-0.996, 0.087, 9.1, 0.034, 0.65],
   [-0.574, 0.819, 5.7, 0.021, 0.65],
   [-0.906, -0.423, 3.6, 0.013, 0.65],
+  // cross sea from other directions: breaks up the parallel crest lines at middle distance
+  [0.259, 0.966, 41.0, 0.06, 0.45],
+  [-0.326, -0.946, 19.3, 0.035, 0.5],
+  [0.616, -0.788, 11.7, 0.022, 0.5],
+  [-0.423, 0.906, 7.3, 0.016, 0.55],
 ];
 
 function glslWaves() {
-  const lines = WAVES.map(([dx, dz, l, a, q]) => {
+  const lines = WAVES.map(([dx, dz, l, a, q], i) => {
     const n = Math.hypot(dx, dz);
     const k = (2 * Math.PI) / l, w = Math.sqrt(9.81 * k);
-    return `  gW(p, vec2(${(dx / n).toFixed(4)}, ${(dz / n).toFixed(4)}), ${k.toFixed(5)}, ${w.toFixed(5)}, ${a.toFixed(4)}, ${(q / (k * a * WAVES.length)).toFixed(4)}, ${l.toFixed(2)}, fp, acc, nrm);`;
+    // wave groups: the amplitude of every component swells and fades over a few hundred metres (alternating sign),
+    // so the crest pattern never repeats regularly
+    const m = `(1.0 + ${(i % 2 ? 0.55 : -0.55).toFixed(2)} * grp${i % 3})`;
+    return `  gW(p, vec2(${(dx / n).toFixed(4)}, ${(dz / n).toFixed(4)}), ${k.toFixed(5)}, ${w.toFixed(5)}, ${a.toFixed(4)} * ${m}, ${(q / (k * a * WAVES.length)).toFixed(4)}, ${l.toFixed(2)}, fp, acc, nrm);`;
   });
-  return lines.join('\n');
+  return `  float grp0 = textureLod(uFoamTex, p * 0.0021 + vec2(0.17, 0.41), 3.0).b * 2.0 - 1.0;
+  float grp1 = textureLod(uFoamTex, p.yx * 0.0017 + vec2(0.63, 0.08), 3.0).b * 2.0 - 1.0;
+  float grp2 = -0.7 * grp0;
+` + lines.join('\n');
 }
 
 const COMMON_GLSL = /* glsl */ `
+uniform sampler2D uFoamTex;
 uniform float uDrift;
 uniform float uAmp;
 uniform sampler2D uHull;
@@ -120,7 +132,6 @@ const FRAG = /* glsl */ `
 ${SKY_GLSL}
 ${COMMON_GLSL}
 uniform sampler2D uRipple;
-uniform sampler2D uFoamTex;
 uniform float uChop;
 uniform float uWhitecap;
 uniform float uShipLights;
@@ -194,13 +205,19 @@ void main() {
     slope += vec2(kx - k0, kz - k0) / e * kFade;
   }
 
-  vec2 t1 = p / 11.0 + vec2(0.012, 0.004) * uTime;
-  vec2 t2 = mat2(0.8, -0.6, 0.6, 0.8) * p / 3.7 + vec2(-0.03, 0.021) * uTime;
+  // domain warp (slow, large-scale) so the tiled slope maps never line up into regular stripes / moire
+  vec2 wq = texture2D(uFoamTex, p * 0.0047 + vec2(0.31, 0.77)).bg - 0.5;
+  vec2 wq2 = texture2D(uFoamTex, p * 0.0113 + vec2(0.62, 0.13)).bg - 0.5;
+  vec2 t1 = p / 11.0 + wq * 0.9 + vec2(0.012, 0.004) * uTime;
+  vec2 t2 = mat2(0.8, -0.6, 0.6, 0.8) * p / 3.7 + wq2 * 1.3 + vec2(-0.03, 0.021) * uTime;
   vec2 t3 = mat2(0.28, 0.96, -0.96, 0.28) * p / 1.3 + vec2(0.05, -0.04) * uTime;
-  vec3 r1 = texture2D(uRipple, t1).rgb, r2 = texture2D(uRipple, t2).rgb, r3 = texture2D(uRipple, t3).rgb;
+  vec2 t0 = mat2(0.57, 0.82, -0.82, 0.57) * p / 53.0 + wq * 0.5 + vec2(-0.004, 0.003) * uTime;
+  vec3 r1 = texture2D(uRipple, t1).rgb, r2 = texture2D(uRipple, t2).rgb, r3 = texture2D(uRipple, t3).rgb, r0 = texture2D(uRipple, t0).rgb;
   vec2 d1 = r1.rg * 2.0 - 1.0, d2 = mat2(0.8, 0.6, -0.6, 0.8) * (r2.rg * 2.0 - 1.0), d3 = mat2(0.28, -0.96, 0.96, 0.28) * (r3.rg * 2.0 - 1.0);
-  float f2 = 1.0 - smoothstep(0.08, 0.5, fp), f3 = 1.0 - smoothstep(0.03, 0.18, fp);
-  vec2 det = (d1 * 0.2 + d2 * 0.17 * f2 + d3 * 0.12 * f3) * uChop;
+  vec2 d0 = mat2(0.57, -0.82, 0.82, 0.57) * (r0.rg * 2.0 - 1.0);
+  float f1 = 1.0 - smoothstep(0.35, 1.6, fp), f2 = 1.0 - smoothstep(0.08, 0.5, fp), f3 = 1.0 - smoothstep(0.03, 0.18, fp);
+  // far away the 11 m map is replaced by a 53 m one (its texels are then filtered instead of aliasing)
+  vec2 det = (d0 * mix(0.09, 0.16, 1.0 - f1) + d1 * 0.2 * f1 + d2 * 0.17 * f2 + d3 * 0.12 * f3) * uChop;
 
   // ---- distance to the hull at the waterline, wake geometry ----
   float x = g.x;
@@ -275,7 +292,7 @@ void main() {
       float lit = max(0.0, side * uSunDir.z) * 0.8 + 0.2;
       float white = step(sideTop(hx) - 8.3, hy) * step(11.9, sideTop(hx));
       vec3 hullC = mix(vec3(0.012, 0.012, 0.014) * (0.4 + uSunI * 0.25 * lit), vec3(0.62, 0.61, 0.58) * (0.15 + uSunI * 0.22 * lit), white) * day;
-      hullC += vec3(0.0006, 0.0006, 0.0008) * uNight;
+      hullC += mix(vec3(0.0008, 0.0008, 0.001), vec3(0.03, 0.025, 0.019), white) * uNight;
       float sig = 0.25 + 0.06 * t;
       hullC += vec3(1.0, 0.7, 0.38) * shipLights(hx, hy, sig) * 1.6 * clamp(0.7 / sig, 0.08, 1.0) * uShipLights;
       float taper = smoothstep(hw - 3.0, hw - 0.3, hullHW(hx));   // the hull narrows towards bow / stern
@@ -308,13 +325,13 @@ void main() {
   }
 
   // ---- night: warm glow of the ship's lights on the water near the hull ----
-  float glow = exp(-dHull / 14.0) * step(abs(x), 124.0) * (0.4 + 0.6 * lace2);
-  col += vec3(1.0, 0.66, 0.32) * glow * 0.012 * uShipLights;
+  float glow = (exp(-dHull / 9.0) * 0.7 + exp(-dHull / 40.0) * 0.3) * (1.0 - smoothstep(110.0, 135.0, abs(x))) * (0.55 + 0.45 * lace2);
+  col += vec3(1.0, 0.66, 0.32) * glow * 0.03 * uShipLights;
 
   // ---- foam shading ----
   float sunL = max(uSunDir.y, 0.0) * sunVis;
   vec3 foamDay = vec3(0.78, 0.82, 0.86) * (0.28 + 0.62 * sunL * uSunI / 3.0) + vec3(0.06, 0.1, 0.14);
-  vec3 foamNight = vec3(0.004, 0.006, 0.009) + vec3(1.0, 0.68, 0.35) * (0.05 * exp(-dHull / 8.0)) * uShipLights;
+  vec3 foamNight = vec3(0.011, 0.013, 0.018) + vec3(1.0, 0.68, 0.35) * (0.08 * exp(-dHull / 10.0)) * uShipLights;
   col = mix(col, mix(foamDay, foamNight, uNight), foam * (0.7 + 0.3 * lace));
 
   // ---- aerial perspective / horizon (same function as the sky dome below the horizon) ----

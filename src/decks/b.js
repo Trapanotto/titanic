@@ -4,6 +4,7 @@
 // Café Parisien; aft: second-class staircases, smoking room and bar, lavatories and deck stewards.
 import { buildDeckShell, createDeckPlan, SIDES, wardrobe, trunk } from '../interior/kit.js';
 import * as H from './b-hero.js';
+import { BM } from './bc-util.js';
 
 const deck = 'B';
 // longitudinal lines (wall centre lines, |z|)
@@ -65,7 +66,7 @@ export async function build(world) {
   const LF = { x0: 37.5, x1: 48, z0: -CO, z1: CO };
   plan.room({
     id: 'B-treppe-v', name: 'Große Treppe (vorn) – B-Deck', type: 'lobby', stairs: true, ...LF, wall: 'oakPanel', floor: 'linoCream', lamp: 'bowl',
-    teleport: { name: 'Große Treppe – B-Deck', group: '1. Klasse', x: 45.0, z: 4.0, yaw: Math.PI },
+    teleport: { name: 'Große Treppe – B-Deck', group: '1. Klasse', x: 45.0, z: 0, yaw: Math.PI },
     info: { title: 'Große Treppe – B-Deck', x: 42.0, z: 5.4, radius: 5, text: T.grandFwd },
     furnish: () => H.grandLobby(plan, LF),
   });
@@ -102,13 +103,13 @@ export async function build(world) {
   // ============================================================== x 14..37.5  Parlour Suites + private promenades
   const SUITE = {
     1: { n: [52, 54, 56], who: 'Ismay', tele: 'Parlour-Suite B52–56 (Ismay)', prom: 'Privates Promenadendeck',
-      sit: { wall: 'whiteGold', floor: 'carpetBlue', fo: { cover: 'fabricGold', wood: 'mahogany', fire: 'marble' } },
-      bedF: { wall: 'damaskGreen', floor: 'carpetGreen', fo: { cover: 'fabricGreen', wood: 'mahogany' } },   // Empire
-      bedA: { wall: 'oakDado', floor: 'carpetRed', fo: { cover: 'fabricRed', wood: 'oak' } } },              // Old Dutch
+      sit: { wall: 'lxvi', floor: 'carpetBlue', fo: { sty: 'lxvi', cover: 'fabricGold', wood: 'mahogany', fire: 'marble' } },
+      bedF: { wall: 'empireB', floor: 'carpetGreen', fo: { sty: 'empire', cover: 'fabricGreen' } },   // Empire
+      bedA: { wall: 'qanneB', floor: 'carpetRed', fo: { sty: 'qanne', cover: 'fabricRed' } } },              // Queen Anne
     '-1': { n: [51, 53, 55], who: 'Cardeza', tele: 'Parlour-Suite B51–55 (Cardeza)', prom: 'Privates Promenadendeck (Cardeza)',
-      sit: { wall: 'adam', floor: 'carpetGreen', fo: { cover: 'fabricGreen', wood: 'mahogany', fire: 'marble' } },
-      bedF: { wall: 'damaskBlue', floor: 'carpetBlue', fo: { cover: 'fabricBlue', wood: 'mahogany' } },      // Louis XV
-      bedA: { wall: 'mahoganyDado', floor: 'carpetRed', fo: { cover: 'fabricGold', wood: 'mahogany' } } },   // Georgian
+      sit: { wall: 'adam', floor: 'carpetGreen', fo: { sty: 'adam', cover: 'fabricGreen', wood: 'mahogany', fire: 'marble' } },
+      bedF: { wall: 'lxvB', floor: 'carpetBlue', fo: { sty: 'lxv', cover: 'fabricBlue' } },      // Louis XV
+      bedA: { wall: 'renB', floor: 'carpetRed', fo: { sty: 'renaiss', cover: 'fabricRed' } } },   // Italian Renaissance
   };
   for (const s of [1, -1]) {
     const S = SUITE[s], band = zr(s, CO, PZ), full = zr(s, CO, 99), cs = s < 0 ? 'stbd' : 'port', ps = s < 0 ? 'port' : 'stbd';
@@ -116,13 +117,13 @@ export async function build(world) {
     const nm = `B ${S.n[0]}–${S.n[2]}`, G = { group: '1. Klasse', type: 'suite', cls: 'first' };
     plan.room({ id: 'B' + S.n[0], name: `Schlafzimmer B ${S.n[0]} (Parlour-Suite ${nm})`, x0: 32.5, x1: 37.5, ...band, ...S.bedF, ...G, lamp: 'bowl',
       furnish: H.suiteBedroom, doors: [{ side: cs, at: 36.6, label: 'B' + S.n[0] }, { side: ps, at: 34.0 }, dA(zi)] });
-    plan.room({ id: 'B' + S.n[1], name: `Wohnzimmer B ${S.n[1]} (Parlour-Suite ${nm})`, x0: 26.5, x1: 32.5, ...band, ...S.sit, ...G, lamp: 'cut',
+    plan.room({ id: 'B' + S.n[1], name: `Wohnzimmer B ${S.n[1]} (Parlour-Suite ${nm})`, x0: 26.5, x1: 32.5, ...band, ...S.sit, ...G, lamp: 'chandelier',
       furnish: H.suiteSitting, doors: [{ side: cs, at: 31.4, label: 'B' + S.n[1] }, { side: ps, at: 29.5, w: 1.2 }, dA(zi)],
       teleport: { name: S.tele, group: '1. Klasse' },
       info: { title: s > 0 ? 'Parlour-Suite B 52–56 (J. Bruce Ismay)' : 'Parlour-Suite B 51–55 (Familie Cardeza)', text: s > 0 ? T.ismay : T.cardeza } });
     plan.room({ id: 'B' + S.n[2], name: `Schlafzimmer B ${S.n[2]} (Parlour-Suite ${nm})`, x0: 21.5, x1: 26.5, ...band, ...S.bedA, ...G, lamp: 'bowl',
       furnish: H.suiteBedroom, doors: [{ side: cs, at: 25.6, label: 'B' + S.n[2] }, { side: ps, at: 23.0 }, dA(zi)] });
-    room(`bad-suite-${S.who}`, `Badezimmer der Parlour-Suite ${nm}`, 19, 21.5, full.z0, full.z1, { preset: 'bathroom', wood: true }, [dA(zi)], { ...WET, ...G, type: 'bath', wall: 'tile' });
+    room(`bad-suite-${S.who}`, `Badezimmer der Parlour-Suite ${nm}`, 19, 21.5, full.z0, full.z1, H.suiteBath, [dA(zi)], { ...WET, ...G, type: 'bath', wall: 'marbleB', floor: 'marble' });
     room(`garderobe-${S.who}`, `Garderobe der Parlour-Suite ${nm}`, 16.6, 19, full.z0, full.z1, (ctx) => {
       for (const p of [['far:lo', 'far:hi'], ['left:hi', 'right:hi'], ['right:hi', 'left:mid'], ['left:mid', 'right:mid']]) ctx.fit(wardrobe({ mirror: true, mat: 'mahogany' }), p);
       ctx.fit(trunk({ big: true }), ['far:mid', 'far:hi', 'left:lo']); ctx.fit(trunk(), ['right:lo', 'left:lo', 'far:mid'], { collide: false });
@@ -133,7 +134,7 @@ export async function build(world) {
     plan.room({ id: `B-prom-${S.who}`, name: `Privates Promenadendeck der Suite ${nm}`, type: 'promenade', ...RP, wall: 'tudor', floor: 'deckWood', lamp: 'bowl', group: '1. Klasse',
       teleport: { name: S.prom, group: '1. Klasse', x: 36.2, z: s * 12.1, yaw: Math.PI },
       info: s > 0 ? { title: 'Privates Promenadendeck', x: 30, z: s * 12.6, radius: 4, text: T.prom } : undefined,
-      furnish: () => H.privatePromenade(plan, RP, s, [34.0, 29.5, 23.0]) });
+      furnish: (ctx) => H.privatePromenade(ctx, RP, s, [34.0, 29.5, 23.0]) });
   }
 
   // ============================================================== x 2..37.5  corridors and staterooms around funnels 2 and 3
@@ -160,7 +161,7 @@ export async function build(world) {
   const LA = { x0: -6.5, x1: 2, z0: -CO, z1: CO };
   plan.room({
     id: 'B-treppe-a', name: 'Große Treppe (achtern) – B-Deck', type: 'lobby', stairs: true, ...LA, wall: 'oakPanel', floor: 'linoCream', lamp: 'bowl',
-    teleport: { name: 'Große Treppe (achtern) – B-Deck', group: '1. Klasse', x: 1.0, z: 5.2, yaw: Math.PI },
+    teleport: { name: 'Große Treppe (achtern) – B-Deck', group: '1. Klasse', x: 0.9, z: 0, yaw: Math.PI },
     info: { title: 'Hintere Große Treppe – B-Deck', x: -1.5, z: 5.5, radius: 4, text: T.grandAft },
     furnish: () => H.aftLobby(plan, LA),
   });
@@ -170,9 +171,9 @@ export async function build(world) {
   // ============================================================== x -13.5..-6.5  restaurant reception (either side of funnel casing 4)
   for (const s of [-1, 1]) {
     const R = { x0: -13.5, x1: -6.5, ...zr(s, 3, 99) };
-    room(s < 0 ? 'empfang-bb' : 'empfang-stb', s < 0 ? 'Empfangsraum des Restaurants' : 'Vorraum zum Café Parisien', R.x0, R.x1, R.z0, R.z1, () => H.reception(plan, R, s),
+    room(s < 0 ? 'empfang-bb' : 'empfang-stb', s < 0 ? 'Empfangsraum des Restaurants' : 'Vorraum zum Café Parisien', R.x0, R.x1, R.z0, R.z1, (ctx) => H.reception(ctx, R, s),
       s < 0 ? [dA(-8.5, { w: 1.8, leaf: false })] : [dA(5.7, { w: 1.2 }), dA(11.2, { w: 1.6, leaf: false })],
-      { type: 'lobby', wall: 'ritz', floor: 'carpetRed', lamp: 'cut', group: '1. Klasse',
+      { type: 'lobby', wall: 'ritz', floor: BM().roseCarpet, lamp: false, group: '1. Klasse',
         teleport: s < 0 ? { name: 'Empfangsraum des Restaurants', group: '1. Klasse', x: -7.3, z: -5.4, yaw: Math.PI } : undefined,
         info: s < 0 ? { title: 'Empfangsraum des À-la-carte-Restaurants', text: T.reception } : undefined });
   }
@@ -180,11 +181,11 @@ export async function build(world) {
   // ============================================================== x -24..-13.5  À la carte restaurant, Café Parisien
   const RR = { x0: -24, x1: -13.5, z0: -99, z1: 8.4 };
   plan.room({
-    id: 'B-restaurant', name: 'À-la-carte-Restaurant', type: 'restaurant', ...RR, wall: 'ritz', floor: 'carpetRed', lamp: 'cut', group: '1. Klasse',
+    id: 'B-restaurant', name: 'À-la-carte-Restaurant', type: 'restaurant', ...RR, wall: 'ritz', floor: BM().roseCarpet, lamp: false, group: '1. Klasse',
     doors: [dS(-18.75, { w: 1.6, leaf: false })],
     teleport: { name: 'À-la-carte-Restaurant', group: '1. Klasse', x: -14.3, z: -8.5, yaw: Math.PI },
     info: { title: 'À-la-carte-Restaurant „Ritz“', x: -18.75, z: -8.0, radius: 6, text: T.ritz },
-    furnish: () => H.restaurant(plan, RR),
+    furnish: (ctx) => H.restaurant(ctx, RR),
   });
   const RC = { x0: -36, x1: -13.5, z0: 8.4, z1: 99 };
   plan.room({
@@ -192,7 +193,7 @@ export async function build(world) {
     doors: [dA(11.0)],
     teleport: { name: 'Café Parisien', group: '1. Klasse', x: -14.6, z: 11.2, yaw: Math.PI },
     info: { title: 'Café Parisien', x: -25, z: 11.0, radius: 6, text: T.cafe },
-    furnish: () => H.cafe(plan, RC, { port: [{ at: -18.75, w: 1.6 }, { at: -27, w: 0.9 }], aft: [{ at: 11.0, w: 0.9 }], fwd: [{ at: 11.2, w: 1.6 }] }),
+    furnish: (ctx) => H.cafe(ctx, RC),
   });
 
   // ============================================================== x -38.5..-24  restaurant galley, pantry, staff (engine casing in the middle)
@@ -220,13 +221,13 @@ export async function build(world) {
   // ============================================================== x -59..-47.5  2nd class smoking room and bar
   const RS = { x0: -59, x1: -47.5, z0: -8.5, z1: 99 };
   plan.room({
-    id: 'B-rauchsalon-2', name: 'Rauchsalon 2. Klasse', type: 'saloon', cls: 'second', ...RS, wall: 'oakPanel', floor: 'linoRed', lamp: 'bowl', group: '2. Klasse',
+    id: 'B-rauchsalon-2', name: 'Rauchsalon 2. Klasse', type: 'saloon', cls: 'second', ...RS, wall: 'oakLXVI', floor: 'linoRed', lamp: false, group: '2. Klasse',
     teleport: { name: 'Rauchsalon 2. Klasse', group: '2. Klasse', x: -58.3, z: 0, yaw: 0 },
     info: { title: 'Rauchsalon der Zweiten Klasse', x: -53.25, z: 3.7, radius: 6, text: T.smoke },
-    furnish: () => H.smokingRoom(plan, RS),
+    furnish: (ctx) => H.smokingRoom(ctx, RS),
   });
   room('bar-2', 'Bar 2. Klasse', -53, -47.5, -99, -8.5, (ctx) => H.barRoom(ctx, -51.6), [dS(-48.6)], { type: 'service', cls: 'second', wall: 'oak', floor: 'linoRed' });
-  H.hatch(plan, -52.6, -50.6, -8.5, { neg: 'oak', pos: 'oakPanel', frame: 'oak' });
+  H.hatch(plan, -52.6, -50.6, -8.5, { neg: 'oak', pos: 'oak', frame: 'oak' });
   room('barlager-2', 'Vorratsraum der Bar', -59, -53, -99, -8.5, 'store', [dS(-56)], { ...SVC, type: 'store' });
 
   // ============================================================== x -71.85..-59  aft 2nd class staircase ('secondAft'), exit to the open deck

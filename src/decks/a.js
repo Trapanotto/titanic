@@ -5,7 +5,7 @@
 // between them, and the aft second-class entrance with pantries and stores.
 import { DECK_Y } from '../core/constants.js';
 import { buildDeckShell, createDeckPlan } from '../interior/kit.js';
-import { sidesBut } from './boat-util.js';
+import { sidesBut, deckMats } from './boat-util.js';
 import {
   furnishHallFwd, furnishLounge, furnishReading, furnishSmoking, furnishVerandah, furnishHallAft, furnishSecondStair,
   furnishSecondHall, furnishBarPantry, furnishVerandahPantry, ceilingDetailsA,
@@ -14,7 +14,7 @@ import {
 const deck = 'A';
 
 export async function build(world) {
-  const Y = DECK_Y[deck];
+  const Y = DECK_Y[deck], DM = deckMats();
   buildDeckShell(world, deck);
   const plan = createDeckPlan(world, deck, { wall: 'whitePanel', floor: null });
 
@@ -69,7 +69,7 @@ export async function build(world) {
   room('treppe-vorn', 'Große Treppe – A-Deck', XH0, XH1, -99, 99, {
     type: 'lobby', cls: 'first', stairs: true, wall: { base: 'oakPanel', cornice: 'gold' }, floor: 'linoCream', lamp: 'bowl', furnish: furnishHallFwd,
     doors: [dF(-6.2, { w: 1.2, leaf: false }), dF(6.2, { w: 1.2, leaf: false }), dA(-3.9, { w: 1.2, leaf: false }), dA(3.9, { w: 1.2, leaf: false })],
-    teleport: { name: 'Große Treppe – A-Deck', group: G1, x: 38.6, z: -3.6, yaw: 0 },
+    teleport: { name: 'Große Treppe – A-Deck', group: G1, x: 45.0, z: 0, yaw: Math.PI },
     info: { title: 'Die Aufzüge auf dem A-Deck', x: 45, z: 3.3, radius: 3, text: 'Direkt vor der Großen Treppe lagen drei elektrische Aufzüge der Ersten Klasse, die vom A-Deck bis hinunter zum E-Deck fuhren. Die Kabinen waren mit Mahagoni getäfelt und mit Sitzbänken ausgestattet; ein Liftboy bediente sie. Das A-Deck war ihre oberste Haltestelle.' },
   });
 
@@ -86,7 +86,7 @@ export async function build(world) {
 
   // ============================================================ x 19..30.5: Reading & Writing Room, starboard strip
   room('lesezimmer', 'Lese- und Schreibzimmer', 19, 30.5, -99, C, {
-    type: 'public', cls: 'first', wall: { base: 'whiteGold' }, floor: 'carpetRed', lamp: false, furnish: furnishReading,
+    type: 'public', cls: 'first', wall: { base: 'whitePanel', cornice: 'paintWhite', dado: 'paintWhite' }, floor: DM.carpetRose, lamp: false, furnish: furnishReading,
     doors: [dS(21.0, { w: 1.2 }), dS(28.6, { w: 1.2 }), dF(-3.9, { w: 1.0 }), dA(-1.5, { w: 1.2 })],
     teleport: { name: 'Lese- und Schreibzimmer', group: G1, x: 21.0, z: 2.1, yaw: Math.PI / 2 },
     info: { title: 'Das Lese- und Schreibzimmer', text: 'Der helle, in weißem georgianischem Stil getäfelte Raum war vor allem für die Damen der Ersten Klasse gedacht, die sich nach dem Essen zum Lesen und Briefeschreiben zurückzogen. Ein großes Erkerfenster öffnete sich zur Promenade. Weil der Raum wenig genutzt wurde, verkleinerte man ihn beim Schwesterschiff Britannic.' },
@@ -97,7 +97,7 @@ export async function build(world) {
 
   // ============================================================ Lounge x 2..19 (funnel-3 casing 8.5..15.5)
   room('lounge', 'Gesellschaftssalon (Lounge)', 2, 19, -99, 99, {
-    type: 'public', cls: 'first', casing: true, wall: { base: 'oakPanel', cornice: 'gold' }, floor: 'carpetGreen', lamp: false, furnish: furnishLounge,
+    type: 'public', cls: 'first', casing: true, wall: { base: 'oakPanel', cornice: 'gold', dado: 'gold' }, floor: 'carpetGreen', lamp: false, furnish: furnishLounge,
     doors: [dA(-4.5, { w: 1.6, leaf: false }), dA(4.5, { w: 1.6, leaf: false }), dF(3.9, { w: 1.2, leaf: false })],
     teleport: { name: 'Gesellschaftssalon (Lounge)', group: G1, x: 3.0, z: 6.4, yaw: -0.4 },
     info: { title: 'Die Lounge der Ersten Klasse', x: 5.5, z: 3.0, radius: 6, text: 'Die Lounge war im Stil Ludwigs XV. nach Vorbildern aus dem Schloss Versailles eingerichtet: geschnitzte Eichenholzvertäfelung, ein großer Kamin mit einer Statue der Artemis von Versailles, ein prachtvoller Kronleuchter und eine Bücherei, aus der Bücher entliehen werden konnten. Hier spielte man Karten, las und trank Tee; die Bordkapelle gab nachmittags Konzerte.' },
@@ -107,7 +107,7 @@ export async function build(world) {
   room('treppe-achtern', 'Große Treppe (achtern) – A-Deck', -6.5, 2, -99, 99, {
     type: 'lobby', cls: 'first', stairs: true, wall: { base: 'oakPanel', cornice: 'gold' }, floor: 'linoCream', lamp: 'bowl', furnish: furnishHallAft,
     doors: [dA(-3.8, { w: 1.1, leaf: false }), dA(3.8, { w: 1.1, leaf: false })],
-    teleport: { name: 'Große Treppe (achtern) – A-Deck', group: G1, x: -5.8, z: -4.0, yaw: 0 },
+    teleport: { name: 'Große Treppe (achtern) – A-Deck', group: G1, x: 0.9, z: 0, yaw: Math.PI },
     info: { title: 'Hintere Treppe auf dem A-Deck', x: -3, z: 3.4, radius: 3.5, text: 'Die hintere Große Treppe lag zwischen Lounge und Rauchsalon. Von hier betraten die Herren nach dem Dinner den Rauchsalon, während sich die Damen in der Lounge oder im Lesezimmer aufhielten. Seitliche Türen führten direkt auf die Promenade des A-Decks.' },
   });
 
@@ -122,7 +122,7 @@ export async function build(world) {
 
   // ============================================================ Smoking Room x -36..-13.5 (engine casing -36..-24)
   room('rauchsalon', 'Rauchsalon 1. Klasse', -36, -13.5, -99, 99, {
-    type: 'public', cls: 'first', casing: true, wall: { base: 'mahogany', cornice: 'gold' }, floor: 'linoCream', lamp: 'bowl', furnish: furnishSmoking,
+    type: 'public', cls: 'first', casing: true, wall: { base: 'mahogany', cornice: 'woodDark', dado: 'woodDark' }, floor: DM.linoSmoke, lamp: false, furnish: furnishSmoking,
     doors: [dF(-3.8, { w: 1.1, style: 'mahogany' }), dF(3.8, { w: 1.1, style: 'mahogany' })],
     teleport: { name: 'Rauchsalon 1. Klasse', group: G1, x: -14.4, z: 2.4, yaw: Math.PI },
     info: { title: 'Der Rauchsalon der Ersten Klasse', x: -18, z: 3.5, radius: 6, text: 'Der Rauchsalon war den Herren vorbehalten. Die Wände waren im georgianischen Stil mit Mahagoni getäfelt und mit Perlmutt eingelegt, die Fenster aus Bleiglas zeigten Häfen, Schiffe und Wappen und wurden von hinten beleuchtet. In grünen Ledersesseln wurde geraucht, getrunken und Karten gespielt.' },
@@ -132,9 +132,9 @@ export async function build(world) {
   for (const s of [-1, 1]) {
     const stb = s > 0;
     room(stb ? 'verandah-stb' : 'verandah-bb', stb ? 'Verandah-Café und Palmenhof (Steuerbord)' : 'Verandah-Café und Palmenhof (Backbord)', -47.5, -36, stb ? C : -99, stb ? 99 : -C, {
-      type: 'public', cls: 'first', wall: { base: 'whitePanel', cornice: 'paintWhite' }, floor: 'linoCream', lamp: 'bowl', furnish: furnishVerandah,
-      doors: [dF(s * 6.5, { w: 1.2, style: 'mahogany' })],
-      teleport: { name: stb ? 'Verandah-Café (Steuerbord)' : 'Verandah-Café (Backbord)', group: G1, x: -36.8, z: s * 5.4, yaw: Math.PI },
+      type: 'public', cls: 'first', wall: { base: 'whitePanel', cornice: 'paintWhite' }, floor: DM.tileCheck, lamp: false, furnish: furnishVerandah,
+      doors: [dF(s * 6.5, stb ? { w: 2.5, leaf: false, style: 'mahogany' } : { w: 1.2, style: 'mahogany' })], // starboard: revolving door
+      teleport: { name: stb ? 'Verandah-Café (Steuerbord)' : 'Verandah-Café (Backbord)', group: G1, x: -37.0, z: s * (stb ? 4.5 : 5.4), yaw: Math.PI },
       info: stb
         ? { title: 'Verandah-Café und Palmenhof', text: 'Die beiden Verandah-Cafés am achteren Ende des A-Decks sollten an eine sonnige Terrasse erinnern: weiß lackierte Spaliere mit Efeu, Korbstühle, Palmen und große Fenster. Das Café an Backbord war für Nichtraucher gedacht, das an Steuerbord schloss an den Rauchsalon an. Vor allem Familien mit Kindern hielten sich hier gern auf.' }
         : undefined,

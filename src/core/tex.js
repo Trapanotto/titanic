@@ -14,6 +14,14 @@ function hash2(x, y, seed) {
 }
 
 const _fields = new Map();
+// The noise fields are only a build-time cache (hundreds of MB). Drop them once texture generation has been idle
+// for a while; they are regenerated on demand if a late texture needs them.
+let _fieldTimer = null;
+function touchFields() {
+  if (_fieldTimer) clearTimeout(_fieldTimer);
+  _fieldTimer = setTimeout(() => { _fields.clear(); _fieldTimer = null; }, 20000);
+  _fieldTimer.unref?.();
+}
 
 /** Tileable value noise, `px` x `py` lattice cells across the texture, values 0..1. */
 export function vnoise(size, px, py = px, seed = 1) {
@@ -39,7 +47,7 @@ export function vnoise(size, px, py = px, seed = 1) {
       f[o + x] = top + (bot - top) * t;
     }
   }
-  _fields.set(key, f);
+  _fields.set(key, f); touchFields();
   return f;
 }
 
@@ -57,7 +65,7 @@ export function fbm(size, px, py = px, oct = 4, seed = 1, gain = 0.5) {
     tot += amp; amp *= gain; cx *= 2; cy *= 2;
   }
   for (let i = 0; i < f.length; i++) f[i] /= tot;
-  _fields.set(key, f);
+  _fields.set(key, f); touchFields();
   return f;
 }
 
@@ -91,7 +99,7 @@ export function worley(size, cells, seed = 1, jitter = 0.9) {
     }
   }
   w = { d1, d2, id };
-  _fields.set(key, w);
+  _fields.set(key, w); touchFields();
   return w;
 }
 

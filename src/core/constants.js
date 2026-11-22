@@ -89,12 +89,19 @@ export const CASINGS = [
 ];
 
 // Interior staircases. Built generically by src/interior (kit). Flight k connects decks[k] -> decks[k+1].
-// Even flights use the port lane (z in [zc-lane, zc]) and climb towards +x (bottom at x0, top at x1),
-// odd flights use the starboard lane (z in [zc, zc+lane]) and climb towards -x (bottom at x1, top at x0).
+// SCISSOR stairs (default): even flights use the port lane (z in [zc-lane, zc]) and climb towards +x (bottom at x0,
+// top at x1), odd flights use the starboard lane (z in [zc, zc+lane]) and climb towards -x (bottom at x1, top at x0).
 // Deck modules must keep the rectangle expanded by 2 m in x free of walls ("stair lobby").
+// IMPERIAL (split) stairs (type 'imperial', the two Grand Staircases): the well is x0..x1, |z - zc| <= lane, stacked
+// identically on every deck. Per deck interval: a CENTRAL flight (|z| <= cw) starts on the lower deck at the foot
+// x1 and climbs towards -x to a half-landing (x0 .. x0 + landing, full width) at half the deck rise; from there two
+// SIDE flights (cw + gap <= |z| <= lane - 0.08) return towards +x and arrive on the upper deck at x1 again.
+// A panelled pier fills back..x0 (aft wall of the landing). Keep-out for deck layouts = `keep` (unchanged).
 export const STAIRS = [
-  { id: 'grandFwd', name: 'Große Treppe (vorn)', x0: 39.5, x1: 44.5, zc: 0, lane: 2.4, decks: ['E', 'D', 'C', 'B', 'A', 'boat'], style: 'grand' },
-  { id: 'grandAft', name: 'Große Treppe (achtern)', x0: -5, x1: 0, zc: 0, lane: 2.0, decks: ['C', 'B', 'A', 'boat'], style: 'grand' },
+  { id: 'grandFwd', name: 'Große Treppe (vorn)', x0: 38.3, x1: 42.2, zc: 0, lane: 2.7, decks: ['E', 'D', 'C', 'B', 'A', 'boat'], style: 'grand',
+    type: 'imperial', back: 37.5, landing: 1.8, cw: 1.1, gap: 0.2, keep: { x0: 37.5, x1: 46.5, hw: 2.7 } },
+  { id: 'grandAft', name: 'Große Treppe (achtern)', x0: -5.8, x1: -2.1, zc: 0, lane: 2.3, decks: ['C', 'B', 'A', 'boat'], style: 'grand',
+    type: 'imperial', back: -6.5, landing: 1.6, cw: 0.85, gap: 0.2, keep: { x0: -7, x1: 2, hw: 2.3 } },
   { id: 'second', name: 'Treppenhaus 2. Klasse', x0: -45.5, x1: -40.5, zc: 0, lane: 1.6, decks: ['F', 'E', 'D', 'C', 'B', 'A', 'boat'], style: 'oak' },
   { id: 'secondAft', name: 'Hinteres Treppenhaus 2. Klasse', x0: -66, x1: -61, zc: 0, lane: 1.5, decks: ['F', 'E', 'D', 'C', 'B'], style: 'oak' },
   { id: 'thirdFwd', name: 'Treppe 3. Klasse (vorn)', x0: 97, x1: 102, zc: 0, lane: 1.3, decks: ['G', 'F', 'E', 'D', 'C'], style: 'steel' },

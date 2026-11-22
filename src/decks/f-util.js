@@ -67,6 +67,43 @@ const posterTex = canvasTexture(256, 1, (ctx, s) => {
 export const posterMat = std({ map: posterTex, roughness: 0.8 });
 posterMat.name = 'fg_poster';
 
+const iznikTex = canvasTexture(256, 0.6, (ctx, s) => {
+  // 4 × 4 glazed tiles (15 cm): turquoise ground, cobalt and white arabesque quatrefoils, green leaves, thin joints
+  const q = s / 4;
+  for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
+    const x = i * q, y = j * q, c = q / 2;
+    ctx.fillStyle = '#2f8f8a'; ctx.fillRect(x, y, q, q);
+    ctx.fillStyle = '#1b3f8a';
+    for (const [dx, dy] of [[0, 0], [q, 0], [0, q], [q, q]]) { ctx.beginPath(); ctx.arc(x + dx, y + dy, q * 0.28, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#eef3ec'; ctx.beginPath();
+    for (let k = 0; k < 4; k++) { const a = (k * Math.PI) / 2; ctx.ellipse(x + c + Math.cos(a) * q * 0.16, y + c + Math.sin(a) * q * 0.16, q * 0.14, q * 0.09, a, 0, 7); }
+    ctx.fill();
+    ctx.fillStyle = '#c8303a'; ctx.beginPath(); ctx.arc(x + c, y + c, q * 0.07, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3d8a3a'; for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + (k * Math.PI) / 2; ctx.beginPath(); ctx.ellipse(x + c + Math.cos(a) * q * 0.3, y + c + Math.sin(a) * q * 0.3, q * 0.08, q * 0.035, a, 0, 7); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(230,230,220,0.9)'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, q - 2, q - 2);
+  }
+}, 619);
+/** glazed blue-green Iznik-style wall tiles (Turkish bath) */
+export const iznikMat = std({ map: iznikTex, roughness: 0.18, metalness: 0.05 });
+iznikMat.name = 'fg_iznik';
+const borderTex = canvasTexture(128, 0.3, (ctx, s) => {
+  ctx.fillStyle = '#123a6e'; ctx.fillRect(0, 0, s, s);
+  ctx.fillStyle = '#e9e2c6'; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo((i * s) / 4, s * 0.5); ctx.lineTo(((i + 0.5) * s) / 4, s * 0.15); ctx.lineTo(((i + 1) * s) / 4, s * 0.5); ctx.lineTo(((i + 0.5) * s) / 4, s * 0.85); ctx.fill(); }
+  ctx.fillStyle = '#b8902f'; ctx.fillRect(0, 0, s, s * 0.08); ctx.fillRect(0, s * 0.92, s, s * 0.08);
+}, 621);
+/** cobalt border tiles with cream lozenges (frames the Iznik panels) */
+export const tileBorderMat = std({ map: borderTex, roughness: 0.2 });
+tileBorderMat.name = 'fg_tileBorder';
+const depthTex = canvasTexture(128, 1, (ctx, s) => {
+  ctx.fillStyle = '#f4f2ea'; ctx.fillRect(0, 0, s, s);
+  ctx.fillStyle = '#1d2d4f'; ctx.font = `bold ${Math.round(s * 0.36)}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('3 FT', s / 4, s / 4); ctx.fillText('4 FT', (3 * s) / 4, s / 4); ctx.fillText('5 FT', s / 4, (3 * s) / 4); ctx.fillText('6 FT', (3 * s) / 4, (3 * s) / 4);
+}, 623);
+depthTex.repeat.set(1, 1);
+/** enamel depth marks (2 × 2 cells: 3 FT, 4 FT, 5 FT, 6 FT) – unit UVs */
+export const depthMat = std({ map: depthTex, roughness: 0.3 });
+depthMat.name = 'fg_depth';
+
 export const meatMat = std({ color: 0xa8474a, roughness: 0.7 });
 meatMat.name = 'fg_meat';
 export const fatMat = std({ color: 0xe8d7c0, roughness: 0.8 });

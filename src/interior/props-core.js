@@ -122,10 +122,23 @@ export { bakeTemplate as _bakeTemplate };
 export const PROPS = {};
 const templates = new Map();
 
+// Cache key for prop options. NOT JSON.stringify: that calls toJSON() on materials/textures first, which
+// serialises whole images (seconds per call).
+function optKey(v) {
+  if (v === null || v === undefined) return '';
+  const t = typeof v;
+  if (t === 'number' || t === 'boolean') return String(v);
+  if (t === 'string') return JSON.stringify(v);
+  if (t === 'function') return 'fn';
+  if (v.uuid) return '#' + (v.name || v.uuid);
+  if (Array.isArray(v)) return '[' + v.map(optKey).join(',') + ']';
+  return '{' + Object.keys(v).map((k) => k + ':' + optKey(v[k])).join(',') + '}';
+}
+
 /** Define a prop: fp = [w, d, h] or fn(opts) → [w, d, h]; build(p: PB, opts). */
 export function def(name, fp, build) {
   const fn = (o = {}) => {
-    const key = name + '|' + JSON.stringify(o, (k, v) => (v && v.isMaterial ? v.name || v.uuid : v));
+    const key = name + '|' + optKey(o);
     let t = templates.get(key);
     if (!t) {
       const p = new PB();

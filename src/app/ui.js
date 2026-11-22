@@ -19,7 +19,8 @@ const HELP = [
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
   ['E', 'Info lesen'],
   ['1 – 9', 'Schnellreise zu Höhepunkten'],
-  ['P', 'FPS-Anzeige'],
+  ['P', 'Leistungsanzeige (FPS, Zeichenaufrufe, Dreiecke, Speicher)'],
+  ['G', 'Grafikqualität (niedrig / mittel / hoch)'],
   ['B', 'Kopfwippen an/aus'],
   ['H', 'Hilfe'],
   ['Esc', 'Maus freigeben'],
@@ -39,6 +40,8 @@ export class UI {
     this.player = player;
     this.noLock = noLock;
     this.controls = null;       // set by main.js
+    this.renderer = null;       // set by main.js (performance display)
+    this.qualityName = () => '';
     this.modal = null;          // null | 'help' | 'info' | 'plan'
     this.started = false;       // loading finished
     this.entered = false;       // user clicked "an Bord gehen" at least once
@@ -56,7 +59,7 @@ export class UI {
     this._buildHud();
     this._buildPanels();
     this.plan = new DeckPlan(this.root, world, player, (t) => this.teleportTo(t), () => this._closed('plan'));
-    this.minimap = new Minimap({ parent: this.hudEl, world, player, ui: this });
+    this.minimap = new Minimap({ parent: this.rightEl, world, player, ui: this });
 
     player.onHint = (text) => this.toast(text, 4);
     player.onRespawn = () => this.toast('Über Bord gegangen – zurück an Deck gesetzt', 3);
@@ -188,7 +191,7 @@ export class UI {
         if (p.toggleFly() === 'fly') this.toast('Flugmodus – F zum Landen', 2.5); else this.toast('Zu Fuß', 1.5);
         break;
       case 'flyspeed': this.toast(`Fluggeschwindigkeit × ${p.changeFlySpeed(arg).toFixed(2)}`, 1.2); break;
-      case 'fps': this._fps.on = !this._fps.on; this.fpsEl.hidden = !this._fps.on; break;
+      case 'fps': this._fps.on = !this._fps.on; this.fpsEl.hidden = !this._fps.on; this._fps.frames = 0; this._fps.t0 = 0; if (this._fps.on) this.fpsEl.textContent = '…'; break;
       case 'bob': p.headBob = !p.headBob; this.toast(p.headBob ? 'Kopfwippen an' : 'Kopfwippen aus', 1.5); break;
       case 'quick': { const t = this.quick[arg - 1]; if (!this.modal && t) this.teleportTo(t); break; }
       case 'touchmode': this.entered = true; this.enableTouch(); break;
@@ -208,6 +211,45 @@ export class UI {
     this.infoEl.hidden = false;
   }
 
+  /** Performance display (key P): frame time, draw calls, triangles, visible zones / chunks, memory. */
+  _perfText(ms) {
+    const r = this.renderer, st = this.world.stats || {}, L = [];
+    L.push(`${Math.round(1000 / ms)} FPS · ${ms.toFixed(1)} ms`);
+    if (r) {
+      const i = r.info.render;
+      L.push(`${i.calls} Aufrufe · ${(i.triangles / 1e6).toFixed(2).replace('.', ',')} Mio. Dreiecke`);
+      L.push(`Zonen ${st.zones ?? '–'} · Blöcke ${st.chunks ?? '–'}/${st.chunksTotal ?? '–'}${st.exterior === false ? ' · außen aus' : ''}`);
+      const m = r.info.memory;
+      L.push(`Geometrien ${m.geometries} · Texturen ${m.textures}`);
+    }
+    const pm = performance.memory;
+    if (pm && pm.usedJSHeapSize) L.push(`JS-Speicher ${Math.round(pm.usedJSHeapSize / 1048576)} MB`);
+    const q = this.qualityName?.();
+    if (q) L.push('Qualität ' + q);
+    this.fpsEl.textContent = L.join('\n');
+  }
+
+  /**
+   * Full-screen message with an optional "reload" button (no WebGL 2, lost graphics context …).
+   * Returns a function that removes it again.
+   */
+  showError(title, text, reload = true) {
+    this._errEl?.remove();
+    const box = el('div', 'modal error');
+    const p = el('div', 'panel error-box');
+    p.append(el('div', 'info-orn', '✦  White Star Line  ✦'), el('h2', '', title), el('p', 'error-text', text));
+    if (reload) {
+      const b = el('button', 'btn-reload', 'Neu laden');
+      b.addEventListener('click', () => location.reload());
+      p.append(b);
+    }
+    box.append(p);
+    this.root.append(box);
+    this._errEl = box;
+    this.controls?.releaseLock?.();
+    return () => { if (this._errEl === box) { box.remove(); this._errEl = null; } };
+  }
+
   toast(text, seconds = 2.5) {
     this.toastEl.textContent = text;
     this.toastEl.classList.add('show');
@@ -224,8 +266,10 @@ export class UI {
 
     const f = this._fps;
     if (f.on) {
-      f.frames++; f.time += dt;
-      if (f.time >= 0.5) { this.fpsEl.textContent = Math.round(f.frames / f.time) + ' FPS'; f.frames = 0; f.time = 0; }
+      const now = performance.now();
+      f.frames++;
+      if (!f.t0) f.t0 = now;
+      if (now - f.t0 >= 500) { this._perfText((now - f.t0) / f.frames); f.frames = 0; f.t0 = now; }
     }
 
     // compass: arrow points to the bow relative to the view direction
@@ -282,6 +326,9 @@ export class UI {
     this.fpsEl.hidden = true;
     col.append(this.headEl, this.timeEl, this.foundEl, this.fpsEl);
     tr.append(col, compass);
+    // right column: compass / status lines, then the minimap below them (flows, never overlaps)
+    this.rightEl = el('div', 'hud-right');
+    this.rightEl.append(tr);
 
     this.promptEl = el('div', 'prompt');
     this.promptEl.append(el('kbd', '', 'E'), (this.promptText = el('span', '', '')));
@@ -289,9 +336,11 @@ export class UI {
     this.toastEl = el('div', 'toast');
 
     const bar = el('div', 'keybar');
-    for (const [k, label] of [['H', 'Hilfe'], ['M', 'Deckplan'], ['J', 'Minikarte'], ['F', 'Flugmodus'], ['N', 'Tag/Nacht'], ['E', 'Info']]) {
+    for (const [k, label, act] of [['H', 'Hilfe', 'help'], ['M', 'Deckplan', 'plan'], ['J', 'Minikarte', 'minimap'], ['F', 'Flugmodus', 'fly'], ['N', 'Tag/Nacht', 'night'], ['E', 'Info', 'info']]) {
       const item = el('span', 'key');
-      item.append(el('kbd', '', k), document.createTextNode(' ' + label));
+      item.title = label + ' (' + k + ')';
+      item.append(el('kbd', '', k), el('span', 'key-label', ' ' + label));
+      item.addEventListener('click', (e) => { e.stopPropagation(); if (act === 'minimap') this.minimap?.toggle(); else this.action(act); });
       bar.append(item);
     }
 
@@ -317,7 +366,7 @@ export class UI {
     tbtn('?', 'Hilfe', () => this.action('help'));
     touch.append(this.stickEl, btns);
 
-    hud.append(tl, tr, this.promptEl, this.toastEl, bar, touch);
+    hud.append(tl, this.rightEl, this.promptEl, this.toastEl, bar, touch);
     this.root.append(hud);
   }
 

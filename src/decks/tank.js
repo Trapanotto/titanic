@@ -11,7 +11,7 @@ import {
   Batch, buildDeckShell, bulkhead, createDeckPlan, tankH, machineBlock, crateStack, barrel, shelves, sackPile, crate, ladder,
 } from '../interior/kit.js';
 import { DECK, Y, CEIL, LOW, Instancer, tube, pipeRun, cageLamp, railX, railZ, plate, flight, floorHW } from './tank-lib.js';
-import { buildBoilerRooms, BOILER_ROOMS, boilerEnds } from './tank-boilers.js';
+import { buildBoilerRooms, BOILER_ROOMS, boilerEnds, wtGear } from './tank-boilers.js';
 import { buildEngineSpaces, LEVEL_U, LEVEL_M } from './tank-engines.js';
 
 const G = 'Maschinen';
@@ -87,6 +87,7 @@ export async function build(world) {
   const b = new Batch(world, DECK);
   const inst = new Instancer(world);
   buildBoilerRooms(world, b, inst);
+  for (const x of [66, ...BOILER_ROOMS.map((r) => r.x0).filter((x) => x > -22), -22]) wtGear(world, b, x);
   boilerAccess(world, b);
   const anim = buildEngineSpaces(world, b);
 
