@@ -13,7 +13,7 @@ const STRAW = 45;   // atlas cell
 
 /** artillery wheel lying in the xy plane (axle along z) centred at (x, y, z): tyre, felloe, 12 wooden spokes, brass hub */
 function wheel(p, x, y, z, side) {
-  p.t(mats.rubber, 0.405, 0.058, x, y, z, 'z', 28, 8);
+  p.t(mats.rubber, 0.392, 0.058, x, y, z, 'z', 28, 8);
   p.t(mats.woodDark, 0.335, 0.028, x, y, z, 'z', 24, 4);
   p.t(mats.iron, 0.348, 0.012, x, y, z, 'z', 24, 3);
   for (let k = 0; k < 12; k++) { const a = (k / 12) * TAU, m = p.fr(mats.oak, 0.03, 0.022, 0.022, 0.018, 0.28, x, y, z, {}); m.position.set(x + Math.cos(a) * 0.06, y + Math.sin(a) * 0.06, z); m.rotation.z = a - Math.PI / 2; }
@@ -39,9 +39,11 @@ export const renault = def('ghRenault', [1.8, 4.6, 2.12], (p) => {
     for (const z of [-0.43, 0.43]) for (let i = 0; i < 4; i++) p.bb(mats.iron, 1.0 - i * 0.18, 0.018, 0.05, x, 0.47 + i * 0.019, z, 0.004);
     if (k) p.s(mats.iron, 0.13, x, 0.45, 0.08, 1, 1, 1, false);
   }
-  p.cx(mats.iron, 0.03, 2.4, 0.0, 0.42, 0.08, 8);  // propeller shaft
+  p.cx(mats.iron, 0.03, 2.05, -0.25, 0.42, 0.08, 8);  // propeller shaft from the differential to the gearbox
+  p.bb(mats.iron, 0.34, 0.2, 0.34, 0.92, 0.36, 0.08, 0.01); p.b(mats.iron, 0.08, 0.06, 0.92, 0.92, 0.42, 0);  // gearbox on its cross member
   // wheels and mudguards
-  for (const x of [1.45, -1.35]) for (const s of [-1, 1]) { wheel(p, x, 0.45, s * 0.78, s); mudguard(p, x, 0.45, s * 0.8, x > 0 ? 0.35 : 0.0, x > 0 ? 2.75 : 2.6); }
+  for (const x of [1.45, -1.35]) for (const s of [-1, 1]) { wheel(p, x, 0.45, s * 0.78, s); mudguard(p, x, 0.45, s * 0.8, x > 0 ? 0.35 : 0.0, x > 0 ? 2.84 : 2.6); }
+  for (const s of [-1, 1]) p.b(mats.iron, 0.04, 0.02, 0.3, 1.45, 0.925, s * 0.56);
   // running boards with brass edging, linoleum top, tool box; spare tyre on the off side
   for (const s of [-1, 1]) {
     p.bb(mats.woodDark, 1.95, 0.035, 0.26, 0.05, 0.56, s * 0.8, 0.006);
@@ -50,13 +52,13 @@ export const renault = def('ghRenault', [1.8, 4.6, 2.12], (p) => {
     for (const x of [0.9, -0.8]) p.b(mats.iron, 0.04, 0.12, 0.3, x, 0.45, s * 0.66);
   }
   p.bb(mats.woodDark, 0.5, 0.25, 0.2, -0.45, 0.6, -0.8, 0.01);
-  p.t(mats.rubber, 0.405, 0.06, 0.45, 0.98, 0.98, 'z', 28, 8); p.t(mats.iron, 0.34, 0.02, 0.45, 0.98, 0.98, 'z', 20, 3);
-  p.b(mats.leather, 0.05, 0.04, 0.12, 0.45, 1.36, 0.98); p.b(mats.iron, 0.04, 0.5, 0.04, 0.45, 0.6, 0.9);
+  p.t(mats.rubber, 0.405, 0.06, 0.45, 1.04, 1.0, 'z', 28, 8); p.t(mats.iron, 0.34, 0.02, 0.45, 1.04, 1.0, 'z', 20, 3);
+  p.b(mats.leather, 0.05, 0.04, 0.12, 0.45, 1.44, 1.0); p.b(mats.iron, 0.04, 0.55, 0.04, 0.45, 0.6, 0.92);
   // coal-scuttle bonnet sloping down to the front (extruded side profile), louvres, hinge, filler cap
   const bon = [[2.3, 0.55], [2.32, 0.7], [2.2, 0.82], [1.85, 0.96], [1.4, 1.06], [1.02, 1.12], [1.02, 0.55]];
   p.extZ(carPaint, bon, 0.84, 0, 0, 0, 0.01);
   for (const s of [-1, 1]) for (let k = 0; k < 7; k++) p.b(mats.iron, 0.04, 0.14, 0.012, 1.25 + k * 0.12, 0.7, s * 0.425).rotation.z = 0.1;
-  p.cx(mats.brass, 0.012, 1.32, 1.66, 1.015, 0, 6).rotation.z = Math.PI / 2 - 0.32;
+  p.cx(mats.brass, 0.012, 0.75, 1.625, 1.0, 0, 6).rotation.z = Math.PI / 2 - 0.24;   // bonnet hinge along the crown
   p.lathe(mats.brass, [[0, 0], [0.04, 0], [0.04, 0.03], [0, 0.04]], 2.05, 0.9, 0, 10).rotation.z = 0.3;
   // radiators behind the engine on either side of the dashboard (Renault's characteristic layout)
   for (const s of [-1, 1]) {
@@ -78,14 +80,14 @@ export const renault = def('ghRenault', [1.8, 4.6, 2.12], (p) => {
   p.pil(mats.leather, 0.48, 0.16, 1.3, 0.22, 0.72, 0, 0.35, 0.2, 4, 14, 0.01);
   p.pil(mats.leather, 0.12, 0.42, 1.34, -0.03, 0.82, 0, 0.4, 0.2, 4, 12, 0.01);
   for (let i = 0; i < 4; i++) p.s(mats.leather, 0.012, 0.03, 1.0 + (i % 2) * 0.12, -0.45 + i * 0.3, 1, 1, 1);
-  const col = p.c(mats.iron, 0.022, 0.75, 0.75, 0.62, -0.32, 6); col.rotation.z = 0.6;
-  p.t(mats.woodDark, 0.19, 0.018, 0.52, 1.2, -0.32, 'y', 20, 5).rotation.z = 0.6;
-  for (let k = 0; k < 3; k++) { const m = p.b(mats.iron, 0.36, 0.012, 0.016, 0.52, 1.2, -0.32); m.rotation.set(0, (k * Math.PI) / 3, 0.6); }
+  const col = p.c(mats.iron, 0.022, 0.52, 0.665, 0.98 - 0.26, -0.32, 6); col.rotation.z = 0.6;
+  p.t(mats.woodDark, 0.19, 0.018, 0.52, 1.2, -0.32, 'y', 20, 5).rotation.set(Math.PI / 2, 0, 0.6, 'ZYX');
+  for (let k = 0; k < 3; k++) { const m = p.b(mats.iron, 0.36, 0.012, 0.016, 0.52, 1.2 - 0.006, -0.32); m.position.y = 1.2; m.rotation.set(0, (k * Math.PI) / 3, 0.6, 'ZYX'); }
   for (const [x, a] of [[0.62, -0.25], [0.5, -0.1]]) { const m = p.c(mats.brass, 0.012, 0.55, x, 0.58, 0.74, 6); m.rotation.x = a; }
   p.b(mats.brass, 0.25, 0.12, 0.02, 0.55, 0.62, 0.75);
-  for (const z of [-0.4, -0.25, 0.0]) p.b(mats.iron, 0.08, 0.02, 0.05, 0.62, 0.66, z);
+  for (const z of [-0.4, -0.25, 0.0]) p.b(mats.iron, 0.08, 0.02, 0.05, 0.62, 0.628, z).rotation.z = 0.35;
   p.cx(mats.brass, 0.03, 0.55, 1.05, 1.05, 0.62, 8); p.latheX(mats.brass, [[0.03, 0], [0.1, 0.15], [0.105, 0.17], [0, 0.17]], 1.32, 1.05, 0.62, 12);
-  p.s(mats.rubber, 0.07, 0.75, 1.05, 0.62, 1.2, 1, 1, false); p.t(mats.brass, 0.08, 0.012, 0.9, 1.05, 0.62, 'x', 12, 3);
+  p.s(mats.rubber, 0.07, 0.75, 1.05, 0.62, 1.2, 1, 1, false); p.t(mats.brass, 0.034, 0.008, 0.9, 1.05, 0.62, 'x', 12, 3);
   // enclosed coupé body: tumblehome lower body with mouldings, door, glazed upper part with frames and curtains, roof
   const body = [[0.18, 0.56], [-1.95, 0.56], [-2.1, 0.7], [-2.1, 1.0], [-1.98, 1.15], [0.18, 1.15]];
   p.extZ(carPaint, body, 1.46, 0, 0, 0, 0.02);
@@ -103,19 +105,18 @@ export const renault = def('ghRenault', [1.8, 4.6, 2.12], (p) => {
     p.b(mats.fabricRed, 0.32, 0.46, 0.01, -1.12, 1.18, s * 0.7); p.b(mats.fabricRed, 0.18, 0.46, 0.01, -0.26, 1.18, s * 0.7);
     p.s(mats.gold, 0.02, -0.96, 1.36, s * 0.69);
   }
-  p.pil(mats.fabricRed, 0.5, 0.18, 1.3, -1.6, 0.72, 0, 0.4, 0.2, 4, 12, 0.01);
   p.pil(mats.fabricRed, 0.14, 0.42, 1.3, -1.85, 0.9, 0, 0.4, 0.2, 4, 12, 0.01);
   p.bb(mats.leather, 2.32, 0.08, 1.58, -0.83, 1.7, 0, 0.03);
   p.bb(mats.leather, 2.26, 0.05, 1.5, -0.83, 1.78, 0, 0.02);
   for (const s of [-1, 1]) p.b(mats.brass, 1.9, 0.02, 0.02, -0.9, 1.86, s * 0.68);
   for (let k = 0; k < 4; k++) p.b(mats.brass, 0.02, 0.06, 1.38, -1.7 + k * 0.55, 1.8, 0);
   for (const s of [-1, 1]) { // coach lamps beside the division
-    p.lathe(mats.brass, [[0, 0], [0.04, 0], [0.06, 0.05], [0.06, 0.18], [0.04, 0.22], [0.02, 0.27], [0, 0.28]], 0.24, 1.15, s * 0.78, 10);
-    p.b(mats.lampGlow, 0.02, 0.1, 0.05, 0.3, 1.22, s * 0.78);
+    p.lathe(mats.brass, [[0, 0], [0.04, 0], [0.06, 0.05], [0.06, 0.18], [0.04, 0.22], [0.02, 0.27], [0, 0.28]], 0.2, 1.15, s * 0.77, 10);
+    p.b(mats.lampGlow, 0.02, 0.1, 0.05, 0.26, 1.22, s * 0.77);
   }
   // rear: luggage grid, red tail lamp, number plate
   p.b(mats.iron, 0.3, 0.02, 1.0, -2.25, 0.62, 0); for (const z of [-0.45, 0.45]) p.b(mats.iron, 0.3, 0.2, 0.02, -2.25, 0.62, z);
-  p.lathe(mats.brass, [[0, 0], [0.04, 0], [0.045, 0.1], [0, 0.12]], -2.16, 0.82, 0.55, 8); p.b(mats.navRed, 0.01, 0.04, 0.04, -2.21, 0.86, 0.55);
+  p.lathe(mats.brass, [[0, 0], [0.04, 0], [0.045, 0.1], [0, 0.12]], -2.135, 0.82, 0.55, 8); p.b(mats.navRed, 0.01, 0.04, 0.04, -2.185, 0.86, 0.55);
   p.b(kitMats.slate, 0.01, 0.12, 0.42, -2.12, 0.62, 0);
 });
 
@@ -125,18 +126,18 @@ export const carCrate = def('ghCarCrate', [2.4, 5.0, 2.3], (p) => {
   const r = rng(5);
   p.b(mats.pine, 4.9, 0.12, 2.1, 0, 0, 0); for (const z of [-0.85, 0, 0.85]) p.b(mats.oak, 4.9, 0.1, 0.14, 0, 0.0, z);
   for (const s of [-1, 1]) {
-    for (let k = 0; k < 7; k++) p.b(k === 3 ? kitMats.stencil : mats.pine, 4.9, 0.28, 0.025, 0, 0.14 + k * 0.29, s * 1.04);
-    for (const x of [-2.4, -1.2, 0, 1.2, 2.4]) p.b(mats.oak, 0.1, 2.05, 0.04, x, 0.14, s * 1.075);
+    for (let k = 0; k < 7; k++) p.b(k === 3 ? kitMats.stencil : mats.pine, 4.9, 0.28, 0.025, 0, 0.12 + k * 0.29, s * 1.04);
+    for (const x of [-2.4, -1.2, 0, 1.2, 2.4]) p.b(mats.oak, 0.1, 2.05, 0.04, x, 0.12, s * 1.075);
     p.b(mats.oak, 4.9, 0.08, 0.04, 0, 2.15, s * 1.075);
   }
-  for (let k = 0; k < 7; k++) p.b(mats.pine, 0.025, 2.05, 0.28, -2.44, 0.14, -0.86 + k * 0.29);
-  for (const z of [-0.8, 0.8]) p.b(mats.oak, 0.04, 2.05, 0.1, -2.47, 0.14, z);
+  for (let k = 0; k < 7; k++) p.b(mats.pine, 0.025, 2.05, 0.28, -2.44, 0.12, -0.86 + k * 0.29);
+  for (const z of [-0.8, 0.8]) p.b(mats.oak, 0.04, 2.05, 0.1, -2.47, 0.12, z);
   // front panel lying on the floor in front of the crate
-  for (let k = 0; k < 7; k++) p.b(mats.pine, 0.28, 0.025, 2.0, 2.65 + (k - 3) * 0.29 * 0 + 0.0, 0.0, 0).position.set(2.62 + k * 0.0, 0.03, -0.86 + k * 0.29 - 0.0);
-  p.b(mats.oak, 0.1, 0.04, 2.0, 2.62, 0.055, 0).rotation.y = Math.PI / 2;
+  for (let k = 0; k < 7; k++) p.b(mats.pine, 0.28, 0.025, 2.05, 2.62 + k * 0.29, 0, 0);
+  for (const z of [-0.8, 0.8]) p.b(mats.oak, 2.0, 0.035, 0.1, 3.49, 0.025, z);
   // straw: a matted bed on the crate floor, tufts and loose stalks on the floor in front
   for (let i = 0; i < 26; i++) { const g = new THREE.SphereGeometry(0.2 + r() * 0.15, 6, 4); g.scale(1.6, 0.35, 1.2); p.ag(STRAW, g, -2.1 + r() * 4.4, 0.13, -0.85 + r() * 1.7); }
-  for (let i = 0; i < 70; i++) { const m = p.ab(STRAW, 0.25 + r() * 0.2, 0.006, 0.01, 2.5 + r() * 1.2, 0.002, -1.1 + r() * 2.2); m.rotation.y = r() * 3; }
+  for (let i = 0; i < 70; i++) { const m = p.ab(STRAW, 0.25 + r() * 0.2, 0.006, 0.01, 2.5 + r() * 1.2, 0.026, -1.0 + r() * 2.0); m.rotation.y = r() * 3; }
   p.b(mats.paper, 0.01, 0.35, 0.6, -2.46, 1.3, 0.3);
 });
 /** canvas-wrapped bale tied with rope bands */

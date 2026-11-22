@@ -51,7 +51,7 @@ function sweep(pts, rFn, rs = 6) {
   }
   for (let i = 0; i < n - 1; i++) for (let k = 0; k < rs; k++) {
     const a = i * (rs + 1) + k, b = a + rs + 1;
-    idx.push(a, b, a + 1, a + 1, b, b + 1);
+    idx.push(a, a + 1, b, a + 1, b + 1, b); // outward-facing (T x dRing points inwards, so a, a+1, b)
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -84,9 +84,9 @@ function boatGeos(type, covered) {
       }, !flip));
     }
     // gunwale (teak) and rubbing strake
-    parts.oak.push(gridGeo(NS + 1, 4, (i, c) => {
+    parts.oak.push(gridGeo(NS + 1, 5, (i, c) => {
       const p = sect(T, tOf(i), 1);
-      const o = [[-0.09, 0.045], [0.035, 0.045], [0.035, -0.06], [-0.02, -0.06]][c];
+      const o = [[-0.09, 0.045], [0.035, 0.045], [0.035, -0.06], [-0.02, -0.06], [-0.09, 0.045]][c]; // closed section
       return [p[0], p[4] + o[0], sg * Math.max(0, p[3] + o[1])];
     }, flip));
     parts.oak.push(gridGeo(NS - 1, 4, (i, c) => {
@@ -96,7 +96,7 @@ function boatGeos(type, covered) {
     }, flip));
     if (!covered) {
       parts.pine.push(gridGeo(NS + 1, NJ + 1, (i, j) => {
-        const p = sect(T, tOf(i) * 0.985, j / NJ);
+        const p = sect(T, tOf(i), j / NJ); // runs right into the stem and stern post (no open hull ends)
         return [p[0], p[1] + 0.035, sg * p[2] * 0.955];
       }, !flip));
     } else {

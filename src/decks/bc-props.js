@@ -131,9 +131,18 @@ export const bcIvy = def('bcIvy', (o) => [o.len ?? 2.4, 0.3, 0.35], (p, o) => {
   const L = o.len ?? 2.4, r = rngOf(Math.round(L * 37) + (o.v ?? 0)), pts = [], leaves = [];
   for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push([(r() - 0.5) * 0.04, -0.03 - 0.1 * Math.sin(Math.PI * t * 2) ** 2, -L / 2 + L * t]); }
   p.loft(M.woodDark, pts, 0.008, 4, false);
+  const vy = (t) => -0.03 - 0.1 * Math.sin(Math.PI * t * 2) ** 2;
+  // trailing tendrils hanging from the vine (leaves below the vine grow on them, never in mid-air)
+  const tend = [];
+  for (let k = 0; k < Math.max(2, Math.round(L * 1.2)); k++) {
+    const t = (k + 0.3 + r() * 0.4) / Math.max(2, Math.round(L * 1.2)), z = -L / 2 + L * t, x = (r() - 0.5) * 0.06, len = 0.12 + r() * 0.14;
+    p.loft(M.woodDark, [[x * 0.3, vy(t), z], [x, vy(t) - len * 0.5, z + 0.02], [x * 1.4, vy(t) - len, z + 0.03]], 0.004, 3, false);
+    tend.push({ t, z, x, len });
+  }
   for (let i = 0; i < Math.round(L * 22); i++) {
-    const t = r(), z = -L / 2 + L * t, y = -0.03 - 0.1 * Math.sin(Math.PI * t * 2) ** 2 - r() * 0.22 * (r() < 0.3 ? 1 : 0.3), x = (r() - 0.5) * 0.22, s = 0.03 + r() * 0.025, a = r() * 6.28;
-    const c = Math.cos(a) * s, d = Math.sin(a) * s;
+    let t = r(), z = -L / 2 + L * t, y = vy(t) + (r() - 0.6) * 0.05, x = (r() - 0.5) * 0.09;
+    if (r() < 0.3) { const q = tend[Math.floor(r() * tend.length)], f = r(); t = q.t; z = q.z + 0.03 * f; x = q.x * (0.3 + 1.1 * f); y = vy(q.t) - q.len * f; }
+    const s = 0.03 + r() * 0.025, a = r() * 6.28, c = Math.cos(a) * s, d = Math.sin(a) * s;
     leaves.push([[x, y + s, z], [x + c, y - s * 0.4, z + d], [x - c, y - s * 0.4, z - d]]);
   }
   p.add(G.polysGeo(leaves), K.ivy);
@@ -149,8 +158,12 @@ export const bcMusicStand = def('bcMusicStand', [0.45, 0.45, 1.2], (p) => {
 });
 /** cello leaning slightly on its end pin */
 export const bcCello = def('bcCello', [0.45, 0.4, 1.25], (p) => {
-  sub(p, () => {
-    const body = []; for (let i = 0; i <= 24; i++) { const t = i / 24, y = 0.08 + 0.72 * t, wv = 0.21 - 0.05 * Math.sin(Math.PI * 2 * t) * (t > 0.3 && t < 0.7 ? 1 : 0.4) - 0.04 * t; body.push([wv, y]); }
+  // modelled with its belly towards +z; turned so the belly faces the prop front (+x), leaning back on its end pin
+  sub(p, () => sub(p, () => {
+    // outline: wide lower bout, C-bout waist above the middle, narrower upper bout, shoulders into the neck
+    const K0 = [[0, 0.1], [0.08, 0.19], [0.22, 0.215], [0.38, 0.19], [0.5, 0.13], [0.6, 0.14], [0.75, 0.175], [0.88, 0.16], [0.97, 0.09], [1, 0.05]];
+    const half = (t) => { let k = 0; while (k < K0.length - 2 && t > K0[k + 1][0]) k++; const [t0, a] = K0[k], [t1, b] = K0[k + 1], f = (t - t0) / (t1 - t0); return a + (b - a) * (0.5 - 0.5 * Math.cos(Math.PI * f)); };
+    const body = []; for (let i = 0; i <= 24; i++) { const t = i / 24; body.push([half(t), 0.08 + 0.72 * t]); }
     const out = [...body, ...body.slice().reverse().map(([a, b]) => [-a, b])];
     p.extZ(M.mahogany, out, 0.2, 0, 0, 0, 0.02);
     p.b(K.ebony, 0.04, 0.5, 0.012, 0, 0.78, 0.1);
@@ -159,7 +172,7 @@ export const bcCello = def('bcCello', [0.45, 0.4, 1.25], (p) => {
     p.b(K.ebony, 0.06, 0.04, 0.03, 0, 0.32, 0.105);
     p.c(M.chrome, 0.006, 0.1, 0, 0, 0, 5);
     for (const s of [-1, 1]) p.b(K.ebony, 0.02, 0.06, 0.012, s * 0.06, 0.48, 0.102);
-  }, [0, 0, 0], [0, 0, -0.18]);
+  }, [0, 0, 0], [-0.18, 0, 0]), [0, 0, 0], [0, Math.PI / 2, 0]);
 });
 
 /** Versailles planter with a clipped bay tree (Café Parisien) */
@@ -229,9 +242,11 @@ export const bcVanity = def('bcVanity', (o) => [o.w ?? 1.4, 0.55, 2.0], (p, o) =
   p.bb(M.marble, 0.03, 0.3, w, -0.26, 0.86, 0, 0.008);
   for (const s of [-1, 1]) {
     const z = s * w * 0.25;
-    p.lathe(M.porcelain, [[0, 0.62], [0.16, 0.66], [0.2, 0.8], [0.17, 0.8], [0.12, 0.7], [0, 0.69]], 0.03, 0, z, 14);
+    // porcelain bowl standing on the marble (an undermounted basin would be hidden by the solid slab)
+    p.lathe(M.porcelain, [[0, 0.86], [0.12, 0.862], [0.17, 0.885], [0.19, 0.93], [0.175, 0.932], [0.12, 0.892], [0, 0.884]], 0.03, 0, z, 14);
     for (const t of [-1, 1]) { p.lathe(M.chrome, [[0, 0], [0.012, 0], [0.012, 0.08], [0.03, 0.09], [0, 0.1]], -0.17, 0.86, z + t * 0.07, 6); }
-    p.loft(M.chrome, [[-0.2, 0.92, z], [-0.12, 0.96, z], [-0.08, 0.92, z]], 0.01, 5);
+    p.c(M.chrome, 0.012, 0.115, -0.2, 0.86, z, 6); // spout pillar
+    p.loft(M.chrome, [[-0.2, 0.97, z], [-0.12, 1.0, z], [-0.08, 0.965, z]], 0.01, 5);
   }
   p.bb(M.gold, 0.03, 0.9, w * 0.85, -0.26, 1.06, 0, 0.008); p.b(M.mirror, 0.006, 0.8, w * 0.85 - 0.1, -0.245, 1.11, 0);
   for (let i = 0; i < 2; i++) p.bb(M.linen, 0.04, 0.3, 0.25, 0.29, 0.5, (i ? 1 : -1) * (w / 2 - 0.15), 0.01);
@@ -404,6 +419,7 @@ export const bcTelemotor = def('bcTelemotor', [1.0, 0.6, 1.3], (p) => {
   p.cz(M.chrome, 0.025, 1.0, 0, 0.9, 0, 8);
   p.bb(M.steelDark, 0.25, 0.25, 0.3, 0, 0.68, 0, 0.02);
   for (const s of [-1, 1]) p.loft(M.copper, [[0.1, 0.8, s * 0.1], [0.2, 1.0, s * 0.1], [0.2, 1.3, s * 0.1]], 0.02, 6, false);
-  p.c(M.brass, 0.08, 0.04, 0.22, 1.05, 0, 12).rotation.z = Math.PI / 2;
-  p.cx(K.gaugeFace, 0.065, 0.01, 0.245, 1.05, 0, 12);
+  p.cx(M.brass, 0.08, 0.04, 0.22, 1.05, 0, 12);
+  const dial = new THREE.CircleGeometry(0.065, 12); dial.rotateY(Math.PI / 2); // upright, unmirrored gauge face towards +x
+  p.add(dial, K.gaugeFace, 0.241, 1.05, 0);
 });

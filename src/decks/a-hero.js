@@ -35,7 +35,7 @@ export const clubChair = def('abClubChair', [0.82, 0.82, 0.92], (p, o) => {
     p.bb(f, 0.7, 0.34, 0.14, 0.02, 0.28, s * 0.335, 0.04);
     p.loft(f, [[-0.32, 0.62, s * 0.34], [0.05, 0.635, s * 0.345], [0.37, 0.61, s * 0.34]], [[0.085, 0.07], [0.09, 0.075], [0.085, 0.07]], 8);
     p.latheX(f, [[0, 0], [0.075, 0], [0.08, 0.015], [0, 0.02]], 0.37, 0.6, s * 0.34, 10);
-    p.b(mats.brass, 0.006, 0.012, 0.13, 0.395, 0.3, s * 0.335); // brass nailed edge
+    p.b(mats.brass, 0.006, 0.012, 0.13, 0.372, 0.3, s * 0.335); // brass nailed edge on the arm front
   }
 });
 /** buttoned leather Chesterfield settee (arms and back at the same height) */
@@ -107,7 +107,7 @@ export const teaTable = def('abTeaTable', [0.84, 0.84, 0.76], (p, o) => {
 export const cafeTable = def('abCafeTable', [0.72, 0.72, 0.76], (p, o) => {
   const v = o.v ?? 0, R = 0.36;
   p.lathe(K.cane, [[0, 0.71], [R, 0.71], [R + 0.01, 0.73], [R, 0.745], [0, 0.745]], 0, 0, 0, 20);
-  p.lathe(mats.wicker, [[0, 0.02], [0.24, 0.02], [0.22, 0.05], [0.06, 0.12], [0.05, 0.6], [0.12, 0.68], [0.3, 0.71], [0, 0.71]], 0, 0, 0, 14);
+  p.lathe(mats.wicker, [[0, 0], [0.24, 0], [0.24, 0.02], [0.22, 0.05], [0.06, 0.12], [0.05, 0.6], [0.12, 0.68], [0.3, 0.71], [0, 0.71]], 0, 0, 0, 14);
   p.rev(mats.linen, [{ o: 0.27, y: 0.746, m: 0.012 }, { o: 0.25, y: 0.748, m: 0.006 }, { o: 0.0, y: 0.75 }], { seg: 32, k: 12, capTop: true }, 0, 0, 0);
   const y = 0.75;
   p.lathe(mats.glass, [[0, 0], [0.025, 0], [0.03, 0.04], [0.012, 0.12], [0.016, 0.14], [0, 0.13]], 0, y, 0, 8);
@@ -141,7 +141,7 @@ export const lyre = def('abLyre', [0.6, 0.6, 0.04], (p) => {
 export const electrolier = def('abElectrolier', [1.4, 1.4, 1.1], (p) => {
   const g = mats.gold, cr = K.crystal;
   p.lathe(g, [[0, 0], [0.22, 0], [0.2, -0.015], [0.14, -0.03], [0.07, -0.05], [0, -0.06]], 0, 0, 0, 20);
-  p.lathe(g, [[0.015, -0.05], [0.015, -0.25], [0.04, -0.28], [0.018, -0.32], [0.018, -0.48], [0.05, -0.52], [0.03, -0.56], [0.09, -0.6], [0.12, -0.63], [0, -0.65]], 0, 0, 0, 12);
+  p.lathe(g, [[0.015, -0.05], [0.015, -0.25], [0.04, -0.28], [0.018, -0.32], [0.018, -0.48], [0.05, -0.52], [0.03, -0.56], [0.09, -0.6], [0.12, -0.63], [0, -0.65]].reverse(), 0, 0, 0, 12); // stem (profile bottom → top: faces outwards)
   p.rev(K.cutGlass, [{ o: 0.0, y: -0.98 }, { o: 0.1, y: -0.95, m: 0.006 }, { o: 0.2, y: -0.86, m: 0.01 }, { o: 0.26, y: -0.74, m: 0.008 }, { o: 0.27, y: -0.66, m: 0.004 }], { seg: 32, k: 16, capBottom: true, capTop: true }, 0, 0, 0);
   p.t(g, 0.27, 0.012, 0, -0.66, 0, 'y', 32, 4);
   const drop = (x, y, z, s = 1) => p.lathe(cr, [[0, 0], [0.012 * s, -0.012 * s], [0, -0.035 * s]], x, y, z, 4);
@@ -155,12 +155,14 @@ export const electrolier = def('abElectrolier', [1.4, 1.4, 1.1], (p) => {
       drop(c * R, yy - 0.06, s * R, 1.4);
       tips.push([c * R, yy - 0.08, s * R]);
     }
-    for (let i = 0; i < n; i++) { // festoons of crystal drops between the arms
-      const A = tips[i], B = tips[(i + 1) % n];
-      for (let k = 1; k < 5; k++) { const t = k / 5; drop(A[0] + (B[0] - A[0]) * t, A[1] - 0.09 * Math.sin(Math.PI * t), A[2] + (B[2] - A[2]) * t); }
+    for (let i = 0; i < n; i++) { // festoons of crystal drops between the arms, strung on a thin crystal chain
+      const A = tips[i], B = tips[(i + 1) % n], at = (t) => [A[0] + (B[0] - A[0]) * t, A[1] - 0.09 * Math.sin(Math.PI * t), A[2] + (B[2] - A[2]) * t];
+      p.tube(cr, [0, 0.2, 0.4, 0.6, 0.8, 1].map(at), 0.003, 5, 3);
+      for (let k = 1; k < 5; k++) drop(...at(k / 5));
     }
   }
-  for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; for (let k = 0; k < 4; k++) drop(Math.cos(a) * (0.27 - k * 0.05), -0.69 - k * 0.07, Math.sin(a) * (0.27 - k * 0.05)); }
+  // strands of touching drops hanging from the rim of the cut-glass bowl
+  for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; for (let k = 0; k < 4; k++) drop(Math.cos(a) * 0.272, -0.668 - k * 0.035, Math.sin(a) * 0.272); }
   p.lathe(cr, [[0, 0], [0.03, -0.03], [0, -0.11]], 0, -0.98, 0, 8);
 });
 /** ivy cluster hanging from a trellis top – origin = mounting point, front +x */
@@ -386,27 +388,32 @@ export function furnishReading(ctx) {
 
 // ============================================================================================== Smoking Room (Georgian)
 
-/** revolving door between the Smoking Room and the starboard Verandah Café (wings book-folded for passage) */
+/**
+ * revolving door between the Smoking Room and the starboard Verandah Café (wings book-folded for passage). The drum stands
+ * in the 2.5 × 2.0 m opening of the aft wall, centred on the wall plane: everything stays below the lintel (y 2.0) and
+ * 1 cm inside the jambs, so neither the drum nor its canopy passes through the wall or the architraves.
+ */
 function revolvingDoor(ctx, d, x, z) {
-  const zone = ctx.plan.zone(x), R = 1.25, Y = d.Y;
+  const zone = ctx.plan.zone(x), R = 1.24, RC = 1.25, Y = d.Y;
   const add = (geo, mat, y = 0, ry = 0) => { const m = new THREE.Mesh(geo, matOf(mat)); m.position.set(x, Y + y, z); m.rotation.y = ry; zone.add(m); };
   for (const a0 of [-0.7, Math.PI - 0.7]) {
-    add(G.arcWall(R, 0.05, a0, 1.4, 0, 0.85, 12), 'mahogany');
-    add(G.arcWall(R - 0.015, 0.012, a0, 1.4, 0.85, 1.25, 12), mats.glass);
-    add(G.arcWall(R, 0.05, a0, 1.4, 2.1, 0.12, 12), 'mahogany');
-    for (const t of [0, 0.5, 1]) { const a = a0 + 1.4 * t; d.box('mahogany', x + Math.sin(a) * (R - 0.025) - 0.03, z + Math.cos(a) * (R - 0.025) - 0.03, x + Math.sin(a) * (R - 0.025) + 0.03, z + Math.cos(a) * (R - 0.025) + 0.03, 0.85, 2.1); }
-    add(G.arcWall(R + 0.01, 0.012, a0, 1.4, 0.82, 0.03, 12), 'brass');
+    add(G.arcWall(R, 0.05, a0, 1.4, 0, 0.8, 12), 'mahogany');
+    add(G.arcWall(R - 0.015, 0.012, a0, 1.4, 0.8, 0.98, 12), mats.glass);
+    add(G.arcWall(R, 0.05, a0, 1.4, 1.78, 0.09, 12), 'mahogany');
+    for (const t of [0, 0.5, 1]) { const a = a0 + 1.4 * t; d.box('mahogany', x + Math.sin(a) * (R - 0.025) - 0.03, z + Math.cos(a) * (R - 0.025) - 0.03, x + Math.sin(a) * (R - 0.025) + 0.03, z + Math.cos(a) * (R - 0.025) + 0.03, 0.8, 1.78); }
+    add(G.arcWall(R + 0.004, 0.012, a0, 1.4, 0.77, 0.03, 12), 'brass');
     const zs = Math.cos(a0 + 0.7) > 0 ? 1 : -1;
-    d.world.addCollider(x - 0.82, Y, z + zs * (R * Math.cos(0.7) - 0.02) - (zs < 0 ? 0.35 : 0), x + 0.82, Y + 2.3, z + zs * (R * Math.cos(0.7) - 0.02) + (zs > 0 ? 0.35 : 0));
+    d.world.addCollider(x - 0.82, Y, z + zs * (RC * Math.cos(0.7) - 0.02) - (zs < 0 ? 0.35 : 0), x + 0.82, Y + 2.3, z + zs * (RC * Math.cos(0.7) - 0.02) + (zs > 0 ? 0.35 : 0));
   }
-  add(G.lathe([[0, 2.22], [R + 0.06, 2.22], [R + 0.06, 2.34], [R + 0.02, 2.38], [R - 0.05, 2.44], [0, 2.46]], 32), 'mahogany');
-  add(G.lathe([[0, 0], [R + 0.04, 0], [R + 0.04, 0.012], [0, 0.012]], 32), 'brass');
-  add(G.lathe([[0, 2.205], [R + 0.07, 2.205], [R + 0.07, 2.225], [0, 2.225]], 32), 'gold');
+  add(G.lathe([[0, 1.885], [R, 1.885], [R, 1.94], [R - 0.03, 1.968], [R - 0.09, 1.99], [0, 1.99]], 32), 'mahogany'); // canopy just under the lintel
+  add(G.lathe([[0, 0], [R, 0], [R, 0.012], [0, 0.012]], 32), 'brass');
+  add(G.lathe([[0, 1.868], [R + 0.004, 1.868], [R + 0.004, 1.886], [0, 1.886]], 32), 'gold');
   // book-folded wings in the centre plane, brass centre post
-  d.box('mahogany', x - R + 0.06, z - 0.035, x + R - 0.06, z + 0.035, 0.03, 2.18, true);
-  d.box(mats.glass, x - R + 0.14, z - 0.04, x + R - 0.14, z + 0.04, 0.9, 2.05);
+  d.box('mahogany', x - R + 0.06, z - 0.035, x + R - 0.06, z + 0.035, 0.03, 1.868);
+  d.world.addCollider(x - RC + 0.06, Y + 0.03, z - 0.035, x + RC - 0.06, Y + 2.18, z + 0.035);
+  d.box(mats.glass, x - R + 0.14, z - 0.04, x + R - 0.14, z + 0.04, 0.9, 1.75);
   d.box('brass', x - R + 0.06, z - 0.04, x + R - 0.06, z + 0.04, 0.95, 1.0);
-  add(G.lathe([[0, 0], [0.05, 0], [0.04, 0.04], [0.035, 2.2], [0, 2.2]], 12), 'brass');
+  add(G.lathe([[0, 0], [0.05, 0], [0.04, 0.04], [0.035, 1.87], [0, 1.87]], 12), 'brass');
 }
 
 export function furnishSmoking(ctx) {

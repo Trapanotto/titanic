@@ -132,7 +132,7 @@ export const cruet = def('dCruet', [0.14, 0.14, 0.17], (p) => {
 /** tent-folded menu card (atlas paper, gilt crest) */
 export const menuCard = def('dMenu', [0.1, 0.06, 0.1], (p) => {
   const a = [[-0.035, 0, -0.05], [-0.035, 0, 0.05], [0, 0.1, 0.05], [0, 0.1, -0.05]], b = [[0.035, 0, 0.05], [0.035, 0, -0.05], [0, 0.1, -0.05], [0, 0.1, 0.05]];
-  p.add(atl(G.polysGeo([a, b], [0, 0.03, 0]), AT.ivory), K.atlas);
+  p.add(atl(G.polysGeo([a, b, [...a].reverse(), [...b].reverse()], null), AT.ivory), K.atlas); // both faces of the folded card (open ends)
   p.add(atl(G.polysGeo([[[-0.0226, 0.064, -0.012], [-0.0226, 0.064, 0.012], [-0.0143, 0.081, 0.012], [-0.0143, 0.081, -0.012]].map(([x, y, z]) => [x - 0.002, y, z])], [-1, 0.5, 0]), AT.gilt), K.atlas);
 });
 /** water carafe */
@@ -182,7 +182,7 @@ export const sideboard = def('dSideboard', (o) => [o.w ?? 2.4, 0.6, 1.8], (p, o)
   p.bb(oak, 0.26, 0.06, w + 0.06, -d / 2 + 0.12, 1.6, 0, 0.012);
   p.extX(oak, [[-w / 2, 0], [w / 2, 0], [w / 2, 0.05], [w * 0.2, 0.07], [0, 0.14], [-w * 0.2, 0.07], [-w / 2, 0.05]], 0.03, -d / 2 + 0.04, 1.66, 0);
   // plates on the shelf, standing against the back (cobalt rims)
-  for (let i = 0; i < 5; i++) { const z = -w / 2 + 0.25 + (i * (w - 0.5)) / 4; const pl = p.add(G.lathe([[0.122, 0.017], [0.07, 0], [0, 0.004]], 10), M.porcelain, -d / 2 + 0.07, 1.6, z); pl.rotation.z = Math.PI / 2 - 0.2; const rim = p.add(atl(G.lathe([[0.124, 0.019], [0.1, 0.012]], 10), AT.cobalt), K.atlas, -d / 2 + 0.07, 1.6, z); rim.rotation.z = Math.PI / 2 - 0.2; }
+  for (let i = 0; i < 5; i++) { const z = -w / 2 + 0.25 + (i * (w - 0.5)) / 4; const pl = p.add(G.lathe([[0.122, 0.017], [0.07, 0], [0, 0.004]], 10), M.porcelain, -d / 2 + 0.07, 1.6, z); pl.rotation.z = -(Math.PI / 2 - 0.2); const rim = p.add(atl(G.lathe([[0.124, 0.019], [0.1, 0.012]], 10), AT.cobalt), K.atlas, -d / 2 + 0.07, 1.6, z); rim.rotation.z = -(Math.PI / 2 - 0.2); } // face to the room, top leaning on the back board
   // silver on the top: coffee urn, tureen, plate stacks, tray with sauce boats
   const ty = 0.92;
   p.lathe(M.chrome, [[0, 0], [0.08, 0], [0.06, 0.03], [0.04, 0.06], [0.1, 0.12], [0.11, 0.24], [0.08, 0.3], [0.03, 0.33], [0.04, 0.36], [0, 0.38]], 0, ty, -w * 0.3, 14);

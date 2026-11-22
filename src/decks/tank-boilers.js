@@ -62,7 +62,7 @@ function lagged(b, p, q, r, bands = 0.5) {
   const L = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]), n = Math.floor(L / bands);
   for (let i = 1; i <= n; i++) {
     const t = (i - 0.5) / n, c = [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t], d = [(q[0] - p[0]) / L * 0.018, (q[1] - p[1]) / L * 0.018, (q[2] - p[2]) / L * 0.018];
-    tubeBetween(b, mats.iron, [c[0] - d[0], c[1] - d[1], c[2] - d[2]], [c[0] + d[0], c[1] + d[1], c[2] + d[2]], r + 0.006, { seg: 10, caps: false });
+    tubeBetween(b, mats.iron, [c[0] - d[0], c[1] - d[1], c[2] - d[2]], [c[0] + d[0], c[1] + d[1], c[2] + d[2]], r + 0.006, { seg: 10 });
   }
 }
 /** bolted pipe flange pair at c, axis d (unit) */
@@ -77,7 +77,7 @@ const dishT = (r) => (r < 2.1 ? 0.06 : 0.06 - 0.03 * Math.min(1, (r - 2.1) / 0.2
 function endPlate(b, x0, dir, mouths = false) {
   latheAt(b, mats.steelDark, [[R + 0.012, -0.2], [R + 0.014, -0.03], [R - 0.03, 0.012], [R - 0.12, 0.035], [2.1, 0.055], [2.0, 0.06]], dir > 0 ? 'x' : '-x', [x0, YC, 0], 40);
   // flat plate as horizontal strips (exact chords), square openings behind the furnace fronts
-  const xf = x0 + dir * 0.062, RP = 2.02, NS = 36, y0 = YC - RP, yb0 = FY - 0.12, yb1 = FY + 0.32;
+  const xf = x0 + dir * 0.062, RP = 2.06, NS = 36, y0 = YC - RP, yb0 = FY - 0.12, yb1 = FY + 0.32;
   const cuts = mouths ? FZ.map((zf) => [zf - 0.26, zf + 0.26]) : [];
   const ys = []; for (let i = 0; i <= NS; i++) ys.push(y0 + (2 * RP * i) / NS);
   if (mouths) { ys.push(yb0, yb1); ys.sort((p, q) => p - q); }

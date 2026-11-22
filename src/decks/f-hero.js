@@ -43,9 +43,9 @@ const fountain = def('fhFountain', [1.1, 0.55, 2.1], (p) => {
   // basin on a fluted pedestal, bronze spout, cups on chains
   p.lathe(mats.marble, [[0, 0], [0.18, 0], [0.16, 0.05], [0.1, 0.12], [0.09, 0.6], [0.13, 0.66], [0.3, 0.72], [0.33, 0.8], [0.3, 0.82], [0.27, 0.76], [0, 0.74]], 0.08, 0, 0, 20);
   p.c(kitMats.water, 0.27, 0.005, 0.08, 0.79, 0, 20);
-  p.lathe(kitMats.bronze, [[0, 0], [0.04, 0], [0.035, 0.05], [0, 0.06]], -0.2, 1.1, 0, 8).rotation.z = -Math.PI / 2;
+  p.lathe(kitMats.bronze, [[0, 0], [0.04, 0], [0.035, 0.05], [0, 0.06]], -0.25, 1.12, 0, 8).rotation.z = -Math.PI / 2;
   p.loft(kitMats.bronze, [[-0.2, 1.12, 0], [-0.08, 1.14, 0], [0.02, 1.08, 0], [0.04, 1.02, 0]], [0.022, 0.02, 0.016, 0.012], 6);
-  for (const s of [-1, 1]) { p.lathe(kitMats.bronze, [[0, 0], [0.035, 0], [0.04, 0.06], [0, 0.055]], 0.25, 0.82, s * 0.15, 8); p.loft(kitMats.bronze, [[-0.2, 1.0, s * 0.3], [0.1, 0.9, s * 0.25], [0.24, 0.86, s * 0.16]], 0.004, 3, false); }
+  for (const s of [-1, 1]) { p.lathe(kitMats.bronze, [[0, 0], [0.035, 0], [0.04, 0.06], [0, 0.055]], 0.25, 0.82, s * 0.15, 8); p.loft(kitMats.bronze, [[-0.25, 1.0, s * 0.3], [0.1, 0.9, s * 0.25], [0.24, 0.86, s * 0.16]], 0.004, 3, false); }
   for (const s of [-1, 1]) p.lathe(mats.marble, [[0, 0], [0.05, 0], [0.04, 0.05], [0.04, 1.35], [0.06, 1.4], [0.06, 1.45], [0, 1.45]], -0.1, 0.0, s * 0.45, 10);
 });
 /** octagonal "Damascus" coffee table: inlaid top (gilt ring, mother-of-pearl star), cusped-arch pierced sides */
@@ -88,10 +88,10 @@ const needleShower = def('fhNeedle', [1.0, 1.0, 2.25], (p) => {
   p.bb(mats.marble, 1.0, 0.08, 1.0, 0, 0, 0, 0.01); p.c(mats.chrome, 0.04, 0.005, 0, 0.08, 0, 8);
   for (let k = 0; k < 6; k++) { const y = 0.45 + k * 0.25; p.t(mats.brass, 0.38, 0.016, 0, y, 0, 'y', 22, 4); }
   for (let i = 0; i < 6; i++) { const a = Math.PI * 0.25 + (i / 5) * Math.PI * 1.5; p.c(mats.brass, 0.018, 1.6, Math.cos(a) * 0.38, 0.12, Math.sin(a) * 0.38, 6); }
-  p.c(mats.brass, 0.025, 0.55, -0.38, 1.7, 0, 6); p.cx(mats.brass, 0.02, 0.4, -0.18, 2.22, 0, 6);
+  p.c(mats.brass, 0.025, 0.95, -0.38, 1.3, 0, 6); p.cx(mats.brass, 0.02, 0.4, -0.18, 2.22, 0, 6);
   p.lathe(mats.brass, [[0, 0], [0.14, 0], [0.12, 0.04], [0.03, 0.08], [0, 0.09]], 0.02, 2.1, 0, 14);
   for (const z of [-0.2, 0.2]) { p.t(mats.brass, 0.07, 0.01, -0.44, 1.3, z, 'x', 12, 3); p.cx(mats.brass, 0.012, 0.08, -0.44, 1.3, z, 6); }
-  p.b(mats.brass, 0.04, 0.12, 0.6, -0.47, 1.25, 0);
+  p.b(mats.brass, 0.1, 0.12, 0.6, -0.44, 1.25, 0);
 });
 /** marble shampooing slab with bevelled top, pillow block, drain channel and linen */
 const marbleSlab = def('fhSlab', [0.8, 2.0, 0.78], (p) => {
@@ -101,6 +101,7 @@ const marbleSlab = def('fhSlab', [0.8, 2.0, 0.78], (p) => {
   p.b(mats.iron, 0.08, 0.005, 0.08, 0, 0.72, 0.9);
   p.bb(mats.linen, 0.6, 0.02, 0.5, 0.02, 0.72, 0.4, 0.008);
   p.b(kitMats.tileBlue, 0.74, 0.08, 1.82, 0, 0, 0);
+  p.g.rotation.y = Math.PI / 2;   // built along z: the footprint is [w 0.8 along the wall, d 2.0 out] → pillow end at the wall
 });
 /** electric light-bath cabinet: oak cabinet with mirrored inside and rows of lamps, door ajar, collar for the head */
 const lightBath = def('fhLightBath', [1.05, 1.15, 1.6], (p) => {
@@ -112,10 +113,12 @@ const lightBath = def('fhLightBath', [1.05, 1.15, 1.6], (p) => {
   for (const s of [-1, 1]) for (let k = 0; k < 4; k++) for (let j = 0; j < 4; j++) p.s(mats.lampGlow, 0.03, -0.35 + k * 0.2, 0.3 + j * 0.25, s * (W / 2 - 0.06), 1, 1, 0.6);
   for (const s of [-1, 1]) p.b(mats.mirror, D - 0.1, H - 0.1, 0.005, 0, 0.1, s * (W / 2 - 0.052));
   // door (front, hinged at -z, ajar) with fielded panels and brass handle
-  const door = p.bb(mats.oak, 0.04, H, W * 0.95, 0, 0.06, 0, 0.008); door.position.set(D / 2 + 0.25, 0.06 + H / 2, -W / 2 + 0.25); door.rotation.y = -1.1;
-  p.fp(mats.oak, 0.3, 0.5, D / 2 + 0.47, 0.5, -W / 2 + 0.72, 0.01, 0.03).rotation.y = -1.1;
+  const da = 0.75, dw = W * 0.95, ux = Math.sin(da), uz = Math.cos(da), nx = Math.cos(da), nz = -Math.sin(da); // along the leaf / outward normal
+  const door = p.bb(mats.oak, 0.04, H, dw, 0, 0.06, 0, 0.008); door.position.set(D / 2 + 0.02 + ux * dw / 2, 0.06 + H / 2, -W / 2 + uz * dw / 2); door.rotation.y = da;
+  p.fp(mats.oak, 0.3, 0.5, D / 2 + 0.02 + ux * dw * 0.6 + nx * 0.02, 0.5, -W / 2 + uz * dw * 0.6 + nz * 0.02, 0.01, 0.03).rotation.y = da;
+  p.c(mats.brass, 0.012, 0.1, D / 2 + 0.02 + ux * dw * 0.92 + nx * 0.03, 0.7, -W / 2 + uz * dw * 0.92 + nz * 0.03, 6);
   // seat, head collar of linen, switches
-  p.bb(mats.oak, 0.45, 0.05, 0.5, -0.15, 0.42, 0, 0.008);
+  p.bb(mats.oak, 0.5, 0.05, W - 0.1, -D / 2 + 0.3, 0.42, 0, 0.008);
   p.t(mats.linen, 0.12, 0.04, 0, H + 0.08, 0, 'y', 14, 5);
   p.b(kitMats.switchboard, 0.04, 0.35, 0.3, -D / 2 - 0.02, 0.7, 0.25);
   for (const z of [0.18, 0.32]) p.cx(mats.brass, 0.015, 0.04, -D / 2 - 0.05, 0.85, z, 6);
@@ -125,8 +128,10 @@ const lounger = def('fhLounger', [0.7, 1.9, 0.75], (p) => {
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.bb(mats.oak, 0.05, 0.32, 0.05, sx * 0.28, 0, sz * 0.85, 0.008);
   for (const s of [-1, 1]) p.bb(mats.oak, 0.04, 0.06, 1.85, s * 0.3, 0.3, 0, 0.006);
   for (let i = 0; i < 14; i++) p.bb(mats.oak, 0.62, 0.025, 0.08, 0, 0.36, -0.82 + i * 0.1, 0.005);
-  for (let i = 0; i < 5; i++) { const m = p.bb(mats.oak, 0.62, 0.025, 0.08, 0, 0.42 + i * 0.07, -0.88 - i * 0.025, 0.005); m.rotation.x = -0.9; }
+  for (let i = 0; i < 5; i++) { const m = p.bb(mats.oak, 0.62, 0.025, 0.08, 0, 0.44 + i * 0.094, -0.865 - i * 0.034, 0.005); m.rotation.x = 1.22; }
+  for (const s of [-1, 1]) p.loft(mats.oak, [[s * 0.3, 0.33, -0.83], [s * 0.3, 0.86, -1.02]], 0.02, 4);
   p.bb(mats.linen, 0.55, 0.03, 1.2, 0, 0.385, 0.15, 0.01);
+  p.g.rotation.y = Math.PI / 2;   // built along z: turn it so that its length runs out from the wall (head end at the wall)
 });
 /** wall thermometer on a carved board (origin = mounting point, faces +x) */
 const thermometer = def('fhThermo', [0.12, 0.03, 0.45], (p) => {
@@ -150,7 +155,7 @@ const table3 = def('fhTable3', (o) => [o.w ?? 2.9, o.d ?? 0.85, 0.78], (p, o) =>
   const w = o.w ?? 2.9, d = o.d ?? 0.85, r = rngOf(o.v ?? 1), ty = 0.762;
   for (const s of [-1, 1]) {
     const z = s * (w / 2 - 0.3);
-    p.bb(mats.pine, d - 0.25, 0.06, 0.06, 0, 0.06, z, 0.008);
+    p.bb(mats.pine, d - 0.25, 0.06, 0.06, 0, 0, z, 0.008);
     p.bb(mats.pine, 0.08, 0.63, 0.06, 0, 0.06, z, 0.008);
     p.bb(mats.pine, d - 0.18, 0.06, 0.07, 0, 0.66, z, 0.008);
   }

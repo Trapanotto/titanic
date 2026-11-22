@@ -24,6 +24,7 @@ export const rowingMachine = def('rowingMachine', [0.6, 2.0, 0.7], (p) => {
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.cz(M.iron, 0.02, 0.02, -0.35 + sx * 0.1, 0.2, sz * 0.09, 8);
   const fb = p.bb(M.oak, 0.04, 0.26, 0.42, 0.78, 0.16, 0, 0.008); fb.rotation.z = 0.5;
   for (const s of [-1, 1]) p.bb(M.leather, 0.06, 0.03, 0.12, 0.74, 0.3, s * 0.1, 0.008).rotation.z = 0.5;
+  p.bb(M.iron, 0.08, 0.04, 0.6, 0.42, 0.14, 0, 0.006); // outrigger carrying the two oar cylinders
   for (const s of [-1, 1]) {
     p.lathe(M.iron, [[0, 0], [0.05, 0], [0.05, 0.12], [0.03, 0.15], [0, 0.16]], 0.42, 0.18, s * 0.24, 10);
     p.loft(M.iron, [[0.42, 0.34, s * 0.24], [0.25, 0.48, s * 0.26], [0.05, 0.6, s * 0.28]], 0.014, 6);
@@ -57,12 +58,14 @@ export const cycleMachine = def('cycleMachine', [0.55, 1.4, 1.5], (p) => {
   p.loft(M.iron, [[-0.32, 0.05, 0], [-0.3, 0.5, 0], [-0.3, 0.86, 0]], 0.022, 8);
   p.loft(M.iron, [[0.3, 0.42, 0], [0.0, 0.42, 0], [-0.3, 0.5, 0]], 0.02, 8);
   p.loft(M.iron, [[0.35, 0.05, 0], [0.36, 0.6, 0], [0.35, 1.02, 0]], 0.022, 8);
-  p.pil(M.leather, 0.28, 0.07, 0.2, -0.32, 0.88, 0, 0.6, 0.5, 3, 10, 0.02);
+  p.pil(M.leather, 0.28, 0.07, 0.2, -0.32, 0.855, 0, 0.6, 0.5, 3, 10, 0.02); // saddle on the seat post
   p.loft(M.chrome, [[0.35, 1.04, -0.25], [0.32, 1.06, 0], [0.35, 1.04, 0.25]], 0.012, 6);
   for (const s of [-1, 1]) { p.lathe(M.rubber, [[0, 0], [0.018, 0], [0.018, 0.1], [0, 0.1]], 0.35, 1.04, s * 0.25, 8).rotation.x = s * Math.PI / 2; }
   p.cz(M.iron, 0.04, 0.1, -0.05, 0.36, 0, 10);
-  for (const s of [-1, 1]) { const c = p.b(M.iron, 0.03, 0.16, 0.015, -0.05, 0.28, s * 0.07); c.rotation.z = s * 0.8; p.bb(M.rubber, 0.1, 0.02, 0.06, -0.05 + s * 0.08, 0.3 + s * 0.06, s * 0.1, 0.006); }
-  p.c(M.iron, 0.015, 0.4, 0.62, 0.9, 0, 6);
+  // opposed cranks (one line through the axle), pedals on the crank ends
+  const cd = [-Math.sin(0.8) * 0.075, Math.cos(0.8) * 0.075];
+  for (const s of [-1, 1]) { const c = p.b(M.iron, 0.03, 0.18, 0.015, -0.05, 0.27, s * 0.07); c.rotation.z = 0.8; p.cz(M.iron, 0.008, 0.04, -0.05 + s * cd[0], 0.36 + s * cd[1], s * 0.09, 6); p.bb(M.rubber, 0.1, 0.02, 0.06, -0.05 + s * cd[0], 0.35 + s * cd[1], s * 0.13, 0.006); }
+  p.c(M.iron, 0.015, 1.2, 0.62, 0.05, 0, 6); // dial column standing on the base plate
   dial(p, 0.6, 1.25, 0, 0.17); p.lathe(M.paintWhite, [[0, 0], [0.19, 0], [0.19, 0.02], [0, 0.02]], 0.6, 1.25, 0, 24).rotation.z = -Math.PI / 2;
 });
 export const punchBag = def('punchBag', (o) => [0.4, 0.4, o.h ?? 2.4], (p, o) => {
@@ -78,22 +81,22 @@ export const punchBag = def('punchBag', (o) => [0.4, 0.4, o.h ?? 2.4], (p, o) =>
 export const marconiSet = def('marconiSet', [1.8, 0.75, 1.55], (p) => {
   p.bb(M.oak, 0.75, 0.04, 1.8, 0, 0.72, 0, 0.012);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.bb(M.oak, 0.06, 0.72, 0.06, sx * 0.32, 0, sz * 0.84, 0.008);
-  drawer(p, M.oak, 0.5, 0.12, 0.35, 0.64, -0.5, 1, false); drawer(p, M.oak, 0.5, 0.12, 0.35, 0.64, 0.5, 1, false);
+  for (const s of [-1, 1]) { p.b(M.oak, 0.62, 0.15, 0.56, 0.02, 0.57, s * 0.5); drawer(p, M.oak, 0.5, 0.12, 0.35, 0.64, s * 0.5, 1, false); } // drawer boxes under the top
   // slate panel with knife switches and meters
   p.bb(K.slate, 0.04, 0.68, 1.4, -0.34, 0.76, 0, 0.006);
-  for (let i = 0; i < 3; i++) { const z = -0.45 + i * 0.45; dial(p, -0.32, 1.28, z, 0.07); for (const s of [-1, 1]) { p.b(M.copper, 0.02, 0.04, 0.03, -0.31, 0.98, z + s * 0.05); const k = p.b(M.copper, 0.012, 0.16, 0.012, -0.29, 1.0, z + s * 0.05); k.rotation.z = -0.4; } p.lathe(K.ebony, [[0, 0], [0.012, 0], [0.012, 0.03], [0, 0.035]], -0.23, 1.14, z, 6); }
+  for (let i = 0; i < 3; i++) { const z = -0.45 + i * 0.45; dial(p, -0.32, 1.28, z, 0.07); for (const s of [-1, 1]) { p.b(M.copper, 0.02, 0.04, 0.03, -0.31, 0.98, z + s * 0.05); const k = p.b(M.copper, 0.012, 0.16, 0.012, -0.29, 1.0, z + s * 0.05); k.rotation.z = -0.4; } p.latheX(K.ebony, [[0, 0], [0.012, 0], [0.012, 0.03], [0, 0.035]], -0.32, 1.14, z, 6); } // knob on the slate
   // magnetic detector (wooden box with brass wheels), tuner with coils, key, headphones
   p.bb(M.woodDark, 0.28, 0.2, 0.4, -0.12, 0.76, -0.6, 0.008);
   for (const s of [-1, 1]) { p.latheZ(M.brass, [[0, 0], [0.07, 0], [0.075, 0.01], [0.07, 0.02], [0, 0.02]], -0.12, 0.98, -0.6 + s * 0.12, 18); p.cz(M.copper, 0.03, 0.12, -0.12, 0.98, -0.6 + s * 0.06, 10); }
   p.bb(M.woodDark, 0.3, 0.18, 0.5, -0.15, 0.76, 0.05, 0.008);
-  for (const s of [-1, 1]) { p.cz(M.copper, 0.06, 0.18, -0.15, 1.02, 0.05 + s * 0.13, 16); p.cz(K.ebony, 0.063, 0.01, -0.15, 1.02, 0.05 + s * 0.13 + 0.09, 16); }
+  for (const s of [-1, 1]) { p.cz(M.copper, 0.06, 0.18, -0.15, 1.0, 0.05 + s * 0.13, 16); p.cz(K.ebony, 0.063, 0.01, -0.15, 1.0, 0.05 + s * 0.13 + 0.09, 16); } // tuning coils resting on the tuner box
   for (let i = 0; i < 4; i++) { p.lathe(K.ebony, [[0, 0], [0.02, 0], [0.02, 0.015], [0, 0.02]], 0.02, 0.94, -0.1 + i * 0.1, 10); }
   p.bb(M.woodDark, 0.16, 0.025, 0.1, 0.22, 0.76, 0.32, 0.005); p.b(M.brass, 0.14, 0.01, 0.02, 0.22, 0.8, 0.32).rotation.z = 0.05; p.lathe(K.ebony, [[0, 0], [0.018, 0], [0.02, 0.012], [0, 0.02]], 0.28, 0.81, 0.32, 10);
   for (const s of [-1, 1]) p.latheX(K.ebony, [[0, 0], [0.04, 0], [0.04, 0.025], [0, 0.03]], 0.12, 0.79, 0.62 + s * 0.08, 12).rotation.set(0, 0, Math.PI / 2);
   p.tube(M.chrome, [[0.12, 0.8, 0.54], [0.12, 0.88, 0.62], [0.12, 0.8, 0.7]], 0.004, 8, 3);
-  papers(p, 0.15, 0.76, -0.15, 0.1, 2); p.c(M.oak, 0.004, 0.15, 0.15, 0.77, 0.05, 6).rotation.x = Math.PI / 2;
-  // clock above
-  p.cx(K.clockFace, 0.11, 0.01, -0.33, 1.48, 0.55, 20); p.t(M.woodDark, 0.115, 0.012, -0.325, 1.48, 0.55, 'x', 20, 4);
+  papers(p, 0.15, 0.76, -0.15, 0.1, 2); p.cz(M.oak, 0.004, 0.15, 0.15, 0.768, 0.05, 6); // pencil lying on the papers
+  // clock above (in front of the slate panel, not half inside it)
+  p.cx(K.clockFace, 0.11, 0.01, -0.31, 1.48, 0.55, 20); p.t(M.woodDark, 0.115, 0.012, -0.305, 1.48, 0.55, 'x', 20, 4);
   p.b(M.glass, 0.12, 0.2, 0.12, 0.0, 0.76, -0.25); p.c(M.chrome, 0.01, 0.16, 0.0, 0.78, -0.25, 6); // spark gap
 });
 export const telegraph = def('telegraph', [0.5, 0.45, 1.3], (p) => {
@@ -192,7 +195,10 @@ export const tankV = def('tankV', (o) => { const d = 2 * (o.r ?? 0.6); return [d
   for (const y of [0.25, h * 0.5, h - 0.28]) p.lathe(M.steelDark, [[r, y], [r + 0.012, y + 0.01], [r + 0.012, y + 0.05], [r, y + 0.06]], 0, 0, 0, 24);
   p.latheX(M.steelDark, [[0, 0], [0.2, 0], [0.2, 0.04], [0.16, 0.06], [0, 0.06]], r - 0.02, h * 0.35, 0, 16);
   for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; p.c(M.iron, 0.012, 0.03, r + 0.04, h * 0.35 + Math.sin(a) * 0.17, Math.cos(a) * 0.17, 6).rotation.z = Math.PI / 2; }
-  p.c(M.glass, 0.015, h * 0.5, r + 0.05, h * 0.25, r * 0.5, 8); p.c(M.brass, 0.02, 0.04, r + 0.05, h * 0.22, r * 0.5, 8);
+  // gauge glass beside the shell (at z = r/2 the shell surface is at x = 0.866 r), two brass cocks into the shell
+  const gx = r * 0.866 + 0.045;
+  p.c(M.glass, 0.015, h * 0.5, gx, h * 0.25, r * 0.5, 8);
+  for (const y of [h * 0.25 - 0.02, h * 0.75 - 0.02]) { p.c(M.brass, 0.02, 0.04, gx, y, r * 0.5, 8); p.b(M.brass, 0.07, 0.025, 0.025, gx - 0.035, y + 0.008, r * 0.5); }
   p.lathe(M.steelDark, [[0, 0], [0.08, 0], [0.08, 0.1], [0.12, 0.1], [0.12, 0.13], [0, 0.13]], 0, h - 0.04, 0, 12);
 });
 export const tankH = def('tankH', (o) => [o.l ?? 2.4, 2 * (o.r ?? 0.6), 2 * (o.r ?? 0.6) + 0.3], (p, o) => {
@@ -213,17 +219,20 @@ export const machineBlock = def('machineBlock', (o) => [o.w ?? 1.6, o.d ?? 1.0, 
     const R = h * 0.36, cy = 0.15 + h * 0.4;
     p.latheZ(body, [[0, 0], [R * 0.6, 0], [R, 0.06], [R, w * 0.45 - 0.06], [R * 0.6, w * 0.45], [0, w * 0.45]], 0, cy, w * 0.15 - w * 0.225, 24);
     for (let i = 0; i < 3; i++) p.latheZ(M.steelDark, [[R, 0], [R + 0.015, 0.01], [R + 0.015, 0.05], [R, 0.06]], 0, cy, w * 0.15 - w * 0.2 + i * w * 0.15, 24);
-    p.cz(M.copper, h * 0.2, w * 0.2, 0, cy, -w * 0.25, 16);
-    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; p.b(M.iron, 0.008, 0.012, w * 0.2, Math.cos(a) * h * 0.2, cy + Math.sin(a) * h * 0.2 - 0.006, -w * 0.25); }
-    p.t(M.iron, h * 0.42, 0.04, 0, 0.15 + h * 0.42, -w * 0.42, 'z', 28, 6);
-    for (let i = 0; i < 6; i++) { const s = p.b(M.iron, 0.03, h * 0.8, 0.02, 0, 0.15 + h * 0.02, -w * 0.42); s.rotation.z = (i * Math.PI) / 6; s.position.set(0, 0.15 + h * 0.42, -w * 0.42); }
+    // commutator against the end of the field frame, shaft through to the flywheel (fits inside the footprint)
+    p.cz(M.copper, h * 0.2, w * 0.2, 0, cy, -w * 0.175, 16);
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; p.b(M.iron, 0.008, 0.012, w * 0.2, Math.cos(a) * h * 0.2, cy + Math.sin(a) * h * 0.2 - 0.006, -w * 0.175); }
+    const FR = Math.min(h * 0.42, d / 2 - 0.05);
+    p.cz(M.steelDark, 0.045, w * 0.2, 0, cy, -w * 0.35, 10);
+    p.t(M.iron, FR, 0.04, 0, cy, -w * 0.42, 'z', 28, 6); p.cz(M.iron, 0.09, 0.08, 0, cy, -w * 0.42, 12);
+    for (let i = 0; i < 6; i++) { const s = p.b(M.iron, 0.03, FR * 2 - 0.04, 0.02, 0, 0, -w * 0.42); s.rotation.z = (i * Math.PI) / 6; s.position.set(0, cy, -w * 0.42); }
     p.bb(body, d * 0.7, 0.2, w * 0.5, 0, 0.15, w * 0.15, 0.02);
   } else if (kind === 'pump') {
     p.bb(body, d * 0.6, h * 0.45, w * 0.5, 0, 0.15, -w * 0.2, 0.03);
     p.lathe(body, [[0, 0], [d * 0.28, 0], [d * 0.28, 0.06], [d * 0.24, 0.1], [d * 0.24, h - 0.3], [d * 0.28, h - 0.25], [d * 0.28, h - 0.18], [0, h - 0.15]], 0, 0.15, w * 0.25, 16);
     p.c(M.brass, d * 0.1, 0.12, 0, h, w * 0.25, 10); p.cz(M.iron, 0.05, w * 0.5, 0, h * 0.6, 0, 8);
     p.t(M.rust, 0.13, 0.015, d * 0.31, h * 0.5, -w * 0.2, 'x', 18, 5); for (let i = 0; i < 4; i++) p.b(M.rust, 0.012, 0.25, 0.014, d * 0.31, h * 0.5 - 0.125, -w * 0.2).rotation.x = (i * Math.PI) / 4;
-    dial(p, d * 0.3, h * 0.85, -w * 0.2, 0.07);
+    dial(p, d * 0.3, 0.15 + h * 0.3, -w * 0.38, 0.07); // on the front of the pump body (not in the air above it)
   } else if (kind === 'engine') {
     const n = Math.max(2, Math.round(w / 0.8));
     p.bb(body, d * 0.8, h * 0.4, w * 0.96, 0, 0.15, 0, 0.03);

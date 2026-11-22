@@ -63,10 +63,10 @@ export const chesterfield = def('dChesterfield', (o) => [o.w ?? 1.9, 0.86, 0.78]
 export const jardiniere = def('dJardiniere', [0.7, 0.7, 0.66], (p) => {
   for (let i = 0; i < 3; i++) { const a = (i / 3) * TAU; p.add(G.loft([[Math.cos(a) * 0.2, 0.17, Math.sin(a) * 0.2], [Math.cos(a) * 0.26, 0.08, Math.sin(a) * 0.26], [Math.cos(a) * 0.24, 0, Math.sin(a) * 0.24]], 0.025, 5, true), M.mahogany); }
   p.add(G.lathe([[0.24, 0.15], [0.25, 0.17], [0, 0.17]], 12), M.mahogany);
-  p.add(G.lathe([[0.16, 0.17], [0.27, 0.24], [0.33, 0.36], [0.33, 0.48], [0.3, 0.58], [0.34, 0.64], [0.32, 0.65], [0.28, 0.6]], 18), M.porcelain);
+  p.add(G.lathe([[0.16, 0.17], [0.27, 0.24], [0.33, 0.36], [0.33, 0.48], [0.3, 0.58], [0.34, 0.64], [0.345, 0.65], [0.3, 0.632], [0.285, 0.595]], 18), M.porcelain); // the inner lip covers the top of the flared rim
   p.add(atl(G.lathe([[0.333, 0.37], [0.333, 0.47]], 18), AT.cobalt), K.atlas);
   p.add(atl(G.lathe([[0.31, 0.585], [0.335, 0.62]], 18), AT.cobalt), K.atlas);
-  p.add(atl(G.lathe([[0.29, 0.59], [0, 0.59]], 12), AT.soil), K.atlas);
+  p.add(atl(G.lathe([[0.305, 0.59], [0, 0.59]], 12), AT.soil), K.atlas); // soil reaches the wall (no gap under the lip)
 });
 
 /** bronze electrolier: rose, stem with collar, four scrolled arms with tulip shades, pendant finial (origin at the ceiling) */
@@ -244,12 +244,13 @@ export const bainMarie = def('dBainMarie', (o) => [o.w ?? 1.6, 0.75, 1.15], (p, 
   p.bb(M.steel, d, 0.38, w, 0, 0.5, 0, 0.01);
   p.bb(M.steelDark, d + 0.03, 0.03, w + 0.03, 0, 0.88, 0, 0.006);
   p.cz(M.brass, 0.012, w - 0.1, d / 2 + 0.03, 0.78, 0, 6);
-  p.add(G.lathe([[0.02, 0], [0.02, 0.06], [0, 0.07]], 6), M.brass, d / 2 + 0.03, 0.55, w * 0.35).rotation.z = -Math.PI / 2;
+  for (const s of [-1, 1]) p.b(M.brass, 0.035, 0.02, 0.02, d / 2 + 0.015, 0.77, s * (w / 2 - 0.1)); // rail brackets
+  p.add(G.lathe([[0.02, 0], [0.02, 0.06], [0, 0.07]], 6), M.brass, d / 2, 0.55, w * 0.35).rotation.z = -Math.PI / 2; // draw-off cock out of the bath
   const n = Math.max(2, Math.round(w / 0.4));
   for (let i = 0; i < n; i++) {
     const z = -w / 2 + (w * (i + 0.5)) / n, big = i % 2 === 0;
     p.add(G.lathe([[0.13, 0.86], [0.14, 0.86], [0.14, 1.06], [0.15, 1.07]], 12), i % 3 === 1 ? M.copper : M.steel, 0, 0, z);
-    p.add(G.lathe([[0.15, 1.07], [0.1, 1.1], [0.02, 1.11], [0.025, 1.14], [0, 1.15]], 12), i % 3 === 1 ? M.copper : M.steel, 0, big ? 0 : -0.01, z);
+    p.add(G.lathe([[0.15, 1.07], [0.1, 1.1], [0.02, 1.11], [0.025, 1.14], [0, 1.15]], 12), i % 3 === 1 ? M.copper : M.steel, 0, 0, z); void big; // lid on the rim
   }
 });
 /** steam-heated plate warmer: steel cupboard with two doors, hot-plate top, stacks of plates */
@@ -266,11 +267,11 @@ export const plateWarmer = def('dPlateWarmer', (o) => [o.w ?? 1.2, 0.7, 1.25], (
 export const utensilRail = def('dUtensilRail', (o) => [o.w ?? 1.6, 0.2, 0.7], (p, o) => {
   const w = o.w ?? 1.6, r = rng(Math.round(w * 37));
   p.cz(M.iron, 0.012, w, 0, 0.68, 0, 6);
-  for (const s of [-1, 1]) p.c(M.iron, 0.008, 0.06, 0, 0.68, s * (w / 2 - 0.05), 4);
+  for (const s of [-1, 1]) p.b(M.iron, 0.04, 0.03, 0.015, -0.015, 0.665, s * (w / 2 - 0.05)); // wall brackets (the rail stands 2 cm off the wall)
   for (let z = -w / 2 + 0.12; z < w / 2 - 0.08; z += 0.15) {
     const k = Math.floor(r() * 4), L = 0.3 + r() * 0.12;
     p.cz(M.iron, 0.004, 0.04, 0, 0.665, z, 4);
-    p.c(k === 3 ? M.copper : M.chrome, 0.006, L, 0, 0.64 - L, z, 4);
+    p.c(k === 3 ? M.copper : M.chrome, 0.006, L + 0.025, 0, 0.64 - L, z, 4); // handle up to the S-hook
     if (k === 0) p.add(G.lathe([[0, 0], [0.04, 0.005], [0.045, 0.04], [0.04, 0.04], [0, 0.01]], 8), M.chrome, 0, 0.6 - L, z);
     else if (k === 1) p.add(G.lathe([[0.05, 0.005], [0.055, 0.01], [0, 0.0]], 8), M.chrome, 0, 0.62 - L, z);
     else if (k === 2) p.add(G.lathe([[0, 0], [0.06, 0.03], [0.065, 0.035], [0, 0.035]], 8), K.ironwork, 0, 0.6 - L, z);
@@ -294,9 +295,12 @@ export const breadRack = def('dBreadRack', [1.4, 0.55, 1.85], (p) => {
 export const doughTrough = def('dDoughTrough', [1.8, 0.7, 0.95], (p) => {
   const w = 1.8;
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add(G.frustum(0.06, 0.06, 0.07, 0.07, 0.55), M.oak, sx * 0.22, 0, sz * (w / 2 - 0.12));
-  p.add(G.frustum(0.5, w - 0.1, 0.68, w, 0.36, { bottom: true, top: false }), M.oak, 0, 0.55, 0);
-  p.add(atl(G.pillow(0.6, 0.1, w - 0.14, 0.5, 0.5, 3, 10), AT.ivory), K.atlas, 0, 0.78, 0);
-  const lid = p.add(boxG(0.7, 0.03, w * 0.48, 0, 0.015, 0, ''), M.oak, -0.34, 0.92, w * 0.24); lid.rotation.z = 1.2;
+  // tub filled with dough to just under the rim (an open frustum would show its inside-out walls), raised rim boards
+  p.add(G.frustum(0.5, w - 0.1, 0.66, w - 0.02, 0.33, { bottom: true, top: true }), M.oak, 0, 0.55, 0);
+  for (const s of [-1, 1]) { p.add(boxG(0.68, 0.04, 0.025, 0, 0.9, s * (w / 2 - 0.0125), ''), M.oak); p.add(boxG(0.025, 0.04, w, s * 0.3275, 0.9, 0, ''), M.oak); }
+  p.add(atl(G.pillow(0.6, 0.07, w - 0.08, 0.5, 0.5, 3, 10), AT.ivory), K.atlas, 0, 0.86, 0);
+  // half lid propped open, hinged on the back rim board, leaning slightly back
+  const lid = p.add(boxG(0.66, 0.03, w * 0.48, 0.33, 0.015, 0, ''), M.oak, -0.315, 0.92, w * 0.24); lid.rotation.z = Math.PI / 2 + 0.05;
 });
 
 let potGeo = null;
@@ -444,9 +448,11 @@ export const opTable = def('dOpTable', [0.62, 1.95, 0.95], (p) => {
   p.add(G.lathe([[0.07, 0.2], [0.07, 0.6], [0.11, 0.65], [0, 0.66]], 12), M.chrome);
   p.bb(M.iron, 1.5, 0.08, 0.5, 0.1, 0.66, 0, 0.01);
   p.add(G.pillow(1.48, 0.07, 0.5, 0.2, 0.15, 3, 10), M.rubber, 0.1, 0.73, 0);
-  const hr = p.add(G.pillow(0.3, 0.06, 0.32, 0.4, 0.3, 3, 8), M.rubber, -0.85, 0.73, 0); hr.rotation.z = -0.1;
-  for (const s of [-1, 1]) p.cx(M.chrome, 0.01, 1.4, 0.1, 0.72, s * 0.27, 6);
-  p.cz(M.chrome, 0.012, 0.6, 0.6, 0.35, 0, 6); p.add(G.lathe([[0.03, 0], [0.03, 0.02], [0, 0.03]], 8), M.chrome, 0.6, 0.33, 0.32);
+  p.bb(M.iron, 0.24, 0.05, 0.34, -0.76, 0.68, 0, 0.008); // head-rest plate hinged to the end of the top
+  const hr = p.add(G.pillow(0.3, 0.06, 0.32, 0.4, 0.3, 3, 8), M.rubber, -0.78, 0.72, 0); hr.rotation.z = -0.1;
+  for (const s of [-1, 1]) { p.cx(M.chrome, 0.01, 1.4, 0.1, 0.72, s * 0.27, 6); for (const x of [-0.5, 0.7]) p.b(M.chrome, 0.02, 0.03, 0.03, x, 0.7, s * 0.255); }
+  // hydraulic foot pump: lever out of the column, pedal
+  p.cx(M.chrome, 0.012, 0.36, 0.25, 0.24, 0, 6); p.add(G.lathe([[0.03, 0], [0.03, 0.02], [0, 0.03]], 8), M.chrome, 0.44, 0.23, 0);
   p.add(G.lathe([[0.06, 0], [0.06, 0.04], [0, 0.04]], 10), M.chrome, 0.3, 0.06, 0.22).rotation.x = Math.PI / 2;
 });
 /** instrument stand: chrome tripod, tray with instruments, bowl, gauze */
@@ -460,6 +466,7 @@ export const instrumentStand = def('dInstrStand', [0.6, 0.45, 0.95], (p) => {
 });
 /** bedside cupboard: white enamelled, door and drawer, glass and carafe on the top */
 export const bedside = def('dBedside', [0.42, 0.4, 0.8], (p) => {
+  p.b(M.paintWhite, 0.36, 0.04, 0.38, -0.01, 0, 0); // recessed plinth
   p.bb(M.paintWhite, 0.4, 0.72, 0.42, 0, 0.04, 0, 0.008);
   p.fp(M.paintWhite, 0.34, 0.12, 0.2, 0.66, 0, 0.006, 0.02); p.fp(M.paintWhite, 0.34, 0.42, 0.2, 0.32, 0, 0.008, 0.03);
   p.c(M.brass, 0.01, 0.02, 0.21, 0.66, 0, 6).rotation.z = Math.PI / 2;
@@ -469,10 +476,11 @@ export const bedside = def('dBedside', [0.42, 0.4, 0.8], (p) => {
 });
 /** folding three-leaf ward screen with linen panels */
 export const wardScreen = def('dWardScreen', [1.6, 0.4, 1.7], (p) => {
+  // centre leaf flat, the side leaves hinged at its edges and folded forward by 0.5 rad (frames meet at the hinge posts)
   for (let i = 0; i < 3; i++) {
-    const a = (i - 1) * 0.5, cz = (i - 1) * 0.5, cx = -Math.abs(i - 1) * 0.12;
+    const a = (i - 1) * 0.5, side = i - 1, cx = -0.1 + Math.abs(side) * 0.24 * Math.sin(0.5), cz = side * (0.24 + 0.24 * Math.cos(0.5));
     const g = p.add(boxG(0.012, 1.4, 0.48, 0, 0.9, 0, ''), M.linen, cx, 0, cz); g.rotation.y = a;
-    for (const s of [-1, 1]) { const q = p.add(G.lathe([[0.012, 0], [0.012, 1.7], [0, 1.71]], 5), M.paintWhite, cx - Math.sin(a) * s * 0.24, 0, cz + Math.cos(a) * s * 0.24); void q; }
+    for (const s of [-1, 1]) p.add(G.lathe([[0.012, 0], [0.012, 1.7], [0, 1.71]], 5), M.paintWhite, cx + Math.sin(a) * s * 0.24, 0, cz + Math.cos(a) * s * 0.24);
   }
 });
 

@@ -320,76 +320,101 @@ const flat = (m, k) => { m.position.x *= k; m.scale.x *= k; return m; };
  */
 const cherubLamp = def('cherubLamp2', [0.36, 0.36, 1.3], (p) => {
   const B = kitMats.bronze;
-  p.lathe(B, [[0, 0], [0.13, 0], [0.13, 0.025], [0.11, 0.045], [0.095, 0.08], [0.115, 0.1], [0.12, 0.115], [0, 0.115]], 0, 0, 0, 24);
-  const y0 = 0.115;
-  // legs (weight on the left leg, right leg a little forward), plump feet
-  p.loft(B, [[-0.02, y0 + 0.02, 0.05], [-0.018, y0 + 0.1, 0.052], [-0.012, y0 + 0.17, 0.056], [-0.005, y0 + 0.24, 0.058], [0, y0 + 0.31, 0.055]], [0.03, 0.036, 0.046, 0.058, 0.066], 14);
-  p.loft(B, [[0.07, y0 + 0.02, -0.055], [0.062, y0 + 0.09, -0.058], [0.045, y0 + 0.16, -0.06], [0.022, y0 + 0.24, -0.058], [0.005, y0 + 0.31, -0.055]], [0.029, 0.035, 0.046, 0.058, 0.066], 14);
-  p.s(B, 0.036, -0.0, y0 + 0.02, 0.05, 1.7, 0.6, 1.05, false); p.s(B, 0.034, 0.1, y0 + 0.02, -0.055, 1.7, 0.6, 1.05, false);
-  for (const z of [-0.055, 0.055]) p.s(B, 0.05, 0.02, y0 + 0.17, z, 1, 0.8, 1, false); // knees
-  // chubby belly, chest, shoulders
-  p.s(B, 0.135, 0.0, y0 + 0.36, 0, 0.82, 0.95, 1.0, false);
-  p.s(B, 0.115, 0.0, y0 + 0.47, 0, 0.78, 0.85, 1.05, false);
-  for (const z of [-0.095, 0.095]) p.s(B, 0.048, -0.005, y0 + 0.515, z, 1, 0.9, 1, false);
-  p.c(B, 0.045, 0.06, 0, y0 + 0.54, 0, 12);
-  // head: face, cheeks, nose, curls
-  const hy = y0 + 0.655;
-  p.s(B, 0.1, 0.005, hy, 0, 0.98, 1.04, 0.94, false);
-  for (const z of [-0.042, 0.042]) p.s(B, 0.034, 0.072, hy - 0.03, z, 0.7, 0.8, 0.8, false);
-  p.s(B, 0.016, 0.1, hy - 0.005, 0, 1, 0.8, 0.8, false);
-  for (let i = 0; i < 14; i++) {
-    const a = (i / 14) * Math.PI * 2, ring = i % 2;
-    p.s(B, 0.034 - ring * 0.006, -0.01 + Math.cos(a) * (0.06 + ring * 0.015), hy + 0.06 + Math.sin(a * 2) * 0.012 - ring * 0.02, Math.sin(a) * (0.07 + ring * 0.012), 1, 1, 1, false);
+  // ---- carved pedestal: moulded foot, gadrooned drum, leaf collar, cushion top
+  p.lathe(B, [[0, 0], [0.118, 0], [0.118, 0.018], [0.108, 0.026], [0.1, 0.03], [0, 0.03]], 0, 0, 0, 24);
+  p.rev(B, [{ o: 0.095, y: 0.028, m: 0 }, { o: 0.092, y: 0.04, m: 0.006 }, { o: 0.082, y: 0.075, m: 0.008 }, { o: 0.07, y: 0.105, m: 0.005 }, { o: 0.066, y: 0.115, m: 0 }], { seg: 32, k: 16 }, 0, 0, 0);
+  for (let i = 0; i < 8; i++) { // acanthus collar
+    const a = (i / 8) * Math.PI * 2 + Math.PI / 8, lf = p.extZ(B, [[-0.022, 0], [0.022, 0], [0.016, 0.03], [0.006, 0.042], [0, 0.05], [-0.006, 0.042], [-0.016, 0.03]], 0.006, 0, 0, 0, 0);
+    lf.position.set(Math.cos(a) * 0.066, 0.1, -Math.sin(a) * 0.066); lf.rotation.set(0, a + Math.PI / 2, 0); lf.rotateX(-0.45);
   }
-  // arms: right arm (−z) raised high with the torch, left arm lowered gathering the drapery
-  p.loft(B, [[0.0, y0 + 0.52, -0.11], [0.02, y0 + 0.6, -0.15], [0.04, y0 + 0.7, -0.165], [0.05, y0 + 0.8, -0.15], [0.055, y0 + 0.86, -0.135]], [0.044, 0.038, 0.034, 0.032, 0.03], 12);
-  p.s(B, 0.032, 0.055, y0 + 0.875, -0.13, 1, 1, 1, false);
-  p.loft(B, [[0.0, y0 + 0.51, 0.11], [0.025, y0 + 0.44, 0.15], [0.055, y0 + 0.38, 0.15], [0.085, y0 + 0.35, 0.12]], [0.044, 0.038, 0.034, 0.03], 12);
-  p.s(B, 0.03, 0.09, y0 + 0.345, 0.11, 1, 1, 1, false);
-  // drapery sash from the left hand across the hips and over the right shoulder
-  p.tube(B, [[0.09, y0 + 0.34, 0.1], [0.11, y0 + 0.3, 0.02], [0.1, y0 + 0.33, -0.08], [0.06, y0 + 0.45, -0.12], [0.0, y0 + 0.55, -0.1], [-0.08, y0 + 0.5, -0.05], [-0.1, y0 + 0.3, -0.02]], 0.022, 24, 6);
-  // feathered wings on the back
-  for (const s of [-1, 1]) {
-    for (const [sc, yo, d] of [[1, 0, 0], [0.72, -0.05, 0.02]]) {
-      const w = p.extX(B, [[0, 0], [0.07, 0.06], [0.15, 0.16], [0.2, 0.28], [0.21, 0.36], [0.17, 0.31], [0.16, 0.34], [0.12, 0.27], [0.1, 0.29], [0.07, 0.21], [0.045, 0.21], [0.02, 0.12]].map(([a, b]) => [-s * a * sc, b * sc]), 0.014, -0.075 - d, y0 + 0.43 + yo, s * 0.035, 0.004);
-      w.rotation.y -= s * 0.55; // (extX: outline a → world −z; swept back a little)
+  p.lathe(B, [[0, 0.112], [0.07, 0.112], [0.085, 0.122], [0.092, 0.135], [0.088, 0.148], [0.075, 0.155], [0, 0.155]], 0, 0, 0, 24);
+  const y0 = 0.155; // top of the pedestal
+  // ---- legs in contrapposto: weight on the right leg (+z), the left leg (−z) relaxed and a little forward
+  p.loft(B, [[0.002, y0 + 0.03, 0.036], [0.008, y0 + 0.1, 0.038], [0.014, y0 + 0.18, 0.041], [0.008, y0 + 0.25, 0.043], [0.0, y0 + 0.33, 0.045]], [0.021, 0.031, 0.029, 0.04, 0.051], 16);
+  p.loft(B, [[0.05, y0 + 0.05, -0.042], [0.05, y0 + 0.11, -0.044], [0.048, y0 + 0.19, -0.046], [0.03, y0 + 0.26, -0.046], [0.004, y0 + 0.33, -0.044]], [0.02, 0.03, 0.028, 0.039, 0.05], 16);
+  p.s(B, 0.036, 0.026, y0 + 0.016, 0.036, 1.35, 0.5, 0.62, false);            // right foot flat on the pedestal
+  const ft = p.s(B, 0.034, 0.072, y0 + 0.028, -0.044, 1.35, 0.5, 0.6, false); ft.rotation.z = -0.45; // left foot, heel raised
+  // ---- torso: slender child, slight belly, shoulders, back and seat
+  p.loft(B, [[0.0, y0 + 0.3, 0], [0.006, y0 + 0.36, 0], [0.01, y0 + 0.41, 0], [0.006, y0 + 0.47, 0], [0.0, y0 + 0.52, 0], [-0.004, y0 + 0.555, 0]],
+    [[0.056, 0.084], [0.061, 0.076], [0.062, 0.072], [0.058, 0.078], [0.05, 0.092], [0.03, 0.05]], 16);
+  for (const z of [-0.034, 0.034]) p.s(B, 0.04, -0.028, y0 + 0.32, z, 1, 1.05, 0.9, false); // seat
+  for (const z of [-0.07, 0.07]) p.s(B, 0.034, -0.003, y0 + 0.515, z, 0.9, 0.85, 1, false); // shoulders
+  p.loft(B, [[-0.004, y0 + 0.54, 0], [0.0, y0 + 0.6, 0]], [[0.024, 0.024], [0.025, 0.025]], 12);   // neck
+  // ---- head: oval skull, chubby cheeks, chin, little nose, a cap of small curls (face left free)
+  const hx = 0.006, hy = y0 + 0.665;
+  p.s(B, 0.07, hx, hy, 0, 0.95, 1.08, 0.9, false);
+  for (const z of [-0.028, 0.028]) p.s(B, 0.024, hx + 0.045, hy - 0.025, z, 0.8, 0.9, 0.9, false);
+  p.s(B, 0.02, hx + 0.05, hy - 0.052, 0, 0.8, 0.8, 1, false);
+  p.s(B, 0.011, hx + 0.069, hy - 0.006, 0, 1, 0.9, 0.8, false);
+  for (const [e, n, r0] of [[0.25, 9, 0.019], [0.75, 9, 0.02], [1.2, 6, 0.019]]) {
+    for (let i = 0; i < n; i++) {
+      const a = e > 1 ? (i / n) * Math.PI * 2 : Math.PI * 0.32 + (i / (n - 1)) * Math.PI * 1.36; // lower rows: round the back, not over the face
+      const cx = Math.cos(a) * Math.cos(e), cz = Math.sin(a) * Math.cos(e), cy = Math.sin(e);
+      p.s(B, r0, hx + cx * 0.064, hy + 0.012 + cy * 0.072, cz * 0.06, 1, 1, 1);
     }
   }
-  // torch: fluted gilt holder and a cut-glass flame
-  p.lathe(mats.gold, [[0, 0], [0.018, 0], [0.014, 0.05], [0.014, 0.17], [0.035, 0.2], [0.05, 0.24], [0.046, 0.255], [0, 0.255]], 0.055, y0 + 0.83, -0.13, 12);
-  p.rev(kitMats.cutGlass, [{ o: 0.0, y: y0 + 1.08, m: 0 }, { o: 0.05, y: y0 + 1.1, m: 0.005 }, { o: 0.058, y: y0 + 1.15, m: 0.006 }, { o: 0.04, y: y0 + 1.21, m: 0.004 }, { o: 0.0, y: y0 + 1.26, m: 0 }], { seg: 16, k: 8 }, 0.055, 0, -0.13);
+  // ---- arms: the left arm (−z) raised high holding the torch, the right arm lowered, hand on the hip holding the drapery
+  p.loft(B, [[0.0, y0 + 0.52, -0.075], [0.012, y0 + 0.6, -0.11], [0.03, y0 + 0.68, -0.12], [0.04, y0 + 0.76, -0.108], [0.044, y0 + 0.81, -0.1]], [0.032, 0.028, 0.024, 0.021, 0.018], 14);
+  p.s(B, 0.024, 0.046, y0 + 0.825, -0.1, 1, 1.15, 0.9, false); // fist round the torch
+  p.loft(B, [[0.0, y0 + 0.515, 0.076], [0.004, y0 + 0.46, 0.1], [0.016, y0 + 0.4, 0.104], [0.04, y0 + 0.355, 0.084]], [0.031, 0.027, 0.023, 0.018], 14);
+  p.s(B, 0.021, 0.05, y0 + 0.345, 0.07, 1, 0.8, 1.1, false);
+  // ---- drapery: cloth gathered in the right hand, across the hips, falling behind the left leg
+  p.loft(B, [[0.05, y0 + 0.34, 0.072], [0.055, y0 + 0.3, 0.03], [0.05, y0 + 0.29, -0.02], [0.028, y0 + 0.31, -0.06], [-0.02, y0 + 0.33, -0.065], [-0.05, y0 + 0.24, -0.04], [-0.05, y0 + 0.12, -0.03]],
+    [[0.02, 0.012], [0.026, 0.012], [0.028, 0.012], [0.026, 0.012], [0.026, 0.012], [0.03, 0.012], [0.024, 0.01]], 10);
+  // ---- feathered wings from the shoulder blades, swept back and up (two layers: flight feathers, coverts)
+  const WING = [[0, 0], [-0.02, 0.06], [-0.055, 0.12], [-0.1, 0.17], [-0.15, 0.2], [-0.2, 0.215], [-0.215, 0.2], [-0.212, 0.18], [-0.2, 0.165], [-0.205, 0.15], [-0.2, 0.13], [-0.185, 0.115], [-0.188, 0.1], [-0.18, 0.082], [-0.162, 0.07],
+    [-0.16, 0.055], [-0.148, 0.04], [-0.13, 0.032], [-0.125, 0.015], [-0.11, 0.003], [-0.092, 0.0], [-0.083, -0.018], [-0.066, -0.026], [-0.05, -0.022], [-0.038, -0.035], [-0.022, -0.03], [-0.012, -0.012]]; // rounded feather tips
+  for (const s of [-1, 1]) {
+    for (const [sc, dx, dy] of [[1, 0, 0], [0.62, 0.008, 0.03]]) {
+      const w = p.extZ(B, WING.map(([a, b]) => [a * sc * 1.15, b * sc * 1.15]), 0.012, -0.04 + dx, y0 + 0.43 + dy, s * (0.03 + dx), 0.003);
+      w.rotation.set(0.1 * s, s * 0.95, 0, 'YXZ');
+    }
+  }
+  // ---- torch: fluted gilt holder through the raised fist, cup, flame-shaped cut-glass shade
+  p.lathe(mats.gold, [[0, 0], [0.012, 0], [0.012, 0.03], [0.01, 0.06], [0.011, 0.15], [0.016, 0.16], [0.026, 0.18], [0.04, 0.2], [0.046, 0.215], [0.04, 0.22], [0, 0.22]], 0.046, y0 + 0.74, -0.1, 12);
+  p.rev(kitMats.cutGlass, [{ o: 0.03, y: y0 + 0.955, m: 0 }, { o: 0.05, y: y0 + 0.985, m: 0.004 }, { o: 0.056, y: y0 + 1.02, m: 0.005 }, { o: 0.046, y: y0 + 1.06, m: 0.004 }, { o: 0.028, y: y0 + 1.1, m: 0.003 }, { o: 0.01, y: y0 + 1.13, m: 0.001 }, { o: 0.0, y: y0 + 1.15, m: 0 }], { seg: 16, k: 6, ph: 0.4, capBottom: true }, 0.046, 0, -0.1);
 });
 
 /** one robed, winged allegorical figure in high relief (Honour s = −1 with book and stylus, Glory s = +1 with palm) */
 function reliefFigure(p, s, fz, y0, hold, K = 0.55) {
-  const W = mats.oak, x = 0.1;
-  const parts = [];
-  // gown flaring to the ground, with three deep folds
-  parts.push(p.loft(W, [[x, y0, fz], [x, y0 + 0.18, fz + s * 0.01], [x, y0 + 0.4, fz + s * 0.015], [x, y0 + 0.58, fz], [x, y0 + 0.7, fz - s * 0.01]], [0.2, 0.17, 0.14, 0.115, 0.1], 16));
-  for (const [dz, a] of [[-0.09, 0.06], [0, 0.11], [0.09, 0.06]]) parts.push(p.tube(W, [[x + 0.15, y0 + 0.01, fz + dz * 1.4], [x + 0.13, y0 + 0.2, fz + dz * 1.15], [x + 0.11, y0 + 0.42, fz + dz], [x + 0.09 + a * 0.1, y0 + 0.6, fz + dz * 0.7]], 0.02, 10, 5));
-  // bodice, shoulders, neck, head with a knot of hair
-  parts.push(p.loft(W, [[x, y0 + 0.68, fz - s * 0.01], [x, y0 + 0.78, fz - s * 0.015], [x, y0 + 0.86, fz - s * 0.01]], [0.1, 0.09, 0.085], 16));
-  parts.push(p.s(W, 0.1, x, y0 + 0.875, fz - s * 0.012, 0.75, 0.42, 1.25, false));
-  parts.push(p.c(W, 0.028, 0.07, x, y0 + 0.88, fz - s * 0.02, 10));
-  parts.push(p.s(W, 0.068, x + 0.005, y0 + 1.0, fz - s * 0.03, 0.95, 1.12, 0.9, false));
-  parts.push(p.s(W, 0.044, x - 0.03, y0 + 1.045, fz + s * 0.015, 1, 0.9, 1, false));
-  parts.push(p.tube(W, [[x + 0.03, y0 + 1.05, fz - s * 0.09], [x + 0.05, y0 + 1.07, fz - s * 0.03], [x + 0.03, y0 + 1.06, fz + s * 0.03]], 0.012, 8, 4));
+  // modelled in the round about x = xc and flattened towards the panel (x *= K); s = side (+z = Glory), −s points at the clock
+  const W = mats.oak, xc = 0.17, parts = [];
+  const P = (dx, y, dz) => [xc + dx, y0 + y, fz + s * dz];
+  // long gown: fluted skirt flaring to the ground (deep vertical folds), slim waist
+  const skirt = p.rev(W, [{ o: 0.19, y: 0, m: 0.02 }, { o: 0.165, y: 0.2, m: 0.017 }, { o: 0.13, y: 0.42, m: 0.012 }, { o: 0.088, y: 0.6, m: 0.006 }, { o: 0.07, y: 0.67, m: 0.002 }], { seg: 28, k: 7, ph: 0.6 }, xc, y0, fz);
+  skirt.scale.x = 0.7; parts.push(skirt);
+  parts.push(p.s(W, 0.03, xc + 0.11, y0 + 0.02, fz - s * 0.05, 1.6, 0.6, 0.9)); // toe of a sandal under the hem
+  // bodice with bust, shoulders, neck
+  parts.push(p.loft(W, [P(0, 0.64, 0), P(0.005, 0.7, -0.005), P(0.01, 0.77, -0.01), P(0.0, 0.84, -0.01), P(-0.01, 0.875, -0.01)], [[0.058, 0.072], [0.062, 0.07], [0.07, 0.082], [0.06, 0.098], [0.035, 0.05]], 14));
+  for (const d of [-1, 1]) parts.push(p.s(W, 0.032, xc + 0.05, y0 + 0.765, fz + d * 0.036, 0.9, 0.85, 1));
+  parts.push(p.loft(W, [P(-0.006, 0.86, -0.012), P(0.0, 0.925, -0.018)], [[0.025, 0.025], [0.026, 0.026]], 10));
+  // head turned a little towards the clock: face, nose, hair drawn back into a knot, fillet
+  parts.push(p.s(W, 0.062, xc + 0.006, y0 + 0.985, fz - s * 0.02, 0.95, 1.18, 0.88, false));
+  parts.push(p.s(W, 0.011, xc + 0.066, y0 + 0.98, fz - s * 0.03, 1, 1.2, 0.8));
+  parts.push(p.s(W, 0.066, xc - 0.014, y0 + 1.005, fz - s * 0.01, 0.95, 1.05, 0.95, false));
+  parts.push(p.s(W, 0.04, xc - 0.062, y0 + 1.01, fz + s * 0.012, 0.9, 1, 1.05));
+  // himation: mantle from the outer shoulder diagonally across the body, gathered at the inner hip and falling in a fold
+  parts.push(p.loft(W, [P(0.0, 0.86, 0.075), P(0.07, 0.76, 0.03), P(0.095, 0.62, -0.035), P(0.1, 0.5, -0.08), P(0.11, 0.3, -0.1), P(0.12, 0.08, -0.095)],
+    [[0.03, 0.018], [0.04, 0.02], [0.045, 0.022], [0.04, 0.024], [0.036, 0.022], [0.03, 0.02]], 10));
   // the inner arm reaches up and holds the laurel wreath over the clock
-  parts.push(p.loft(W, [[x + 0.01, y0 + 0.86, fz - s * 0.09], [x + 0.04, y0 + 0.95, fz - s * 0.17], [x + 0.05, y0 + 1.02, fz - s * 0.24], [x + 0.05, y0 + 1.07, fz - s * 0.31]], [0.034, 0.03, 0.027, 0.024], 10));
-  parts.push(p.loft(W, [[x + 0.04, y0 + 0.88, fz - s * 0.17], [x + 0.08, y0 + 0.86, fz - s * 0.2], [x + 0.08, y0 + 0.92, fz - s * 0.24]], [0.05, 0.035, 0.02], 8, true)); // hanging sleeve
-  // the outer arm: Honour holds an open book and writes, Glory lowers a palm branch
-  parts.push(p.loft(W, [[x + 0.01, y0 + 0.85, fz + s * 0.09], [x + 0.05, y0 + 0.74, fz + s * 0.12], [x + 0.1, y0 + 0.66, fz + s * 0.07]], [0.034, 0.03, 0.026], 10));
+  parts.push(p.loft(W, [P(0.0, 0.83, -0.075), P(0.03, 0.92, -0.15), P(0.045, 0.99, -0.22), P(0.05, 1.04, -0.28), P(0.05, 1.06, -0.3)], [0.03, 0.026, 0.022, 0.02, 0.018], 10));
+  parts.push(p.s(W, 0.02, xc + 0.05, y0 + 1.065, fz - s * 0.31, 1, 1, 1));
+  parts.push(p.loft(W, [P(0.01, 0.84, -0.09), P(0.05, 0.82, -0.13), P(0.06, 0.88, -0.17)], [[0.045, 0.012], [0.035, 0.01], [0.012, 0.006]], 8)); // loose sleeve
+  // the outer arm: Honour holds an open book, Glory lowers a palm branch
   if (hold === 'book') {
-    const bk = p.b(W, 0.03, 0.2, 0.16, x + 0.13, y0 + 0.56, fz + s * 0.03); bk.rotation.z = 0.15;
-    parts.push(bk, p.b(mats.gold, 0.008, 0.18, 0.004, x + 0.146, y0 + 0.57, fz + s * 0.03));
-    parts.push(p.loft(W, [[x + 0.12, y0 + 0.62, fz - s * 0.08], [x + 0.15, y0 + 0.68, fz - s * 0.02]], 0.008, 6));
+    parts.push(p.loft(W, [P(0.0, 0.83, 0.078), P(0.03, 0.74, 0.1), P(0.09, 0.68, 0.06), P(0.12, 0.665, 0.02)], [0.028, 0.024, 0.021, 0.018], 10));
+    for (const d of [-1, 1]) { const pg = p.b(W, 0.015, 0.012, 0.11, xc + 0.15, y0 + 0.66, fz + d * 0.05); pg.rotation.x = d * 0.25; parts.push(pg); } // open pages
+    parts.push(p.b(mats.gold, 0.012, 0.01, 0.2, xc + 0.15, y0 + 0.652, fz));
   } else {
-    parts.push(p.loft(W, [[x + 0.1, y0 + 0.66, fz + s * 0.07], [x + 0.12, y0 + 0.4, fz + s * 0.16], [x + 0.12, y0 + 0.12, fz + s * 0.2]], 0.01, 6));
-    for (let i = 0; i < 9; i++) { const t = i / 8, yy = y0 + 0.62 - t * 0.48; for (const d of [-1, 1]) { const lf = p.extX(W, [[0, 0], [0.012, 0.005], [0.07, 0.02], [0.012, 0.012]], 0.008, x + 0.12, yy, fz + s * (0.08 + t * 0.12)); lf.rotation.x = d * 0.6 + Math.PI; parts.push(lf); } }
+    parts.push(p.loft(W, [P(0.0, 0.83, 0.078), P(0.02, 0.72, 0.11), P(0.06, 0.62, 0.12), P(0.08, 0.58, 0.115)], [0.028, 0.024, 0.021, 0.018], 10));
+    parts.push(p.loft(W, [P(0.08, 0.62, 0.115), P(0.09, 0.45, 0.15), P(0.1, 0.25, 0.18), P(0.1, 0.1, 0.2)], 0.009, 6));
+    for (let i = 0; i < 9; i++) { const t = i / 8, yy = y0 + 0.5 - t * 0.36; for (const d of [-1, 1]) { const lf = p.extX(W, [[0, 0], [0.012, 0.005], [0.07, 0.02], [0.012, 0.012]], 0.008, xc + 0.1, yy, fz + s * (0.15 + t * 0.045)); lf.rotation.x = d * 0.6 + Math.PI; parts.push(lf); } }
   }
-  // two-tiered spread wings behind the shoulder, pointing outwards and up
-  for (const [sc, yo] of [[1, 0], [0.75, -0.08]]) {
-    parts.push(p.extX(W, [[0, 0], [0.09, 0.08], [0.2, 0.22], [0.28, 0.4], [0.3, 0.55], [0.24, 0.47], [0.22, 0.52], [0.17, 0.41], [0.14, 0.44], [0.1, 0.31], [0.065, 0.32], [0.03, 0.17]].map(([a, b]) => [-s * a * sc * 0.8, b * sc]), 0.03, 0.04, y0 + 0.74 + yo, fz + s * 0.06, 0.008)); // (extX: outline a → world −z)
+  // large feathered wings rising from the shoulders, spreading away from the clock (flight feathers + coverts)
+  const WING = [[0, 0], [0.02, 0.14], [0.05, 0.28], [0.09, 0.42], [0.14, 0.53], [0.19, 0.58], [0.225, 0.55], [0.235, 0.51], [0.26, 0.49], [0.265, 0.45], [0.29, 0.42], [0.29, 0.38], [0.305, 0.34], [0.3, 0.3], [0.31, 0.26],
+    [0.295, 0.22], [0.3, 0.18], [0.28, 0.15], [0.275, 0.11], [0.25, 0.085], [0.24, 0.05], [0.21, 0.035], [0.19, 0.0], [0.16, -0.005], [0.135, -0.035], [0.1, -0.03], [0.075, -0.05], [0.045, -0.03], [0.02, -0.03]].map(([a, b]) => [a * 0.93, b]);
+  for (const [sc, dx, dy] of [[1, 0, 0], [0.62, 0.025, 0.06]]) {
+    parts.push(p.extX(W, WING.map(([a, b]) => [-s * a * sc, b * sc]), 0.028, 0.05 + dx, y0 + 0.78 + dy, fz + s * 0.05, 0.008)); // (extX: outline a → world −z)
   }
   for (const m of parts) if (Math.abs(m.rotation.y) < 1e-6) flat(m, K); // extruded parts are thin already
 }
@@ -417,7 +442,7 @@ const honourGlory = def('honourGlory2', (o) => [o.w ?? 1.6, 0.3, (o.h ?? 1.5) + 
   // the clock: carved case, gilt bezel, dial, hands
   const cy = h * (o.figures === false ? 0.55 : 0.52), R = 0.2;
   p.latheX(W, [[0, 0], [R + 0.08, 0], [R + 0.09, 0.03], [R + 0.06, 0.08], [R + 0.03, 0.09], [0, 0.09]], 0.03, cy, 0, 28);
-  p.latheX(Gd, [[R - 0.01, 0], [R + 0.025, 0.01], [R + 0.015, 0.025], [R - 0.02, 0.02]], 0.12, cy, 0, 28);
+  p.latheX(Gd, [[R - 0.01, 0], [R + 0.025, 0.01], [R + 0.015, 0.025], [R - 0.02, 0.02], [R - 0.01, 0]], 0.12, cy, 0, 28); // closed bezel ring
   p.cx(kitMats.clockFace, R, 0.006, 0.123, cy, 0, 28);
   const hand = (len, a, t) => { const m = p.b(Dk, 0.005, len, t, 0.13, 0, 0); m.position.set(0.13, cy + (Math.cos(a) * len) / 2, (-Math.sin(a) * len) / 2); m.rotation.x = -a; };
   hand(0.12, -0.9, 0.014); hand(0.16, 0.75, 0.009);
@@ -433,8 +458,8 @@ const honourGlory = def('honourGlory2', (o) => [o.w ?? 1.6, 0.3, (o.h ?? 1.5) + 
     for (const s of [-1, 1]) for (let i = 0; i < 7; i++) p.s(W, 0.035, 0.07, cy - 0.3 + i * 0.1, s * (R + 0.2 + Math.sin(i) * 0.02), 0.8, 1.2, 0.9, false);
     return;
   }
-  reliefFigure(p, -1, -w * 0.3, 0.1, 'book');
-  reliefFigure(p, 1, w * 0.3, 0.1, 'palm');
+  reliefFigure(p, -1, -w * 0.28, 0.1, 'book');
+  reliefFigure(p, 1, w * 0.28, 0.1, 'palm');
 });
 
 /** gilt newel lamp with three cut-glass tulips (newel caps at the foot of the central flights) – origin = newel top */

@@ -15,6 +15,18 @@ import { detailer, wput, iput, reserve, reserveExtDoors, wx, wz, boatWindows, ex
 const FW = 7.35; // inner face of the forward house side walls
 const K = kitMats, B = mats.brass, TEAK = mats.oak;
 
+/**
+ * Flat dial disc whose texture reads upright and unmirrored from the front (cylinder caps carry their UVs along z / x and
+ * show lettering sideways or upside down). face: 'z' (+z), '-z', 'x' (+x), 'y-x' (lying, texture top towards −x).
+ */
+export function dialGeo(r, seg, face) {
+  const g = new THREE.CircleGeometry(r, seg);
+  if (face === 'x') g.rotateY(Math.PI / 2);
+  else if (face === '-z') g.rotateY(Math.PI);
+  else if (face === 'y-x') { g.rotateX(-Math.PI / 2); g.rotateY(Math.PI / 2); }
+  return g;
+}
+
 // ============================================================================================== custom props (front +x)
 
 /** teak deck grating (lattice of slats on battens) */
@@ -31,7 +43,7 @@ export const telegraph2 = def('abTelegraph', (o) => [0.5, 0.45, o.dock ? 1.15 : 
   p.rev(B, [{ o: 0.06, y: 0.25, m: 0.004 }, { o: 0.056, y: yc - 0.35, m: 0.004 }], { seg: 32, k: 16 }, 0, 0, 0);
   p.cz(B, R + 0.03, 0.18, 0, yc, 0, 28);
   for (const s of [-1, 1]) {
-    const f = p.cz(face, R, 0.004, 0, yc, s * 0.092, 28); f.rotation.y = s > 0 ? 0 : Math.PI;
+    p.add(dialGeo(R, 28, s > 0 ? 'z' : '-z'), face, 0, yc, s * 0.0925);
     p.t(B, R + 0.01, 0.014, 0, yc, s * 0.09, 'z', 28, 4);
     p.latheZ(mats.glass, [[0, 0], [R, 0], [R * 0.6, 0.02], [0, 0.025]], 0, yc, s * 0.094, 20, s);
     p.b(mats.iron, 0.012, R * 0.8, 0.004, 0, yc, s * 0.097).rotation.z = -0.5; // pointer
@@ -48,7 +60,7 @@ export const binnacle2 = def('abBinnacle', [0.75, 0.55, 1.45], (p) => {
   p.lathe(mats.woodDark, [[0, 0], [0.25, 0], [0.25, 0.05], [0.19, 0.1], [0.15, 0.2], [0.14, 0.78], [0.18, 0.9], [0.19, 0.98], [0, 0.98]], 0, 0, 0, 16);
   for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; p.b(B, 0.012, 0.6, 0.012, Math.cos(a) * 0.15, 0.2, Math.sin(a) * 0.15); }
   p.lathe(B, [[0, 0.98], [0.2, 0.98], [0.2, 1.08], [0.19, 1.1], [0, 1.1]], 0, 0, 0, 20);
-  p.c(M.compassFace, 0.16, 0.004, 0, 1.1, 0, 28);
+  p.add(dialGeo(0.16, 28, 'y-x'), M.compassFace, 0, 1.104, 0); // N towards the helmsman's far side
   p.lathe(mats.glass, [[0.19, 1.1], [0.18, 1.15], [0.12, 1.2], [0, 1.21]], 0, 0, 0, 20);
   p.lathe(B, [[0, 1.26], [0.12, 1.24], [0.2, 1.17], [0.21, 1.13], [0.205, 1.13], [0.19, 1.16], [0.12, 1.22], [0, 1.24]].reverse(), 0, 0, 0, 20);
   p.lathe(B, [[0, 1.24], [0.04, 1.25], [0.04, 1.4], [0.06, 1.42], [0, 1.45]], -0.1, 0, 0, 10);
@@ -75,8 +87,9 @@ export const phone = def('abPhone', [0.26, 0.14, 0.42], (p) => {
   p.lathe(K.ebony, [[0, 0], [0.03, 0], [0.028, 0.02], [0.012, 0.04], [0, 0.05]], 0.1, -0.05, 0, 10).rotation.z = -Math.PI / 2; // mouthpiece
   p.lathe(K.ebony, [[0, 0], [0.022, 0], [0.018, 0.14], [0.03, 0.16], [0.03, 0.2], [0, 0.2]], 0.08, -0.28, -0.14, 10);
   p.b(B, 0.03, 0.02, 0.04, 0.06, -0.07, -0.12);
-  p.cx(B, 0.008, 0.05, 0.125, -0.2, 0.12, 6); p.b(B, 0.01, 0.07, 0.012, 0.15, -0.24, 0.12); p.lathe(K.ebony, [[0, 0], [0.012, 0], [0.012, 0.04], [0, 0.04]], 0.18, -0.26, 0.12, 8).rotation.z = -Math.PI / 2;
-  p.b(mats.paper, 0.004, 0.08, 0.12, 0.1, -0.36, 0);
+  // magneto crank on the right-hand side of the case: axle out of the side, arm, ebony handle
+  p.cz(B, 0.008, 0.05, 0.05, -0.12, 0.13, 6); p.b(B, 0.012, 0.08, 0.01, 0.05, -0.2, 0.158); p.latheZ(K.ebony, [[0, 0], [0.012, 0], [0.012, 0.04], [0, 0.04]], 0.05, -0.19, 0.163, 8);
+  p.b(mats.paper, 0.004, 0.07, 0.1, 0.101, -0.19, 0.0); // instruction card on the case front
 });
 /** ship's bell on a bracket – origin = mounting point */
 export const bell = def('abBell', [0.3, 0.3, 0.45], (p) => {
@@ -90,13 +103,13 @@ export const bell = def('abBell', [0.3, 0.3, 0.45], (p) => {
 export const chrono = def('abChrono', [0.22, 0.22, 0.24], (p) => {
   p.bb(mats.mahogany, 0.2, 0.14, 0.2, 0, 0, 0, 0.006);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.b(B, 0.03, 0.14, 0.03, sx * 0.09, 0, sz * 0.09);
-  p.c(B, 0.07, 0.012, 0, 0.14, 0, 16); p.c(K.clockFace, 0.06, 0.004, 0, 0.152, 0, 16); p.lathe(mats.glass, [[0, 0], [0.065, 0], [0.04, 0.01], [0, 0.012]], 0, 0.156, 0, 12);
+  p.c(B, 0.07, 0.012, 0, 0.14, 0, 16); p.add(dialGeo(0.06, 16, 'y-x'), K.clockFace, 0, 0.153, 0); p.lathe(mats.glass, [[0, 0], [0.065, 0], [0.04, 0.01], [0, 0.012]], 0, 0.156, 0, 12);
   const lid = p.bb(mats.mahogany, 0.012, 0.18, 0.2, -0.1, 0.14, 0, 0.004); lid.rotation.z = 0.25;
 });
 /** marine barometer (carved case, dial, thermometer) – wall mounted */
 export const barometer = def('abBarometer', [0.3, 0.08, 0.9], (p) => {
   p.extX(mats.mahogany, [[-0.13, -0.45], [0.13, -0.45], [0.13, 0.08], [0.15, 0.2], [0.1, 0.32], [0, 0.36], [-0.1, 0.32], [-0.15, 0.2], [-0.13, 0.08]], 0.03, 0.015, 0, 0, 0.005);
-  p.cx(K.gaugeFace, 0.12, 0.006, 0.033, 0.18, 0, 24); p.t(B, 0.125, 0.01, 0.034, 0.18, 0, 'x', 24, 4);
+  p.add(dialGeo(0.12, 24, 'x'), K.gaugeFace, 0.032, 0.18, 0); p.t(B, 0.125, 0.01, 0.034, 0.18, 0, 'x', 24, 4);
   p.b(mats.glass, 0.006, 0.36, 0.03, 0.033, -0.35, 0); p.b(mats.paper, 0.004, 0.34, 0.06, 0.031, -0.34, 0); p.c(mats.navRed, 0.004, 0.2, 0.038, -0.34, 0, 6);
 });
 /** signal-flag locker: pigeon holes with rolled flags */
@@ -109,7 +122,7 @@ export const flagLocker = def('abFlagLocker', [1.5, 0.5, 1.3], (p) => {
   const cells = [AT.red, AT.yellow, AT.navy, AT.whitePaint, AT.black, AT.labelBlue, AT.redPaint, AT.flowerYellow];
   for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
     const z = -w / 2 + ((i + 0.5) * w) / cols, y = 0.08 + (j * (h - 0.02)) / rows;
-    for (let k = 0; k < 2; k++) p.alathe(cells[(i * 3 + j * 5 + k) % cells.length], [[0, 0], [0.05, 0], [0.05, 0.4], [0, 0.4]], 0.0, y + 0.06, z + (k - 0.5) * 0.11, 8).rotation.z = -Math.PI / 2;
+    for (let k = 0; k < 2; k++) p.alathe(cells[(i * 3 + j * 5 + k) % cells.length], [[0, 0], [0.05, 0], [0.05, 0.3], [0, 0.3]], -0.06, y + 0.06, z + (k - 0.5) * 0.11, 8).rotation.z = -Math.PI / 2; // rolled flags, ends just proud of the front
   }
   p.bb(m, 0.54, 0.04, w + 0.04, 0, h + 0.06, 0, 0.01);
 });
@@ -118,7 +131,7 @@ export const clock2 = def('abClock', [0.4, 0.08, 0.4], (p, o) => {
   const face = deckMats()[o.face ?? 'marconiClock'];
   p.t(mats.woodDark, 0.18, 0.025, 0.02, 0, 0, 'x', 28, 6);
   p.cx(mats.woodDark, 0.18, 0.03, 0.015, 0, 0, 24);
-  p.cx(face, 0.16, 0.004, 0.032, 0, 0, 28);
+  p.add(dialGeo(0.16, 28, 'x'), face, 0.031, 0, 0);
   p.t(B, 0.165, 0.01, 0.036, 0, 0, 'x', 28, 4);
   p.latheX(mats.glass, [[0, 0], [0.16, 0], [0.12, 0.012], [0, 0.016]], 0.036, 0, 0, 20);
 });
@@ -174,7 +187,7 @@ export const inductionCoil = def('abInductionCoil', [0.8, 0.5, 0.9], (p) => {
   p.bb(mats.woodDark, 0.5, 0.5, 0.8, 0, 0, 0, 0.01);
   p.cz(mats.copper, 0.16, 0.5, 0, 0.7, 0, 20);
   for (let i = 0; i < 8; i++) p.t(mats.copper, 0.165, 0.008, 0, 0.7, -0.22 + i * 0.063, 'z', 20, 3);
-  for (const s of [-1, 1]) { p.bb(K.ebony, 0.36, 0.36, 0.04, 0, 0.52, s * 0.28, 0.006); p.lathe(mats.porcelain, [[0, 0], [0.035, 0], [0.025, 0.04], [0.035, 0.08], [0.025, 0.12], [0, 0.13]], 0, 0.88, s * 0.28, 8); }
+  for (const s of [-1, 1]) { p.bb(K.ebony, 0.36, 0.38, 0.04, 0, 0.5, s * 0.28, 0.006); p.lathe(mats.porcelain, [[0, 0], [0.035, 0], [0.025, 0.04], [0.035, 0.08], [0.025, 0.12], [0, 0.13]], 0, 0.88, s * 0.28, 8); }
 });
 /** wall bars (gymnasium) */
 export const wallBars = def('abWallBars', (o) => [o.w ?? 0.9, 0.16, 2.4], (p, o) => {

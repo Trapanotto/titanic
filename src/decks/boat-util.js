@@ -556,10 +556,10 @@ export const drapes = def('abDrapes', (o) => [o.w ?? 1.8, 0.2, o.h ?? 2.3], (p, 
 /** hanging lantern on a chain (Verandah Café) – origin at the ceiling */
 export const hangLamp = def('abHangLamp', [0.3, 0.3, 0.9], (p) => {
   p.lathe(mats.brass, [[0, 0], [0.07, 0], [0.06, -0.02], [0.015, -0.04], [0, -0.04]], 0, 0, 0, 10);
-  for (let i = 0; i < 6; i++) p.t(mats.brass, 0.018, 0.004, 0, -0.06 - i * 0.04, 0, i % 2 ? 'x' : 'z', 8, 3);
+  for (let i = 0; i < 7; i++) p.t(mats.brass, 0.018, 0.004, 0, -0.06 - i * 0.04, 0, i % 2 ? 'x' : 'z', 8, 3); // chain down to the cap
   p.lathe(mats.brass, [[0, -0.3], [0.12, -0.3], [0.13, -0.32], [0.04, -0.36], [0, -0.37]].reverse(), 0, 0, 0, 12);
-  p.rev(mats.lampGlow, [{ o: 0.09, y: -0.62 }, { o: 0.12, y: -0.5, m: 0.004 }, { o: 0.11, y: -0.38 }], { seg: 12, k: 6, capBottom: true }, 0, 0, 0);
-  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; p.loft(mats.brass, [[Math.cos(a) * 0.11, -0.38, Math.sin(a) * 0.11], [Math.cos(a) * 0.125, -0.5, Math.sin(a) * 0.125], [Math.cos(a) * 0.095, -0.62, Math.sin(a) * 0.095]], 0.006, 3, false); }
+  p.rev(mats.lampGlow, [{ o: 0.09, y: -0.62 }, { o: 0.12, y: -0.5, m: 0.004 }, { o: 0.11, y: -0.38 }], { seg: 12, k: 6, capBottom: true, capTop: true }, 0, 0, 0);
+  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; p.loft(mats.brass, [[Math.cos(a) * 0.115, -0.325, Math.sin(a) * 0.115], [Math.cos(a) * 0.11, -0.38, Math.sin(a) * 0.11], [Math.cos(a) * 0.125, -0.5, Math.sin(a) * 0.125], [Math.cos(a) * 0.095, -0.62, Math.sin(a) * 0.095]], 0.006, 3, false); }
   p.lathe(mats.brass, [[0, -0.7], [0.03, -0.66], [0.1, -0.63], [0.1, -0.61], [0, -0.61]], 0, 0, 0, 12);
 });
 

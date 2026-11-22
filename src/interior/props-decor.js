@@ -171,17 +171,17 @@ export const ceilingLight = def('ceilingLight', [0.4, 0.4, 0.2], (p, o) => {
   if (st === 'bowl') { // gilt rose, three chains, cut-glass bowl in a gilt ring
     p.lathe(M.gold, ROSE(0.1), 0, 0, 0, 12);
     for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; p.loft(M.gold, [[Math.cos(a) * 0.05, -0.04, Math.sin(a) * 0.05], [Math.cos(a) * 0.19, -0.2, Math.sin(a) * 0.19]], 0.004, 4, false); }
-    p.lathe(M.gold, [[0.2, -0.2], [0.21, -0.21], [0.2, -0.225], [0.19, -0.215], [0.2, -0.2]], 0, 0, 0, 20); // closed ring profile
+    p.lathe(M.gold, [[0.2, -0.2], [0.19, -0.215], [0.2, -0.225], [0.21, -0.21], [0.2, -0.2]], 0, 0, 0, 20); // closed ring profile (counter-clockwise: faces outwards)
     p.rev(K.cutGlass, [{ o: 0.02, y: -0.33, m: 0 }, { o: 0.1, y: -0.315, m: 0.006 }, { o: 0.16, y: -0.27, m: 0.008 }, { o: 0.192, y: -0.215, m: 0.004 }], { seg: 24, k: 12, capBottom: true, capTop: true }, 0, 0, 0);
     p.lathe(M.gold, [[0, 0], [0.022, 0], [0.02, -0.03], [0.008, -0.05], [0, -0.06]], 0, -0.32, 0, 8);
   } else if (st === 'bulkhead') {
     p.lathe(M.iron, [[0, 0], [0.12, 0], [0.12, -0.025], [0.08, -0.06], [0, -0.06]], 0, 0, 0, 10);
     p.lathe(M.lampGlow, [[0, -0.205], [0.05, -0.195], [0.085, -0.12], [0.075, -0.055]], 0, 0, 0, 10);
-    for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); p.loft(M.iron, [[c * 0.085, -0.06, s * 0.085], [c * 0.098, -0.13, s * 0.098], [c * 0.05, -0.205, s * 0.05]], 0.006, 3, false); }
+    for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); p.loft(M.iron, [[c * 0.085, -0.06, s * 0.085], [c * 0.098, -0.13, s * 0.098], [c * 0.05, -0.205, s * 0.05]], 0.006, 3); }
     p.t(M.iron, 0.096, 0.006, 0, -0.12, 0, 'y', 10, 3);
   } else if (st === 'cut') {
     p.bb(M.gold, 0.34, 0.025, 0.34, 0, -0.025, 0, 0.008);
-    p.fr(K.cutGlass, 0.28, 0.28, 0.12, 0.12, 0.1, 0, -0.025, 0, { top: false }).rotation.x = Math.PI;
+    p.fr(K.cutGlass, 0.28, 0.28, 0.12, 0.12, 0.1, 0, -0.025, 0).rotation.x = Math.PI; // small face = bottom of the glass, closed
     p.bb(M.gold, 0.3, 0.012, 0.3, 0, -0.04, 0, 0.004);
     for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; p.lathe(K.crystal, [[0, 0], [0.014, -0.012], [0, -0.04]], Math.cos(a) * 0.13, -0.04, Math.sin(a) * 0.13, 4); }
     p.lathe(K.crystal, [[0, 0], [0.025, -0.02], [0, -0.07]], 0, -0.13, 0, 6);
@@ -206,15 +206,17 @@ export const ceilingRose = def('ceilingRose', (o) => [2 * (o.r ?? 0.3), 2 * (o.r
 export const chandelier = def('chandelier', [1.0, 1.0, 0.9], (p, o) => {
   const n = o.arms ?? 6;
   p.lathe(M.gold, ROSE(0.13), 0, 0, 0, 16);
-  p.lathe(M.gold, [[0.012, -0.04], [0.012, -0.2], [0.03, -0.24], [0.012, -0.28], [0.012, -0.4], [0.035, -0.44], [0.02, -0.5], [0.06, -0.54], [0.09, -0.56], [0, -0.58]], 0, 0, 0, 12);
+  // stem: profile bottom → top so the surface faces outwards (an open profile written top → bottom is inside-out)
+  p.lathe(M.gold, [[0, -0.58], [0.09, -0.56], [0.06, -0.54], [0.02, -0.5], [0.035, -0.44], [0.012, -0.4], [0.012, -0.28], [0.03, -0.24], [0.012, -0.2], [0.012, -0.04]], 0, 0, 0, 12);
   p.rev(K.cutGlass, [{ o: 0.0, y: -0.78, m: 0 }, { o: 0.08, y: -0.75, m: 0.006 }, { o: 0.13, y: -0.68, m: 0.008 }, { o: 0.15, y: -0.6, m: 0.004 }], { seg: 24, k: 12, capBottom: true, capTop: true }, 0, 0, 0);
-  p.lathe(M.gold, [[0.15, -0.6], [0.16, -0.59], [0.15, -0.58], [0.14, -0.585]], 0, 0, 0, 20);
+  p.lathe(M.gold, [[0.15, -0.6], [0.16, -0.59], [0.15, -0.58], [0.14, -0.585], [0.15, -0.6]], 0, 0, 0, 20); // closed ring
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2, c = Math.cos(a), s = -Math.sin(a), R = 0.42;
     p.loft(M.gold, [[c * 0.08, -0.56, s * 0.08], [c * 0.22, -0.64, s * 0.22], [c * 0.34, -0.62, s * 0.34], [c * 0.41, -0.55, s * 0.41], [c * R, -0.5, s * R]], 0.011, 6);
     p.lathe(M.gold, [[0, 0], [0.035, 0], [0.04, 0.012], [0.015, 0.02], [0.012, 0.04], [0, 0.04]], c * R, -0.5, s * R, 10);
     p.lathe(M.lampGlow, [[0, 0], [0.022, 0], [0.055, 0.07], [0.058, 0.11], [0.04, 0.12], [0, 0.12]], c * R, -0.46, s * R, 12);
-    for (let k = 0; k < 3; k++) p.lathe(K.crystal, [[0, 0], [0.012, -0.012], [0, -0.035]], c * (0.18 + k * 0.08), -0.66 - (k === 1 ? 0.02 : 0), s * (0.18 + k * 0.08), 4);
+    // crystal drops hung from the underside of the arm (arm centre line y at radius 0.18 / 0.26 / 0.34, radius 0.011)
+    for (const [rr, ya] of [[0.18, -0.617], [0.26, -0.633], [0.34, -0.62]]) p.lathe(K.crystal, [[0, 0], [0.012, -0.012], [0, -0.035]], c * rr, ya - 0.008, s * rr, 4);
   }
   for (let i = 0; i < n * 2; i++) { const a = (i / (n * 2)) * Math.PI * 2; p.lathe(K.crystal, [[0, 0], [0.01, -0.01], [0, -0.03]], Math.cos(a) * 0.155, -0.6, -Math.sin(a) * 0.155, 4); }
   p.lathe(K.crystal, [[0, 0], [0.025, -0.025], [0, -0.09]], 0, -0.78, 0, 6);
@@ -237,8 +239,10 @@ export const tableLamp = def('tableLamp', [0.2, 0.2, 0.32], (p) => { tableLampOn
 export const heater = def('heater', [0.6, 0.2, 0.62], (p) => {
   for (const s of [-1, 1]) { p.b(M.iron, 0.18, 0.02, 0.06, 0, 0, s * 0.26); p.lathe(M.brass, [[0, 0], [0.012, 0], [0.012, 0.56], [0.02, 0.58], [0, 0.6]], -0.04, 0.02, s * 0.26, 6); }
   p.bb(M.iron, 0.05, 0.52, 0.5, -0.06, 0.06, 0, 0.012);
-  const refl = p.rev(M.copper, [{ o: 0.25, y: 0.11 }, { o: 0.22, y: 0.07 }, { o: 0.15, y: 0.03 }, { o: 0.05, y: 0 }], { seg: 12, capTop: true }, -0.03, 0.34, 0);
+  // dished copper reflector: closed shell (convex back faces the wall, polished concave face towards the room)
+  const refl = p.lathe(M.copper, [[0, 0], [0.05, 0], [0.15, 0.03], [0.22, 0.07], [0.25, 0.11], [0.24, 0.112], [0.212, 0.078], [0.145, 0.04], [0.05, 0.012], [0, 0.012]], 0, 0, 0, 12);
   refl.rotation.z = -Math.PI / 2; refl.position.set(-0.035, 0.34, 0); refl.scale.set(1.05, 0.7, 1);
+  for (const y of [0.13, 0.55]) for (const s of [-1, 1]) p.b(M.brass, 0.05, 0.01, 0.012, 0.06, y, s * 0.185); // grille brackets to the side strips
   for (let i = 0; i < 4; i++) p.cz(M.fire, 0.016, 0.34, 0.03, 0.2 + i * 0.09, 0, 6);
   for (const s of [-1, 1]) p.bb(M.chrome, 0.03, 0.34, 0.02, 0.025, 0.17, s * 0.18, 0.005);
   for (let i = 0; i < 7; i++) p.b(M.brass, 0.006, 0.42, 0.006, 0.085, 0.13, -0.18 + i * 0.06);
@@ -368,7 +372,7 @@ export const piano = def('piano', (o) => (o.grand ? [1.5, 2.1, 1.05] : [1.5, 0.6
     p.extX(m, [[-0.3, 0], [0.3, 0], [0.3, 0.2], [-0.3, 0.2]], 0.015, 0.68, 0.95, 0, 0.003).rotation.z = 0.25;
     p.ab(AT.paper, 0.01, 0.24, 0.36, 0.69, 0.98, 0).rotation.z = 0.25;
     for (const [x, z] of [[0.8, -0.6], [0.8, 0.6], [-0.85, -0.3]]) p.lathe(m, [[0, 0], [0.045, 0], [0.05, 0.03], [0.07, 0.08], [0.05, 0.3], [0.06, 0.45], [0.075, 0.6], [0.08, 0.66], [0, 0.66]], x, 0, z, 10);
-    p.extX(m, [[-0.08, 0], [0.08, 0], [0.05, 0.55], [-0.05, 0.55]], 0.04, 0.6, 0.1, 0, 0.004);
+    p.extX(m, [[-0.08, 0], [0.08, 0], [0.05, 0.62], [-0.05, 0.62]], 0.04, 0.6, 0.04, 0, 0.004); // pedal lyre down to the pedals
     for (let i = -1; i <= 1; i++) p.bb(M.brass, 0.08, 0.012, 0.02, 0.64, 0.06, i * 0.04, 0.003);
     return;
   }
@@ -382,6 +386,7 @@ export const piano = def('piano', (o) => (o.grand ? [1.5, 2.1, 1.05] : [1.5, 0.6
   p.extX(m, [[-0.4, 0], [0.4, 0], [0.4, 0.04], [-0.4, 0.04]], 0.02, 0.06, 0.95, 0, 0.003).rotation.z = 0.15;
   p.ab(AT.paper, 0.006, 0.26, 0.38, 0.07, 0.97, -0.1).rotation.z = 0.15; p.ab(AT.paper, 0.006, 0.26, 0.38, 0.072, 0.97, 0.22).rotation.z = 0.15;
   for (const s of [-1, 1]) { p.loft(M.brass, [[0.02, 1.0, s * 0.62], [0.1, 0.96, s * 0.64], [0.14, 1.0, s * 0.64]], 0.008, 5); p.lathe(M.brass, [[0, 0], [0.025, 0], [0.012, 0.02], [0, 0.025]], 0.14, 1.0, s * 0.64, 8); p.lathe(M.paintCream, [[0, 0], [0.01, 0], [0.01, 0.12], [0, 0.13]], 0.14, 1.02, s * 0.64, 6); }
+  p.bb(m, 0.17, 0.08, 0.3, 0.075, 0, 0, 0.006); // toe board the pedals come out of
   for (let i = -1; i <= 1; i++) p.bb(M.brass, 0.08, 0.012, 0.02, 0.2, 0.05, i * 0.05, 0.003);
 });
 
@@ -446,7 +451,7 @@ for (const name of ['b', 'bb', 'c', 'cx', 'cz', 's', 't', 'lathe', 'latheX', 'la
 /** planked shipping crate with stencilling */
 function crateAt(p, s, x, y, z, rot = 0, mat = M.pine) {
   const q = p;
-  q.b(mat, s - 0.04, s - 0.04, s - 0.04, x, y + 0.02, z);
+  q.b(mat, s - 0.04, s - 0.023, s - 0.04, x, y + 0.02, z); // body up to just under the top rails (crates stack on it)
   for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
     const g = new THREE.PlaneGeometry(s - 0.1, s - 0.1); const m = q.add(g, K.stencil, x + sx * (s / 2 - 0.018), y + s / 2, z + sz * (s / 2 - 0.018)); m.rotation.y = sx ? (sx > 0 ? Math.PI / 2 : -Math.PI / 2) : (sz > 0 ? 0 : Math.PI);
   }
@@ -466,7 +471,7 @@ export const crateStack = def('crateStack', [1.9, 1.7, 1.8], (p, o) => {
 export const barrel = def('barrel', [0.64, 0.64, 0.9], (p, o) => {
   const m = matOf(o.mat, M.oak);
   p.rev(m, [{ o: 0.25, y: 0, m: 0.003 }, { o: 0.28, y: 0.15, m: 0.004 }, { o: 0.31, y: 0.45, m: 0.004 }, { o: 0.28, y: 0.75, m: 0.004 }, { o: 0.25, y: 0.9, m: 0.003 }], { seg: 24, wave: (pt, i) => (i % 2 ? -1 : 1) }, 0, 0, 0);
-  p.lathe(m, [[0.25, 0.9], [0.235, 0.9], [0.235, 0.88], [0, 0.88]], 0, 0, 0, 16);
+  p.lathe(m, [[0.256, 0.892], [0.256, 0.9], [0.235, 0.9], [0.235, 0.88], [0, 0.88]], 0, 0, 0, 16); // head + chime covering the wavy stave tops
   for (const [y, r] of [[0.06, 0.258], [0.2, 0.285], [0.7, 0.285], [0.84, 0.258]]) p.lathe(M.iron, [[r - 0.002, y], [r + 0.008, y + 0.02], [r - 0.002, y + 0.04]], 0, 0, 0, 16);
   for (let i = -2; i <= 2; i++) p.b(m, 0.46, 0.004, 0.003, 0, 0.881, i * 0.08);
   p.c(M.woodDark, 0.025, 0.01, 0.1, 0.88, 0.05, 8);
@@ -506,14 +511,16 @@ export const range = def('range', (o) => [o.w ?? 2.4, 0.95, 1.95], (p, o) => {
   p.bb(M.iron, 0.86, 0.77, w, -0.02, 0.08, 0, 0.012);
   p.bb(M.steelDark, 0.95, 0.04, w + 0.04, 0, 0.85, 0, 0.01);
   for (let i = 0; i < n; i++) for (let k = 0; k < 2; k++) p.t(M.iron, 0.12, 0.012, -0.12 + k * 0.28, 0.89, -w / 2 + (w / n) * (i + 0.5), 'y', 16, 4);
-  p.bb(M.iron, 0.06, 0.5, w, -0.42, 0.89, 0, 0.008);
+  p.bb(M.iron, 0.06, 0.6, w, -0.42, 0.89, 0, 0.008); // back plate up to the hood (carries it)
   for (let i = 0; i < n; i++) {
+    // oven / firebox doors flush on the carcass front (x = 0.41)
     const z = -w / 2 + (w / n) * (i + 0.5), dw = w / n - 0.14;
-    p.bb(M.steelDark, 0.02, 0.4, dw, 0.44, 0.32, z, 0.006);
-    p.fp(M.steelDark, dw - 0.08, 0.32, 0.45, 0.52, z, 0.006, 0.03);
-    p.cz(M.brass, 0.012, dw - 0.16, 0.48, 0.66, z, 8);
-    for (const s of [-1, 1]) p.b(M.brass, 0.02, 0.05, 0.03, 0.455, 0.36, z + s * (dw / 2 - 0.06));
-    p.bb(M.iron, 0.02, 0.12, dw, 0.44, 0.12, z, 0.004); p.b(M.fire, 0.006, 0.02, dw * 0.6, 0.452, 0.15, z);
+    p.bb(M.steelDark, 0.02, 0.4, dw, 0.42, 0.32, z, 0.006);
+    p.fp(M.steelDark, dw - 0.08, 0.32, 0.43, 0.52, z, 0.006, 0.03);
+    p.cz(M.brass, 0.012, dw - 0.16, 0.45, 0.66, z, 8);
+    for (const s of [-1, 1]) p.b(M.brass, 0.03, 0.05, 0.03, 0.44, 0.36, z + s * (dw / 2 - 0.06));
+    for (const s of [-1, 1]) p.b(M.brass, 0.03, 0.012, 0.012, 0.44, 0.654, z + s * (dw / 2 - 0.09));
+    p.bb(M.iron, 0.02, 0.12, dw, 0.42, 0.12, z, 0.004); p.b(M.fire, 0.006, 0.02, dw * 0.6, 0.432, 0.15, z);
     const k = i % 3;
     if (k === 0) { p.lathe(M.copper, [[0, 0], [0.16, 0], [0.17, 0.02], [0.17, 0.22], [0.18, 0.23], [0.165, 0.23], [0.16, 0.03], [0, 0.03]], -0.1, 0.89, z, 16); p.lathe(M.copper, [[0, 0.23], [0.17, 0.23], [0.12, 0.27], [0.02, 0.28], [0.02, 0.31], [0, 0.31]], -0.1, 0.89, z, 14); }
     else if (k === 1) { p.lathe(M.steelDark, [[0, 0], [0.13, 0], [0.13, 0.12], [0, 0.12]], -0.1, 0.89, z - 0.1, 14); p.cz(M.iron, 0.012, 0.25, -0.1, 0.97, z + 0.15, 6); }
@@ -525,7 +532,7 @@ export const range = def('range', (o) => [o.w ?? 2.4, 0.95, 1.95], (p, o) => {
   p.fr(M.steel, 0.95, w + 0.1, 0.5, w * 0.6, 0.3, 0, 1.5, 0, { bottom: false }).position.x = -0.1;
   p.bb(M.steel, 0.95, 0.06, w + 0.1, 0, 1.47, 0, 0.01);
   p.c(M.steel, 0.16, 0.25, -0.15, 1.7, 0, 12);
-  for (let i = 0; i < 4; i++) p.loft(M.iron, [[0.3, 1.45, -w / 2 + 0.2 + i * (w - 0.4) / 3], [0.3, 1.32, -w / 2 + 0.2 + i * (w - 0.4) / 3]], 0.006, 4);
+  for (let i = 0; i < 4; i++) p.loft(M.iron, [[0.3, 1.49, -w / 2 + 0.2 + i * (w - 0.4) / 3], [0.3, 1.24, -w / 2 + 0.2 + i * (w - 0.4) / 3]], 0.006, 4); // pan hooks from the hood rim
   for (let i = 0; i < 4; i++) p.lathe(M.copper, [[0, 0], [0.08, 0], [0.09, 0.1], [0.085, 0.1], [0, 0.01]], 0.3, 1.15, -w / 2 + 0.2 + i * (w - 0.4) / 3, 12);
 });
 export const oven = def('oven', (o) => [o.w ?? 1.4, 1.0, 2.0], (p, o) => {
@@ -534,7 +541,7 @@ export const oven = def('oven', (o) => [o.w ?? 1.4, 1.0, 2.0], (p, o) => {
   p.bb(M.iron, 1.04, 0.06, w + 0.04, 0, 1.4, 0, 0.01);
   for (const [y, h] of [[0.55, 0.4], [0.12, 0.3]]) {
     p.bb(M.iron, 0.04, h, w * 0.62, 0.5, y, 0, 0.008); p.fp(M.iron, w * 0.55, h - 0.08, 0.52, y + h / 2, 0, 0.006, 0.03);
-    p.cz(M.brass, 0.014, w * 0.4, 0.56, y + h - 0.06, 0, 8);
+    p.cz(M.brass, 0.014, w * 0.4, 0.54, y + h - 0.06, 0, 8); // handle bar on the door face
     for (const s of [-1, 1]) p.c(M.iron, 0.02, h - 0.08, 0.52, y + 0.04, s * w * 0.31, 8);
   }
   p.b(M.fire, 0.01, 0.04, w * 0.4, 0.52, 0.2, 0);

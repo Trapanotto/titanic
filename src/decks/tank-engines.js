@@ -67,9 +67,9 @@ function buildEngine(world, b, s, anim) {
       }
       b.box(mats.steelDark, u.x - 0.95, Y + 3.4, E + side * 1.42 - 0.08, u.x + 0.95, Y + 3.6, E + side * 1.42 + 0.08); // stay
       // crosshead guides with bolted backing bars
-      b.box(mats.chrome, u.x - 0.32, Y + 3.7, E + side * 0.32 - 0.05, u.x + 0.32, Y + 5.85, E + side * 0.32 + 0.05);
-      b.box(mats.steelDark, u.x - 0.45, Y + 3.6, E + side * 0.4, u.x + 0.45, Y + 5.85, E + side * 0.46);
-      for (let y = Y + 3.8; y < Y + 5.8; y += 0.35) for (const dx of [-0.38, 0.38]) nut(b, [u.x + dx, y, E + side * 0.46], [0, 0, side], 0.022);
+      b.box(mats.chrome, u.x - 0.32, Y + 3.15, E + side * 0.32 - 0.05, u.x + 0.32, Y + 5.85, E + side * 0.32 + 0.05);
+      b.box(mats.steelDark, u.x - 0.45, Y + 3.15, E + side * 0.4, u.x + 0.45, Y + 5.85, E + side * 0.46);
+      for (let y = Y + 3.3; y < Y + 5.8; y += 0.35) for (const dx of [-0.38, 0.38]) nut(b, [u.x + dx, y, E + side * 0.46], [0, 0, side], 0.022);
       b.box(mats.steelDark, u.x - 0.08, Y + 4.6, E + side * 0.46, u.x + 0.08, Y + 4.8, E + side * 1.35);
     }
     // piston-rod stuffing box (gland with studs) under the cylinder
@@ -82,7 +82,7 @@ function buildEngine(world, b, s, anim) {
   UNITS.forEach((u, i) => {
     const r = u.r + 0.08;
     tube(b, mats.paintGrey, 'y', [u.x, E], r, CYL0, CYL1, { seg: 28, caps: false });
-    for (const y of [CYL0 + 0.12, (CYL0 + CYL1) / 2, CYL1 - 0.12]) tube(b, mats.brass, 'y', [u.x, E], r + 0.02, y - 0.05, y + 0.05, { seg: 28, caps: false });
+    for (const y of [CYL0 + 0.12, (CYL0 + CYL1) / 2, CYL1 - 0.12]) tube(b, mats.brass, 'y', [u.x, E], r + 0.02, y - 0.05, y + 0.05, { seg: 28 });
     tube(b, mats.steelDark, 'y', [u.x, E], r + 0.1, CYL0 - 0.1, CYL0 + 0.02, { seg: 28 });
     tube(b, mats.steelDark, 'y', [u.x, E], r + 0.1, CYL1, CYL1 + 0.15, { seg: 28 });
     latheAt(b, mats.steelDark, [[r + 0.02, 0], [r * 0.85, 0.08], [r * 0.55, 0.2], [0.32, 0.26], [0.3, 0.32], [0, 0.33]], 'y', [u.x, CYL1 + 0.15, E], 24);
@@ -105,7 +105,7 @@ function buildEngine(world, b, s, anim) {
     for (const dx of [-0.18, -0.06, 0.06, 0.18]) tubeBetween(b, mats.copper, [u.x + dx, CYL0, lz], [u.x + dx * 1.4, Y + 4.0, E - s * 0.48], 0.007, { seg: 4, caps: false });
     const vx = u.x + u.r + 0.55;
     tube(b, mats.paintGrey, 'y', [vx, E], 0.38, Y + 5.95, Y + 8.4, { seg: 16 });
-    tube(b, mats.brass, 'y', [vx, E], 0.4, Y + 8.1, Y + 8.18, { seg: 16, caps: false });
+    tube(b, mats.brass, 'y', [vx, E], 0.4, Y + 8.1, Y + 8.18, { seg: 16 });
     tube(b, mats.steelDark, 'y', [vx, E], 0.46, Y + 8.33, Y + 8.4, { seg: 16 });
     for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2; nut(b, [vx + Math.cos(a) * 0.42, Y + 8.4, E + Math.sin(a) * 0.42], [0, 1, 0], 0.025); }
     tube(b, mats.chrome, 'y', [vx, E], 0.06, Y + 4.4, Y + 5.95, { seg: 6, caps: false }); // valve spindle guide
@@ -155,12 +155,16 @@ function buildEngine(world, b, s, anim) {
   world.addCollider(EX0, Y + 2.0, E - 1.9, EX1, Y + 6.0, E + 1.9);
   world.addCollider(EX0, Y + 6.0, E - 1.45, EX1, Y + 9.3, E + 1.45);
 
+  tube(b, mats.chrome, 'x', [yc, E], 0.3, EX0 + 0.1, EX1 - 0.1, { seg: 14 }); // crankshaft through the main bearings (the cranks turn on it)
   // ---- moving parts (one set per crank): built-up crank with webs and balance weights, eccentric sheaves, rods
   const crankT = new TBatch();
   for (const dx of [-0.42, 0.42]) {
-    crankT.box(mats.steel, dx - 0.11, -0.42, -0.5, dx + 0.11, CR + 0.36, 0.5);
-    stamp(crankT, mats.steel, gcache('cwt', () => new THREE.CylinderGeometry(0.85, 0.85, 0.24, 14, 1, false, Math.PI * 0.7, Math.PI * 0.6)), M4(dx, 0, 0, 0, 0, Math.PI / 2));
-    for (const y of [CR, 0]) for (const dz of [-0.3, 0.3]) crankT.box(mats.iron, dx - 0.115, y - 0.03, dz - 0.03, dx + 0.115, y + 0.03, dz + 0.03);
+    crankT.box(mats.steel, dx - 0.11, -0.42, -0.42, dx + 0.11, CR + 0.27, 0.42);
+    stamp(crankT, mats.steel, gcache('cwt', () => {
+      const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.absarc(0, 0, 0.85, -Math.PI / 2 - Math.PI * 0.3, -Math.PI / 2 + Math.PI * 0.3, false); sh.lineTo(0, 0);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.24, bevelEnabled: false, curveSegments: 10 }); g.translate(0, 0, -0.12); g.rotateY(Math.PI / 2); return g;
+    }), M4(dx, 0, 0));
+    for (const y of [CR, 0]) for (const dz of [-0.28, 0.28]) crankT.box(mats.iron, dx - 0.115, y - 0.03, dz - 0.03, dx + 0.115, y + 0.03, dz + 0.03);
   }
   tube(crankT, mats.chrome, 'x', [CR, 0], 0.27, -0.31, 0.31, { seg: 14, caps: false });
   tube(crankT, mats.chrome, 'x', [0, 0], 0.34, -0.53, 0.53, { seg: 14, caps: false });
@@ -174,14 +178,14 @@ function buildEngine(world, b, s, anim) {
   tube(rodT, mats.chrome, 'y', [0, 0], 0.15, -CL / 2 + 0.25, CL / 2 - 0.45, { seg: 10, r1: 0.11, caps: false });
   rodT.box(mats.steel, -0.3, -CL / 2 - 0.3, -0.32, 0.3, -CL / 2 + 0.3, 0.32);   // big end with brasses and bolts
   rodT.box(mats.brass, -0.31, -CL / 2 - 0.04, -0.33, 0.31, -CL / 2 + 0.04, 0.33);
-  for (const dx of [-0.24, 0.24]) for (const dz of [-0.26, 0.26]) tube(rodT, mats.iron, 'y', [dx, dz], 0.04, -CL / 2 - 0.36, -CL / 2 + 0.36, { seg: 6 });
+  for (const dx of [-0.24, 0.24]) for (const dz of [-0.26, 0.26]) tube(rodT, mats.iron, 'y', [dx, dz], 0.04, -CL / 2 - 0.33, -CL / 2 + 0.36, { seg: 6 });
   rodT.box(mats.steel, -0.2, CL / 2 - 0.5, -0.24, 0.2, CL / 2 - 0.35, 0.24);       // forked small end
   for (const dz of [-0.17, 0.17]) rodT.box(mats.steel, -0.2, CL / 2 - 0.35, dz - 0.06, 0.2, CL / 2 + 0.14, dz + 0.06);
   tube(rodT, mats.brass, 'z', [0, CL / 2], 0.09, -0.24, 0.24, { seg: 10 });
   const rodParts = rodT.parts();
   const xhT = new TBatch();
   xhT.box(mats.steel, -0.3, -0.18, -0.1, 0.3, 0.25, 0.1);
-  for (const dz of [-1, 1]) { xhT.box(mats.brass, -0.3, -0.3, dz * 0.27, 0.3, 0.3, dz * 0.31); xhT.box(mats.steel, -0.3, -0.25, Math.min(dz * 0.1, dz * 0.27), 0.3, 0.25, Math.max(dz * 0.1, dz * 0.27)); }
+  for (const dz of [-1, 1]) { xhT.box(mats.brass, -0.3, -0.3, dz * 0.225, 0.3, 0.3, dz * 0.27); xhT.box(mats.steel, -0.3, -0.25, Math.min(dz * 0.1, dz * 0.225), 0.3, 0.25, Math.max(dz * 0.1, dz * 0.225)); }
   tube(xhT, mats.chrome, 'y', [0, 0], 0.11, 0.25, 2.65, { seg: 10, caps: false });
   tube(xhT, mats.steel, 'y', [0, 0], 0.16, 0.25, 0.42, { seg: 10 });
   const xhParts = xhT.parts();
@@ -190,10 +194,12 @@ function buildEngine(world, b, s, anim) {
   vrT.box(mats.steel, -0.08, -0.1, -0.08, 0.08, 0.1, 0.08);
   for (let k = 0; k < 6; k++) { const a0 = -0.42 + k * 0.14, za = Math.sin(a0), zb = Math.sin(a0 + 0.14), ya = 1 - Math.cos(a0), yb = 1 - Math.cos(a0 + 0.14); for (const dx of [-0.07, 0.07]) vrT.bar(mats.steel, [dx, ya - 0.06, za], [dx, yb - 0.06, zb], 0.04, 0.12); }
   const vrParts = vrT.parts();
-  const erT = new TBatch();     // eccentric rod (unit length along +y) with its strap round the sheave
-  tube(erT, mats.steel, 'y', [0, 0], 0.035, 0.25, 1, { seg: 6, caps: false });
-  tube(erT, mats.steel, 'x', [0, 0], 0.55, -0.05, 0.05, { seg: 18 });
+  const erT = new TBatch();     // eccentric rod (unit length along +y, scaled to the distance) and its strap round the sheave
+  tube(erT, mats.steel, 'y', [0, 0], 0.035, 0.3, 1, { seg: 6, caps: false });
   const erParts = erT.parts();
+  const esT = new TBatch();
+  tube(esT, mats.steel, 'x', [0, 0], 0.55, -0.05, 0.05, { seg: 18 });
+  const esParts = esT.parts();
 
   UNITS.forEach((u, i) => {
     const phase = (i * Math.PI) / 2 + (s > 0 ? Math.PI / 4 : 0);
@@ -203,7 +209,7 @@ function buildEngine(world, b, s, anim) {
     const vx = u.x + u.r + 0.55;
     const vr = addMesh(world, vrParts, vx);
     const ecc = addMesh(world, eccParts, vx, (g) => g.position.set(vx, yc, E));
-    const er = [0, 1].map(() => addMesh(world, erParts, vx));
+    const er = [0, 1].map(() => addMesh(world, erParts, vx)), es = [0, 1].map(() => addMesh(world, esParts, vx));
     anim.push((t) => {
       const th = t * W_ENG + phase, sn = Math.sin(th), cs = Math.cos(th);
       crank.rotation.x = th; ecc.rotation.x = th;
@@ -218,7 +224,8 @@ function buildEngine(world, b, s, anim) {
         // sheave centre in world: rotation.x of (0, cos ph, sin ph)·ECC by th
         const a = th + EPH[k], ey = yc + ECC * Math.cos(a), ez = E + ECC * Math.sin(a);
         const ly = vy + 0.03, lz = E + (k ? 0.4 : -0.4), dy = ly - ey, dz = lz - ez;
-        const m = er[k]; m.position.set(vx + (k ? 0.14 : -0.14), ey, ez); m.scale.set(1, Math.sqrt(dy * dy + dz * dz), 1); m.rotation.x = Math.atan2(dz, dy);
+        const m = er[k], L = Math.sqrt(dy * dy + dz * dz); m.position.set(vx + (k ? 0.14 : -0.14), ey, ez); m.scale.set(1, L, 1); m.rotation.x = Math.atan2(dz, dy);
+        es[k].position.set(vx + (k ? 0.14 : -0.14), ey, ez);
       }
     });
   });
@@ -310,7 +317,7 @@ function startingPlatform(world, b) {
     place(zone, telegraph(), -29.2, yp, s * 1.55, Math.PI, { collide: false });
     place(zone, telegraph(), -33.8, yp, s * 1.55, 0, { collide: false });
     for (const dx of [0, 0.35]) { tubeBetween(b, mats.chrome, [-31.6 + dx, yp, s * 2.2], [-31.5 + dx, yp + 1.25, s * 2.05], 0.03, { seg: 5 }); b.box(mats.brass, -31.56 + dx, yp + 1.2, s * 2.01, -31.44 + dx, yp + 1.33, s * 2.09); }
-    b.ring(mats.rust, [-30.4, yp + 1.35, s * 2.25], [0, 0, -s], 0.35, 0.4, 14);
+    handwheel(b, mats.rust, -30.4, yp + 1.35, s * 2.2, 0.36, [0, 0, -s]); tube(b, mats.iron, 'z', [-30.4, yp + 1.35], 0.03, Math.min(s * 2.2, s * 2.38), Math.max(s * 2.2, s * 2.38), { seg: 6 });
     // speaking tubes from the bridge
     pipeRun(b, mats.brass, [[-32.8, yp + 1.6, s * 2.3], [-32.8, CEIL, s * 2.3]], 0.04, { seg: 6, flange: null });
     b.ring(mats.brass, [-32.8, yp + 1.6, s * 2.25], [0, 0, -s], 0.02, 0.09, 8);

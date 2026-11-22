@@ -12,27 +12,28 @@ import { strokeText } from './structure-font.js';
 
 const TAU = Math.PI * 2;
 
-// ---------- cowl ventilator (bent cowl: lathe swept round a quarter bend, flared bell mouth, red inside) ----------
+// ---------- cowl ventilator (quarter bend of nearly constant bore, then a flared bell mouth, red inside) ----------
+// The bend radius must stay larger than the pipe radius, otherwise the inner side of the bend folds through itself;
+// the flare therefore happens in a straight bell section after the bend.
 let COWL = null;
 function cowlGeos() {
   if (COWL) return COWL;
-  const Rb = 1.25, K = 14, N = 20;
-  const flare = (f) => 1 + 0.78 * Math.pow(f, 1.8);
+  const Rb = 1.45, K = 12, M = 6, N = 20, BELL = 0.75, RE = 1.78;
+  const rad = (i) => (i <= K ? 1 + 0.12 * (i / K) : 1.12 + (RE - 1.12) * Math.pow((i - K) / M, 1.6));
   const ring = (i, j, k = 1) => {
-    const f = i / K, ph = f * Math.PI / 2, rr = flare(f) * k, al = (j / N) * TAU;
-    const c = Math.cos(al) * rr, s = Math.sin(al) * rr;
-    return [Rb * (1 - Math.cos(ph)) + c * Math.cos(ph), Rb * Math.sin(ph) - c * Math.sin(ph), s];
+    const al = (j / N) * TAU, rr = rad(i) * k, c = Math.cos(al) * rr, s = Math.sin(al) * rr;
+    if (i <= K) { const ph = (i / K) * Math.PI / 2; return [Rb * (1 - Math.cos(ph)) + c * Math.cos(ph), Rb * Math.sin(ph) - c * Math.sin(ph), s]; }
+    return [Rb + ((i - K) / M) * BELL, Rb - c, s];
   };
-  const outer = gridGeo(K + 1, N + 1, (i, j) => ring(i, j));
-  const inner = gridGeo(K - 3, N + 1, (i, j) => ring(i + 4, j, 0.96), true);
-  // rolled lip round the mouth
-  const lip = gridGeo(6, N + 1, (i, j) => {
-    const a = (i / 5) * Math.PI, f = 1, ph = Math.PI / 2, rr = flare(f) + 0.04 - 0.04 * Math.cos(a), al = (j / N) * TAU, dx = 0.05 * Math.sin(a);
-    const c = Math.cos(al) * rr, s = Math.sin(al) * rr;
-    return [Rb * (1 - Math.cos(ph)) + c * Math.cos(ph) + dx, Rb * Math.sin(ph) - c * Math.sin(ph), s];
-  });
-  const f4 = 4 / K, ph4 = f4 * Math.PI / 2;
-  const mouth = new THREE.CircleGeometry(flare(f4) * 0.96, N).rotateY(Math.PI / 2).rotateZ(Math.PI / 2 - ph4).translate(Rb * (1 - Math.cos(ph4)), Rb * Math.sin(ph4), 0);
+  const outer = gridGeo(K + M + 1, N + 1, (i, j) => ring(i, j));
+  const inner = gridGeo(M + 3, N + 1, (i, j) => ring(i + K - 2, j, 0.97), true);
+  // rolled bead round the mouth (closed tube joining the outer and the inner skin)
+  const lip = gridGeo(7, N + 1, (i, j) => {
+    const a = (i / 6) * Math.PI, rr = RE * (0.985 + 0.015 * Math.cos(a)) + 0.035 * Math.sin(a), al = (j / N) * TAU, dx = 0.035 * Math.sin(a) - 0.01;
+    return [Rb + BELL + dx, Rb - Math.cos(al) * rr, Math.sin(al) * rr];
+  }, true);
+  // dark throat closing the bore where the bell starts
+  const mouth = new THREE.CircleGeometry(rad(K) * 0.97, N).rotateY(Math.PI / 2).translate(Rb + 0.03, Rb, 0);
   COWL = { outer: merge([outer, lip]), inner, mouth };
   return COWL;
 }
@@ -89,14 +90,15 @@ function sirocco(parent, x, y, z, s, yawQuarter = false) {
 
 // ---------- skylights ----------
 const triGeoCache = new Map();
-function gableGeo(w, r) {
+/** Gable triangle (half width w, rise r) in the local z/y plane, facing +x (rotate by PI about y for a -x end). */
+export function gableGeo(w, r) {
   const k = Math.round(w * 100) + '_' + Math.round(r * 100);
   let g = triGeoCache.get(k);
   if (!g) {
     g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -w, 0, 0, w, 0, r, 0, 0, 0, w, 0, 0, -w, 0, r, 0], 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute([1, 0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0], 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(12), 2));
+    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, w, 0, 0, -w, 0, r, 0], 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute([1, 0, 0, 1, 0, 0, 1, 0, 0], 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 2 * w, 0, w, r], 2));
     triGeoCache.set(k, g);
   }
   return g;
@@ -126,7 +128,7 @@ function skylight(parent, x0, x1, z0, z1, y, { coam = 0.4, rise = 0.5, bars = 0.
     parent.add(cyl(mats.brass, xc, y + coam, zc + s * (w - 0.1), xc, y + coam + rise * 0.5, zc + s * (w * 0.5), 0.01, 3));
   }
   parent.add(box(W, len + 0.06, 0.07, 0.1, xc, y + coam + rise + 0.01, zc));
-  for (const x of [x0 + 0.01, x1 - 0.01]) parent.add(mk(gableGeo(w, rise), W, x, y + coam, zc));
+  for (const [x, ry] of [[x0 + 0.01, Math.PI], [x1 - 0.01, 0]]) { const gm = mk(gableGeo(w, rise), W, x, y + coam, zc); gm.rotation.y = ry; parent.add(gm); }
 }
 
 // Straight member of section w (x) by t between two points given as [z, y] in the side plane, at x.
@@ -154,7 +156,7 @@ function benchGeos() {
     iron.push(beamZY(0.03, 0.03, x, [-0.1, 0.4], [0.02, 0.64]), beamZY(0.03, 0.03, x, [0.14, 0.4], [0.02, 0.64])); // V brace
     iron.push(boxG(0.07, 0.02, 0.09, x, 0.01, 0.24), boxG(0.07, 0.02, 0.09, x, 0.01, -0.31));           // feet
   }
-  iron.push(boxG(0.04, 0.03, 0.44, 0, 0.4, -0.01), boxG(1.72, 0.03, 0.03, 0, 0.2, -0.04));              // centre bearer, stretcher
+  iron.push(boxG(0.04, 0.03, 0.44, 0, 0.4, -0.01), boxG(1.72, 0.03, 0.03, 0, 0.2, -0.269));             // centre bearer, stretcher between the rear legs
   BENCH = { wood: merge(wood), iron: merge(iron) };
   return BENCH;
 }
@@ -188,12 +190,50 @@ function chairGeos() {
     for (let k = 0; k < n; k++) { const q = lerp(a, b, (k + 0.5) / n); sling.push(boxG(0.505, 0.014, w, 0, 0, 0, ang).translate(0, q[1] + lift, q[0])); }
   };
   slats(HIP, TOP, 8, 0.0); slats(HIP, KNEE, 6, 0.028); slats(KNEE, FOOT, 7, 0.028);
-  // steamer rug: lies folded on the leg rest and hangs over its end
-  const ra = Math.atan2(-(FOOT[1] - KNEE[1]), FOOT[0] - KNEE[0]);
-  rug.push(boxG(0.5, 0.035, 0.6, 0, 0, 0, ra).translate(0, 0.395, 1.2));
-  rug.push(boxG(0.46, 0.03, 0.3, 0, 0, 0, ra).translate(0, 0.428, 1.12));
-  rug.push(boxG(0.5, 0.2, 0.03, 0, 0.245, 1.585));
+  rug.push(rugGeo(KNEE, FOOT));
   return { wood: merge(parts), sling: merge(sling), rug: merge(rug) };
+}
+
+/**
+ * Steamer rug: a folded blanket lying on the slats of the leg rest (soft rounded top, edges drooping over the side
+ * rails), whose top layer rolls over the foot bar and hangs down with a slight sag and a wavy hem.
+ * Built as one closed tube: path in the side plane [z, y] (underside of the rug), cross-section loop across x.
+ */
+function rugGeo(KNEE, FOOT) {
+  const len = Math.hypot(FOOT[0] - KNEE[0], FOOT[1] - KNEE[1]);
+  const tz = (FOOT[0] - KNEE[0]) / len, ty = (FOOT[1] - KNEE[1]) / len;     // direction of the leg rest
+  const top = (z) => KNEE[1] + ((z - KNEE[0]) * ty) / tz + 0.036;            // top of the leg-rest slats
+  const path = [];                                                         // [z, y, nz, ny, thickness, halfWidth, droop]
+  const zA = 0.975, zB = 1.545, ra = 0.036;
+  // A: folded stack on the slats (rounded fold at the head end, slightly thinner towards the foot)
+  for (const f of [0, 0.03, 0.09, 0.25, 0.45, 0.65, 0.85, 1]) {
+    const z = zA + (zB - zA) * f;
+    const th = f === 0 ? 0 : (f < 0.05 ? 0.035 : 0.06 - 0.03 * Math.max(0, f - 0.5) * 2);
+    path.push([z, top(z), -ty, tz, th, 0.3, 1]);
+  }
+  // B: top layer rolling over the foot bar
+  const cz = zB, cy = top(zB) - ra, a0 = Math.atan2(tz, -ty);
+  for (const f of [0.33, 0.66, 1]) {
+    const a = a0 * (1 - f);
+    path.push([cz + Math.cos(a) * ra, cy + Math.sin(a) * ra, Math.cos(a), Math.sin(a), 0.03, 0.3, 1 - 0.5 * f]);
+  }
+  // C: hanging end with a gentle belly, flaring a little towards the hem
+  const yEnd = 0.1;
+  for (const f of [0.2, 0.4, 0.6, 0.8, 0.95, 1]) {
+    const y = cy - (cy - yEnd) * f, z = cz + ra + 0.025 * Math.sin(Math.PI * f * 0.9);
+    path.push([z, y, 1, 0, f === 1 ? 0 : 0.022, 0.3 + 0.025 * f, 0.5]);
+  }
+  const J = 12;
+  return gridGeo(path.length, J + 1, (i, j) => {
+    const [z, y, nz, ny, th, W, droop] = path[i];
+    const th2 = (j / J) * TAU, x = W * Math.cos(th2), s = Math.sin(th2);
+    // rounded top, flat underside, sides drooping over the rails (outside |x| = 0.29)
+    let n = s >= 0 ? th * Math.pow(s, 0.45) : 0.004 * s;
+    n -= droop * Math.max(0, Math.abs(x) - 0.285) * 1.6;
+    // hem: a soft wave along the lower edge
+    const wave = i === path.length - 1 || i === path.length - 2 ? 0.012 * Math.sin(x * 19) : 0;
+    return [x, y + ny * n + wave, z + nz * n];
+  });
 }
 
 // ---------- life ring with "S.S. TITANIC" and its holder ----------
@@ -351,13 +391,15 @@ export function buildGear(world, parent) {
     root.add(vcyl(mats.brass, cx, yp + 1.0, 0, 0.1, 0.23, 14));
     root.add(ball(mats.brass, cx, yp + 1.1, 0, 0.22, 14, 8, 0.9));
     root.add(vcyl(mats.brass, cx, yp + 1.28, 0, 0.08, 0.05, 8));
-    root.add(box(mats.windowLit, 0.12, 0.08, 0.01, cx - 0.21, yp + 1.12, 0));
+    root.add(box(mats.windowLit, 0.012, 0.08, 0.12, cx - 0.214, yp + 1.12, 0)); // lamp window facing aft
     for (const s of [-1, 1]) {
       root.add(ball(mats.iron, cx, yp + 0.98, s * 0.36, 0.095, 10, 8));
       root.add(box(mats.brass, 0.05, 0.04, 0.2, cx, yp + 0.98, s * 0.26));
     }
-    root.add(vcyl(mats.brass, cx + 0.3, yp + 0.55, 0, 0.5, 0.035, 8));
-    root.add(vcyl(mats.brass, cx + 0.3, yp + 1.05, 0, 0.06, 0.05, 8));
+    // Flinders bar in its brass case against the fore side of the binnacle, with a foot bracket
+    root.add(vcyl(mats.brass, cx + 0.24, yp + 0.55, 0, 0.5, 0.035, 8));
+    root.add(vcyl(mats.brass, cx + 0.24, yp + 1.05, 0, 0.06, 0.05, 8));
+    root.add(box(mats.brass, 0.08, 0.04, 0.05, cx + 0.2, yp + 0.6, 0));
     world.addInfo({
       title: 'Kompassplattform',
       text: 'Auf dem erhöhten Dach zwischen dem zweiten und dritten Schornstein stand – möglichst weit entfernt von störendem Eisen – der Regelkompass des Schiffes auf einer hölzernen Plattform. Mit ihm wurden die Steuerkompasse auf der Brücke regelmäßig verglichen, zuletzt am Abend des 14. April 1912.',

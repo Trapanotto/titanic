@@ -316,7 +316,8 @@ export function plate(b, world, x0, x1, z0, z1, y, opts = {}) {
   if (grate) {
     // open-mesh grating in a flat-bar frame, bearer bars every 0.6 m underneath
     b.box(gratingMat, x0, y - 0.004, z0, x1, y - 0.002, z1, 'Y');
-    b.box(mats.steelDark, x0, y - t, z0, x1, y, z1, 'xXzZ');
+    // flat-bar frame (four bars, closed, so that it also reads from below)
+    for (const [a0, a1, c0, c1] of [[x0, x1, z0, z0 + 0.012], [x0, x1, z1 - 0.012, z1], [x0, x0 + 0.012, z0, z1], [x1 - 0.012, x1, z0, z1]]) b.box(mats.steelDark, a0, y - t, c0, a1, y - 0.005, c1);
     const alongX = x1 - x0 >= z1 - z0;
     if (alongX) for (let x = x0 + 0.6; x < x1 - 0.1; x += 0.6) b.box(mats.steelDark, x - 0.012, y - t, z0, x + 0.012, y - 0.005, z1, 'xXy');
     else for (let z = z0 + 0.6; z < z1 - 0.1; z += 0.6) b.box(mats.steelDark, x0, y - t, z - 0.012, x1, y - 0.005, z + 0.012, 'zZy');
@@ -344,7 +345,7 @@ export function flight(b, world, { axis = 'x', a0, a1, y0, y1, c0, c1, rails = [
   for (let i = 1; i < N; i++) {
     const ac = lowA + (sgn * run * i) / N, ha = run / N / 2 + 0.02, yt = yl + (rise * i) / N;
     boxA(mats.steelFloor, Math.min(ac - ha, ac + ha), Math.max(ac - ha, ac + ha), yt - 0.035, yt, c0 + 0.04, c1 - 0.04, 'Yy' + (axis === 'x' ? 'xX' : 'zZ'));
-    boxA(mats.steelDark, Math.min(ac + sgn * ha - sgn * 0.04, ac + sgn * ha), Math.max(ac + sgn * ha - sgn * 0.04, ac + sgn * ha), yt - 0.09, yt, c0 + 0.04, c1 - 0.04, axis === 'x' ? 'xX' : 'zZ'); // nosing
+    boxA(mats.steelDark, Math.min(ac + sgn * ha - sgn * 0.04, ac + sgn * ha), Math.max(ac + sgn * ha - sgn * 0.04, ac + sgn * ha), yt - 0.09, yt, c0 + 0.04, c1 - 0.04, axis === 'x' ? 'xXy' : 'zZy'); // nosing
   }
   // stringers (plates on edge) and handrails
   for (const [ci, c] of [[0, c0], [1, c1]]) {
