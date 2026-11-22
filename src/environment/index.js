@@ -1,0 +1,439 @@
+import * as THREE from 'three';
+import { applyNightToMaterials, mats } from '../core/materials.js';
+import { MACHINERY_X, DECK_Y, deckAboveY } from '../core/constants.js';
+import { createSky, createInteriorEnvMaterial } from './sky.js';
+import { createOcean } from './ocean.js';
+import { createSmoke } from './smoke.js';
+import { createIceberg } from './iceberg.js';
+import { createDust, DUST_LIGHTS } from './dust.js';
+
+// ENVIRONMENT & LIGHTING
+// sky dome + stars, ocean + bow spray, sun / star light with camera-following shadows, interior lighting
+// (pool of real lamp lights following world.lamps, low warm ambient, image-based "room" environment),
+// furnace flicker, dust motes, funnel smoke, iceberg, and the per-situation colour grade / haze / bloom /
+// AO / sun-shaft parameters of the post pipeline (world.post). Day/night: world.onTimeChange (2 s cross-fade),
+// inside/outside: world.state.inside (0.6 s cross-fade). The number of lights never changes after build.
+
+// ---- tunables -------------------------------------------------------------------------------
+const SUN_DIR = new THREE.Vector3(0.5, 0.5, 0.72).normalize();   // afternoon sun, ~30 deg high, off the starboard bow
+const STAR_DIR = new THREE.Vector3(0.18, 1.0, 0.12).normalize(); // diffuse star light from above
+const SUN_COLOR = new THREE.Color(0xfff0dc);
+const STAR_COLOR = new THREE.Color(0x7f96c8);
+const SUN_INTENSITY = 3.3, STAR_INTENSITY = 0.22;
+const HEMI_DAY = 0.5, HEMI_NIGHT = 0.28;
+const ENV_DAY = 0.95, ENV_NIGHT = 0.8, ENV_INSIDE = 0.26, ENV_MACHINE = 0.2;
+const FOG_DAY = 0.00016, FOG_NIGHT = 0.0004;
+const AMB_FIRST = 0.05, AMB_OTHER = 0.045, AMB_MACHINE = 0.035;
+const SHADOW_HALF = 55, SHADOW_DIST = 260, SHADOW_STEP = 3;
+const POOL = 14, LAMP_EVERY = 0.12;
+const LAMP_DAY_OUT = 0.6, LAMP_NIGHT_OUT = 14, LAMP_INSIDE = 9;
+const RANGE_INSIDE = 9, RANGE_OUT = 15;
+const BUCKET = 8, BUCKET_X0 = -168, BUCKETS = 42, LAMP_SEARCH = 30;
+// share of the sky light that reaches into the interior, per deck (windows / skylights / open doors)
+const DAYLIGHT = { boat: 0.55, A: 0.45, B: 0.35, C: 0.16, D: 0.07, E: 0.03, F: 0.02, G: 0.015, orlop: 0.01, tank: 0.01 };
+
+const smooth = (x) => x * x * (3 - 2 * x);
+const lerp = (a, b, t) => a + (b - a) * t;
+const approach = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
+const C = (r, g, b) => new THREE.Color(r, g, b);
+
+// ---- colour grade / post presets per situation -------------------------------------------------
+function grade(o) {
+  return {
+    exposure: 1, contrast: 1.05, saturation: 1, vignette: 0.25, grain: 0.012,
+    lift: C(0, 0, 0), gain: C(1, 1, 1), bloom: 0.1, bloomThreshold: 1.8, bloomKnee: 0.7,
+    haze: 0, hazeMax: 0.3, hazeColor: C(0, 0, 0), aoStrength: 0.8, aoRadius: 0.7, aoIntensity: 1.2, rays: 0, ...o,
+  };
+}
+const GRADES = {
+  day: grade({ exposure: 1.0, contrast: 1.07, saturation: 1.03, vignette: 0.2, grain: 0.008, lift: C(0.0, 0.004, 0.012), gain: C(0.985, 1.0, 1.025), bloom: 0.08, bloomThreshold: 2.4, aoStrength: 0.65, aoRadius: 1.1, aoIntensity: 1.0, rays: 0.32 }),
+  night: grade({ exposure: 1.55, contrast: 1.12, saturation: 0.92, vignette: 0.38, grain: 0.022, lift: C(0.0, 0.005, 0.016), gain: C(1.02, 0.99, 0.95), bloom: 0.2, bloomThreshold: 1.0, bloomKnee: 0.6, aoStrength: 0.6, aoRadius: 0.9 }),
+  first: grade({ exposure: 1.3, contrast: 1.07, saturation: 1.02, vignette: 0.3, grain: 0.012, lift: C(0.012, 0.006, 0.0), gain: C(1.03, 0.995, 0.93), bloom: 0.14, bloomThreshold: 1.5, haze: 0.022, hazeMax: 0.22, hazeColor: C(0.11, 0.075, 0.042), aoStrength: 0.95, aoRadius: 0.95, aoIntensity: 1.45 }),
+  other: grade({ exposure: 1.25, contrast: 1.06, saturation: 0.9, vignette: 0.32, grain: 0.015, lift: C(0.004, 0.006, 0.007), gain: C(1.0, 1.0, 0.96), bloom: 0.12, bloomThreshold: 1.5, haze: 0.014, hazeMax: 0.18, hazeColor: C(0.07, 0.062, 0.05), aoStrength: 0.95, aoRadius: 0.85, aoIntensity: 1.45 }),
+  machine: grade({ exposure: 1.55, contrast: 1.14, saturation: 0.9, vignette: 0.4, grain: 0.026, lift: C(0.006, 0.006, 0.006), gain: C(1.02, 1.0, 0.95), bloom: 0.18, bloomThreshold: 1.3, haze: 0.03, hazeMax: 0.4, hazeColor: C(0.05, 0.044, 0.036), aoStrength: 1.0, aoRadius: 0.9, aoIntensity: 1.45 }),
+  boiler: grade({ exposure: 1.6, contrast: 1.16, saturation: 0.98, vignette: 0.42, grain: 0.03, lift: C(0.014, 0.006, 0.0), gain: C(1.07, 0.96, 0.84), bloom: 0.24, bloomThreshold: 1.2, haze: 0.045, hazeMax: 0.5, hazeColor: C(0.085, 0.04, 0.015), aoStrength: 1.0, aoRadius: 0.9, aoIntensity: 1.45 }),
+};
+const NUM_KEYS = ['exposure', 'contrast', 'saturation', 'vignette', 'grain', 'bloom', 'bloomThreshold', 'bloomKnee', 'haze', 'hazeMax', 'aoStrength', 'aoRadius', 'aoIntensity', 'rays'];
+const COL_KEYS = ['lift', 'gain', 'hazeColor'];
+
+export async function build(world) {
+  const scene = world.scene;
+  const renderer = world.renderer || null;
+
+  const shared = { uNight: { value: 0 }, uSunDir: { value: SUN_DIR.clone() }, uTime: { value: 0 } };
+
+  // ---------- sky, ocean, smoke, iceberg, dust ----------
+  const sky = createSky(shared);
+  const ocean = createOcean(shared);
+  const smoke = createSmoke(shared, world);
+  const berg = createIceberg();
+  const dust = createDust(shared);
+  const root = new THREE.Group();
+  root.name = 'environment';
+  root.userData.noMerge = true;
+  root.add(sky.dome, sky.stars, ocean.mesh, ocean.spray, smoke.points, berg.mesh, dust.points);
+  scene.add(root);
+
+  // ---------- fog / background ----------
+  const fogDay = new THREE.Color(0.60, 0.69, 0.79), fogNight = new THREE.Color(0.0035, 0.0055, 0.010);
+  const fog = new THREE.FogExp2(fogDay.clone(), FOG_DAY);
+  scene.fog = fog;
+  const background = fogDay.clone();
+  scene.background = background;
+
+  // ---------- lights (the number of lights never changes after build) ----------
+  const sun = new THREE.DirectionalLight(SUN_COLOR.clone(), SUN_INTENSITY);
+  sun.name = 'sun';
+  sun.castShadow = true;
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  const bigShadow = renderer && renderer.capabilities.maxTextureSize >= 8192 && !coarse;
+  let mapSize = 0;
+  const sc = sun.shadow.camera;
+  function setShadowSize(q) {
+    const want = q === 'hoch' && bigShadow ? 4096 : 2048;
+    if (want === mapSize) return;
+    mapSize = want;
+    sun.shadow.mapSize.set(want, want);
+    if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+    sun.shadow.needsUpdate = true;
+    lastTx = NaN;
+  }
+  sc.left = -SHADOW_HALF; sc.right = SHADOW_HALF; sc.top = SHADOW_HALF; sc.bottom = -SHADOW_HALF;
+  sc.near = 20; sc.far = SHADOW_DIST * 2;
+  sc.updateProjectionMatrix();
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.035;
+  sun.shadow.radius = 2;
+  sun.shadow.autoUpdate = false;   // the ship is static: re-render only when the frustum moves (+ a slow refresh)
+  sun.shadow.needsUpdate = true;
+  sun.position.copy(SUN_DIR).multiplyScalar(SHADOW_DIST);
+  scene.add(sun, sun.target);
+
+  const hemiDaySky = new THREE.Color(0xa9c6f0), hemiDayGround = new THREE.Color(0x4a4840);
+  const hemiNightSky = new THREE.Color(0x1a2850), hemiNightGround = new THREE.Color(0x040508);
+  const hemi = new THREE.HemisphereLight(hemiDaySky.clone(), hemiDayGround.clone(), HEMI_DAY);
+  hemi.name = 'skyLight';
+  const ambWarm = new THREE.Color(0xffc68c), ambMachine = new THREE.Color(0xff9a52), ambOther = new THREE.Color(0xffd8b0);
+  const interiorAmbient = new THREE.AmbientLight(ambWarm.clone(), 0); // electric light, ~2700 K
+  interiorAmbient.name = 'interiorAmbient';
+  scene.add(hemi, interiorAmbient);
+
+  // pool of lamp lights (no shadows), physically based inverse-square falloff with a soft range cut-off
+  const slots = [];
+  for (let i = 0; i < POOL; i++) {
+    const light = new THREE.PointLight(0xffd9a0, 0, RANGE_INSIDE, 2);
+    light.name = 'lampPool' + i;
+    light.castShadow = false;
+    light.position.set(0, -50, 0);
+    scene.add(light);
+    slots.push({ light, lamp: -1, k: 0, want: false, base: 1, flick: 0, seed: i * 1.731 });
+  }
+
+  // ---------- PBR environment maps ----------
+  let envDay = null, envNight = null, envInside = null, envMachine = null;
+  if (renderer) {
+    try {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const envScene = new THREE.Scene();
+      const geo = new THREE.SphereGeometry(20, 48, 24);
+      const ball = new THREE.Mesh(geo, sky.material);
+      ball.frustumCulled = false;
+      envScene.add(ball);
+      sky.uniforms.uEnv.value = 1;
+      shared.uNight.value = 0;
+      envDay = pmrem.fromScene(envScene, 0.02, 0.1, 100).texture;
+      shared.uNight.value = 1;
+      envNight = pmrem.fromScene(envScene, 0.02, 0.1, 100).texture;
+      const insideMat = createInteriorEnvMaterial(0);
+      ball.material = insideMat;
+      envInside = pmrem.fromScene(envScene, 0.03, 0.1, 100).texture;
+      insideMat.uniforms.uKind.value = 1;
+      envMachine = pmrem.fromScene(envScene, 0.03, 0.1, 100).texture;
+      sky.uniforms.uEnv.value = 0;
+      shared.uNight.value = 0;
+      pmrem.dispose(); geo.dispose(); insideMat.dispose();
+      scene.environment = envDay;
+      scene.environmentIntensity = ENV_DAY;
+    } catch (e) {
+      sky.uniforms.uEnv.value = 0;
+      shared.uNight.value = 0;
+      envDay = envNight = envInside = envMachine = null;
+      console.warn('[environment] PMREM failed', e);
+    }
+  }
+
+  // ---------- state ----------
+  let time = 0;
+  let nightTarget = world.state.night ? 1 : 0, nightLin = nightTarget, first = true;
+  let insideLin = world.state.inside ? 1 : 0;
+  let daylight = 1, machineLin = 0, firstLin = 0, fireLin = 0;
+  world.onTimeChange((night) => {
+    nightTarget = night ? 1 : 0;
+    if (first) { first = false; nightLin = nightTarget; }
+    applyNightToMaterials(!!night);
+  });
+
+  // grade state (current values, blended towards the situation targets)
+  const cur = grade({});
+  for (const k of NUM_KEYS) cur[k] = GRADES.day[k];
+  for (const k of COL_KEYS) cur[k].copy(GRADES.day[k]);
+  const tgt = grade({});
+  let gradeInit = false;
+
+  // ---------- shadow frustum following the camera ----------
+  const right = new THREE.Vector3(), upv = new THREE.Vector3(), dir = new THREE.Vector3(), tgtV = new THREE.Vector3();
+  const UP = new THREE.Vector3(0, 1, 0);
+  let lastTx = NaN, lastTz = NaN, lastDir = -1, shadowTimer = 0, shadowStale = true;
+  setShadowSize(world.quality || 'hoch');
+  function updateSun(cam, n, ins, dt) {
+    const dirKey = n < 0.5 ? 0 : 1;
+    const tx = Math.round(cam.x / SHADOW_STEP) * SHADOW_STEP, tz = Math.round(cam.z / SHADOW_STEP) * SHADOW_STEP;
+    let need = false;
+    if (tx !== lastTx || tz !== lastTz || dirKey !== lastDir) {
+      lastTx = tx; lastTz = tz; lastDir = dirKey;
+      dir.copy(dirKey ? STAR_DIR : SUN_DIR);
+      right.crossVectors(UP, dir).normalize();
+      upv.crossVectors(dir, right).normalize();
+      tgtV.set(tx, Math.min(Math.max(cam.y, 12), 34), tz);
+      // snap to shadow-map texels in light space so the shadow edges do not crawl
+      const texel = (2 * SHADOW_HALF) / mapSize;
+      const px = Math.round(tgtV.dot(right) / texel) * texel, py = Math.round(tgtV.dot(upv) / texel) * texel, pd = tgtV.dot(dir);
+      tgtV.set(0, 0, 0).addScaledVector(right, px).addScaledVector(upv, py).addScaledVector(dir, pd);
+      sun.target.position.copy(tgtV);
+      sun.position.copy(tgtV).addScaledVector(dir, SHADOW_DIST);
+      sun.color.copy(dirKey ? STAR_COLOR : SUN_COLOR);
+      need = true;
+    }
+    shadowTimer -= dt;
+    if (shadowTimer <= 0) need = true;
+    // deep inside the hull the sun does not matter: skip the shadow-map pass, refresh once when it does again
+    const skip = ins > 0.98 && daylight < 0.25;
+    if (skip) { if (need) shadowStale = true; }
+    else if (need || shadowStale) { sun.shadow.needsUpdate = true; shadowTimer = dirKey ? 1.5 : 0.5; shadowStale = false; }
+    const dayK = Math.max(0, 1 - 2 * n), nightK = Math.max(0, 2 * n - 1);
+    sun.intensity = (SUN_INTENSITY * dayK + STAR_INTENSITY * nightK) * lerp(1, daylight * 0.5, ins);
+    return SUN_INTENSITY * dayK;
+  }
+
+  // ---------- lamp pool ----------
+  let lampCount = -1;
+  let bucketStart = new Int32Array(BUCKETS + 1), bucketItems = new Int32Array(0);
+  const bestI = new Int32Array(POOL), bestD = new Float32Array(POOL), taken = new Uint8Array(POOL), pending = new Int32Array(POOL);
+  let nBest = 0, nPending = 0, lampTimer = 0;
+  const bucketOf = (x) => Math.max(0, Math.min(BUCKETS - 1, Math.floor((x - BUCKET_X0) / BUCKET)));
+  const tmpC = new THREE.Color(), tmpC2 = new THREE.Color();
+
+  function indexLamps() { // only when the number of lamps changed
+    const lamps = world.lamps;
+    lampCount = lamps.length;
+    bucketStart.fill(0);
+    if (bucketItems.length < lampCount) bucketItems = new Int32Array(lampCount + 256);
+    for (let i = 0; i < lampCount; i++) bucketStart[bucketOf(lamps[i].x) + 1]++;
+    for (let b = 0; b < BUCKETS; b++) bucketStart[b + 1] += bucketStart[b];
+    const cursor = bucketStart.slice(0, BUCKETS);
+    for (let i = 0; i < lampCount; i++) bucketItems[cursor[bucketOf(lamps[i].x)]++] = i;
+    for (const s of slots) if (s.lamp >= lampCount) { s.lamp = -1; s.want = false; }
+  }
+
+  function selectLamps(cam) {
+    const lamps = world.lamps;
+    if (lamps.length !== lampCount) indexLamps();
+    nBest = 0;
+    // only lamps of the camera's own deck: without shadows, lamps under the floor / above the ceiling would leak
+    const deck = world.state.deck in DECK_Y ? world.state.deck : 'boat';
+    const y0 = DECK_Y[deck] - 0.25, y1 = deckAboveY(deck) + 0.1;
+    const j0 = bucketStart[bucketOf(cam.x - LAMP_SEARCH)], j1 = bucketStart[bucketOf(cam.x + LAMP_SEARCH) + 1];
+    for (let j = j0; j < j1; j++) {
+      const idx = bucketItems[j], L = lamps[idx];
+      if (L.y < y0 || L.y > y1) continue;
+      const dx = L.x - cam.x, dy = (L.y - cam.y) * 4, dz = L.z - cam.z; // other decks count four times as far
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d > 1500) continue;
+      if (nBest < POOL || d < bestD[nBest - 1]) {
+        let p = nBest < POOL ? nBest++ : POOL - 1;
+        while (p > 0 && bestD[p - 1] > d) { bestD[p] = bestD[p - 1]; bestI[p] = bestI[p - 1]; p--; }
+        bestD[p] = d; bestI[p] = idx;
+      }
+    }
+    taken.fill(0);
+    for (const s of slots) {
+      s.want = false;
+      if (s.lamp < 0) continue;
+      for (let q = 0; q < nBest; q++) if (bestI[q] === s.lamp) { s.want = true; taken[q] = 1; break; }
+    }
+    nPending = 0;
+    for (let q = 0; q < nBest; q++) if (!taken[q]) pending[nPending++] = bestI[q];
+  }
+
+  function updateLamps(cam, dt, n, ins) {
+    lampTimer -= dt;
+    if (lampTimer <= 0) { lampTimer = LAMP_EVERY; selectLamps(cam); }
+    const scale = lerp(lerp(LAMP_DAY_OUT, LAMP_NIGHT_OUT, n), LAMP_INSIDE, ins);
+    const range = lerp(RANGE_OUT, RANGE_INSIDE, ins);
+    const lamps = world.lamps;
+    let next = 0;
+    for (const s of slots) {
+      if (s.want) {
+        s.k = Math.min(1, s.k + dt * 3);
+      } else {
+        s.k = Math.max(0, s.k - dt * 4);
+        if (s.k === 0) {
+          if (next < nPending) {
+            const idx = pending[next++], L = lamps[idx];
+            if (L) {
+              s.lamp = idx; s.want = true;
+              s.light.position.set(L.x, L.y - 0.22, L.z); // keep the point light off the ceiling (no burnt hot spots)
+              tmpC.set(L.color ?? 0xffd9a0);
+              s.light.color.copy(tmpC);
+              // fire / furnace glows flicker strongly, a few electric lamps very slightly
+              s.flick = tmpC.r > 0.9 && tmpC.b < 0.4 ? 1 : ((idx * 2654435761) >>> 0) % 11 === 0 ? 0.12 : 0;
+              s.base = Number.isFinite(L.intensity) ? L.intensity : 1;
+              if (s.flick === 1) s.base *= 1.6;
+            }
+          } else {
+            s.lamp = -1;
+          }
+        }
+      }
+      let f = 1;
+      if (s.flick > 0) {
+        const t = time * (s.flick === 1 ? 9 : 23) + s.seed * 10;
+        const w = Math.sin(t) * 0.5 + Math.sin(t * 2.31 + 1.7) * 0.3 + Math.sin(t * 5.13 + 0.4) * 0.2;
+        f = 1 - s.flick * 0.28 * (0.5 + 0.5 * w);
+      }
+      s.light.intensity = smooth(s.k) * s.base * scale * f;
+      s.light.distance = range;
+    }
+    if (next > 0) { // remove the lamps that were just assigned from the pending list
+      for (let q = next; q < nPending; q++) pending[q - next] = pending[q];
+      nPending -= next;
+    }
+  }
+
+  // ---------- situation ----------
+  const sit = { machine: 0, firstCls: 0 };
+  function situation(cam) {
+    const d = world.state.deck;
+    sit.machine = (d === 'tank' && cam.x > MACHINERY_X[0] && cam.x < MACHINERY_X[1]) ? 1 : 0;
+    sit.firstCls = !sit.machine && (d === 'boat' || d === 'A' || d === 'B' || d === 'C' || d === 'D') && cam.x > -38 ? 1 : 0;
+    return sit;
+  }
+
+  function blendGrade(dt, n, ins) {
+    // target = mix(outside(day/night), inside(first/other/machine), ins)
+    const out = n;
+    for (const k of NUM_KEYS) {
+      const o = lerp(GRADES.day[k], GRADES.night[k], out);
+      let i = lerp(GRADES.other[k], GRADES.first[k], firstLin);
+      i = lerp(i, lerp(GRADES.machine[k], GRADES.boiler[k], fireLin), machineLin);
+      tgt[k] = lerp(o, i, ins);
+    }
+    for (const k of COL_KEYS) {
+      tmpC.copy(GRADES.day[k]).lerp(GRADES.night[k], out);
+      tmpC2.copy(GRADES.machine[k]).lerp(GRADES.boiler[k], fireLin);
+      tgt[k].copy(GRADES.other[k]).lerp(GRADES.first[k], firstLin).lerp(tmpC2, machineLin);
+      tgt[k].lerpColors(tmpC, tgt[k], ins);
+    }
+    // inside at night the windows are black: a touch more exposure
+    tgt.exposure *= 1 + 0.08 * n * ins;
+    const a = gradeInit ? 1 - Math.exp(-dt * 3) : 1;
+    gradeInit = true;
+    for (const k of NUM_KEYS) cur[k] = lerp(cur[k], tgt[k], a);
+    for (const k of COL_KEYS) cur[k].lerp(tgt[k], a);
+    const P = world.post?.params;
+    if (P) {
+      for (const k of NUM_KEYS) P[k] = cur[k];
+      for (const k of COL_KEYS) P[k].copy(cur[k]);
+      P.sunDir.copy(SUN_DIR);
+      P.sunColor.setRGB(1.0, 0.86, 0.66).multiplyScalar(1 - n);
+      P.rays *= (1 - ins) * (1 - n);
+    } else if (renderer) {
+      renderer.toneMappingExposure = cur.exposure;
+    }
+  }
+
+  // ---------- per frame ----------
+  const camPos = new THREE.Vector3(0, 40, 0);
+  const size = new THREE.Vector2();
+  let lastQuality = world.quality;
+  function update(dt) {
+    dt = Math.min(Math.max(dt || 0, 0), 0.1);
+    time += dt;
+    const cam = world.camera;
+    if (cam) camPos.copy(cam.position);
+    if (world.quality !== lastQuality) { lastQuality = world.quality; setShadowSize(lastQuality); }
+
+    nightLin = approach(nightLin, nightTarget, dt / 2.0);
+    insideLin = approach(insideLin, world.state.inside ? 1 : 0, dt / 0.6);
+    const n = smooth(nightLin), ins = smooth(insideLin);
+    situation(camPos);
+    machineLin = approach(machineLin, sit.machine, dt / 1.2);
+    firstLin = approach(firstLin, sit.firstCls, dt / 1.2);
+    daylight = approach(daylight, DAYLIGHT[world.state.deck] ?? 0.05, dt / 1.0);
+
+    shared.uTime.value = time;
+    shared.uNight.value = n;
+
+    // pixel scale for point sprites
+    let h = 900;
+    if (renderer) h = renderer.getDrawingBufferSize(size).y;
+    const fov = cam && cam.isPerspectiveCamera ? cam.fov : 70;
+    const pxScale = h / (2 * Math.tan((fov * Math.PI) / 360));
+
+    // lights
+    const sunI = updateSun(camPos, n, ins, dt);
+    const dayIn = lerp(1, daylight, ins);
+    hemi.color.lerpColors(hemiDaySky, hemiNightSky, n);
+    hemi.groundColor.lerpColors(hemiDayGround, hemiNightGround, n);
+    hemi.intensity = lerp(HEMI_DAY, HEMI_NIGHT, n) * dayIn;
+    const amb = lerp(lerp(AMB_OTHER, AMB_FIRST, firstLin), AMB_MACHINE, machineLin);
+    interiorAmbient.color.copy(ambOther).lerp(ambWarm, firstLin).lerp(ambMachine, machineLin);
+    interiorAmbient.intensity = amb * ins;
+    updateLamps(camPos, dt, n, ins);
+    let fireI = 0, allI = 1e-3;
+    for (const s of slots) { allI += s.light.intensity; if (s.flick === 1) fireI += s.light.intensity; }
+    fireLin = approach(fireLin, Math.min(1, (fireI / allI) * 2.5), dt / 1.5);
+    mats.fire.emissiveIntensity = 2.6 + 0.6 * Math.sin(time * 7.3) * Math.sin(time * 3.1 + 1.2) + 0.3 * Math.sin(time * 17.0);
+
+    // sky / ocean / smoke / iceberg / dust
+    sky.follow(camPos);
+    sky.stars.visible = n > 0.002;
+    if (renderer) sky.starUniforms.uPx.value = renderer.getPixelRatio();
+    ocean.update(camPos, time, n, sunI, pxScale);
+    smoke.update(dt, n, cam);
+    berg.update(n);
+    dust.points.visible = ins > 0.01;
+    if (dust.points.visible) {
+      const U = dust.uniforms;
+      U.uCam.value.copy(camPos);
+      U.uScale.value = pxScale;
+      U.uAmount.value = ins * lerp(0.035, 0.09, machineLin);
+      for (let i = 0; i < DUST_LIGHTS; i++) {
+        const s = slots[i];
+        U.uL.value[i].set(s.light.position.x, s.light.position.y, s.light.position.z, s.light.intensity);
+        U.uLC.value[i].copy(s.light.color);
+      }
+    }
+
+    // fog / background / environment map
+    fog.color.lerpColors(fogDay, fogNight, n);
+    fog.density = lerp(FOG_DAY, FOG_NIGHT, n);
+    background.copy(fog.color);
+    if (envDay) {
+      const inEnv = insideLin > 0.5;
+      const envIn = machineLin > 0.5 ? envMachine : envInside;
+      scene.environment = inEnv ? envIn : (nightLin < 0.5 ? envDay : envNight);
+      const dipInside = Math.abs(2 * insideLin - 1);
+      const dipNight = inEnv ? 1 : Math.abs(2 * nightLin - 1);
+      const dipMachine = inEnv ? Math.abs(2 * machineLin - 1) : 1;
+      const inI = lerp(ENV_INSIDE, ENV_MACHINE, machineLin) * (1 + 0.6 * daylight * (1 - n));
+      scene.environmentIntensity = (inEnv ? inI : (nightLin < 0.5 ? ENV_DAY : ENV_NIGHT)) * dipInside * dipNight * dipMachine;
+    }
+
+    // rooms with lots of daylight (boat deck / A deck) keep part of the cool exterior grade
+    blendGrade(dt, n, ins * (1 - 0.75 * daylight * (1 - n)));
+  }
+
+  update(0);
+  return { update };
+}

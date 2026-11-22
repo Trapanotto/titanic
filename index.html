@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0a1422">
+  <title>RMS Titanic – Rundgang in 3D</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/src/app/style.css">
+</head>
+<body>
+  <canvas id="view" tabindex="-1"></canvas>
+  <div id="ui"></div>
+
+  <div id="start" hidden>
+    <div class="liner">White Star Line</div>
+    <h2 id="start-title">Klicken, um an Bord zu gehen</h2>
+    <p class="subtitle">RMS Titanic · Southampton – New York, April 1912</p>
+    <div class="rule"></div>
+    <div class="start-keys">
+      <b>W A S D</b><span>bewegen</span>
+      <b>Maus</b><span>umsehen</span>
+      <b>Shift</b><span>rennen</span>
+      <b>Leertaste</b><span>springen</span>
+      <b>F</b><span>Flugmodus</span>
+      <b>N</b><span>Tag / Nacht</span>
+      <b>M</b><span>Deckplan</span>
+      <b>E</b><span>Info lesen</span>
+      <b>H</b><span>Hilfe</span>
+      <b>Esc</b><span>Maus freigeben</span>
+    </div>
+  </div>
+
+  <div id="loading">
+    <div class="emblem">★</div>
+    <div class="liner">White Star Line</div>
+    <h1>RMS Titanic</h1>
+    <div class="subtitle">Southampton – New York, April 1912</div>
+    <div class="rule"></div>
+    <div class="bar"><div id="loading-bar"></div></div>
+    <div id="loading-label">Das Schiff wird vorbereitet …</div>
+    <div id="loading-warn"></div>
+  </div>
+
+  <noscript><p style="position:fixed;inset:auto 0 20px;text-align:center;z-index:99">Für den Rundgang wird JavaScript benötigt.</p></noscript>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
