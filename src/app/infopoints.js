@@ -53,6 +53,7 @@ export class InfoPoints {
     if (this.mesh) { this.scene.remove(this.mesh); this.mesh.dispose(); this.mesh = null; }
     if (!this.items.length) return;
     const geo = new THREE.CylinderGeometry(0.11, 0.11, 0.022, 20);
+    geo.rotateY(Math.PI / 2); // cap UVs run along z/x: turn them so the "i" stands upright on the +z face
     geo.rotateX(Math.PI / 2); // faces look along z
     const face = new THREE.MeshBasicMaterial({ map: tokenTexture() });
     const rim = new THREE.MeshBasicMaterial({ color: 0xb08a38 });
