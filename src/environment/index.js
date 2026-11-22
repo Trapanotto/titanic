@@ -7,6 +7,7 @@ import { createOcean } from './ocean.js';
 import { createSmoke } from './smoke.js';
 import { createIceberg } from './iceberg.js';
 import { createDust, DUST_LIGHTS } from './dust.js';
+import { TIER } from '../core/tier.js';
 
 // ENVIRONMENT & LIGHTING
 // sky dome + stars, ocean + bow spray, sun / star light with camera-following shadows, interior lighting
@@ -26,7 +27,9 @@ const ENV_DAY = 0.95, ENV_NIGHT = 0.8, ENV_INSIDE = 0.26, ENV_MACHINE = 0.2;
 const FOG_DAY = 0.00016, FOG_NIGHT = 0.0004;
 const AMB_FIRST = 0.05, AMB_OTHER = 0.045, AMB_MACHINE = 0.035;
 const SHADOW_HALF = 55, SHADOW_DIST = 260, SHADOW_STEP = 3;
-const POOL = 12, SH_POOL = 2, LAMP_EVERY = 0.12;     // plain lamp lights + shadow-casting lamp lights (fixed counts)
+const LAMP_EVERY = 0.12;
+// plain lamp lights + shadow-casting lamp lights (fixed counts, by device tier: 12 + 2 on desktop, 4 + 0 on phones; TIER.lamps is the total)
+const SH_POOL = Math.max(0, TIER.lampShadows ?? 2), POOL = Math.max(1, (TIER.lamps ?? 12) - SH_POOL);
 const LAMP_DAY_OUT = 0.6, LAMP_NIGHT_OUT = 14, LAMP_INSIDE = 9, LAMP_MACHINE = 1.35, VOL_NIGHT = 13;
 const RANGE_INSIDE = 9, RANGE_OUT = 15, RANGE_MACHINE = 13;
 const SH_RANGE = 9, SH_NEAR = 0.3, SH_EVERY = 0.1, SH_MAP = { niedrig: 256, mittel: 512, hoch: 512 };
@@ -98,7 +101,8 @@ export async function build(world) {
   let mapSize = 0;
   const sc = sun.shadow.camera;
   function setShadowSize(q) {
-    const want = q === 'hoch' && bigShadow ? 4096 : 2048;
+    if (!TIER.sunShadow) { sun.castShadow = false; return; }
+    const want = q === 'hoch' && bigShadow ? Math.min(4096, TIER.sunShadow) : Math.min(2048, TIER.sunShadow);
     if (want === mapSize) return;
     mapSize = want;
     sun.shadow.mapSize.set(want, want);
@@ -166,13 +170,14 @@ export async function build(world) {
       sky.uniforms.uEnv.value = 1;
       shared.uNight.value = 0;
       envDay = pmrem.fromScene(envScene, 0.02, 0.1, 100).texture;
+      const all = TIER.envMaps !== 'min'; // phones: one outside + one inside map
       shared.uNight.value = 1;
-      envNight = pmrem.fromScene(envScene, 0.02, 0.1, 100).texture;
+      envNight = all ? pmrem.fromScene(envScene, 0.02, 0.1, 100).texture : envDay;
       const insideMat = createInteriorEnvMaterial(0);
       ball.material = insideMat;
       envInside = pmrem.fromScene(envScene, 0.03, 0.1, 100).texture;
       insideMat.uniforms.uKind.value = 1;
-      envMachine = pmrem.fromScene(envScene, 0.03, 0.1, 100).texture;
+      envMachine = all ? pmrem.fromScene(envScene, 0.03, 0.1, 100).texture : envInside;
       sky.uniforms.uEnv.value = 0;
       shared.uNight.value = 0;
       pmrem.dispose(); geo.dispose(); insideMat.dispose();
@@ -400,6 +405,7 @@ export async function build(world) {
   // The static scene is baked per zone. Only zone meshes near a shadow light cast into its cube map; the exterior
   // casters (hull, superstructure) are switched off in the frames where a lamp shadow map is rendered, and the sun
   // shadow is never rendered in the same frame.
+  const dueOne = [null];
   let castersReady = false, extCasters = [], zoneCasters = new Map(), activeZones = new Set(), mode = 'sun', shTimer = 0;
   const NO_CAST = new Set(['glass', 'lampGlow', 'fire', 'navRed', 'navGreen', 'windowLit']);
   function prepareCasters() {
@@ -411,23 +417,37 @@ export async function build(world) {
       for (const c of o.children) walk(c);
     };
     walk(scene);
-    for (const g of world.zones.values()) {
-      const list = [];
-      g.traverse((o) => {
-        if (!o.isMesh) return;
-        o.receiveShadow = true;
-        o.castShadow = false;
-        const m = o.material;
-        if (Array.isArray(m) || !m || m.transparent || NO_CAST.has(m.name) || !(m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) return;
-        list.push(o);
-      });
-      zoneCasters.set(g, list);
-    }
+    for (const g of world.zones.values()) castersOf(g);
   }
+  /** Lamp-shadow casters of a zone (recomputed when the deck streamer re-bakes or empties the zone). */
+  function castersOf(g) {
+    let e = zoneCasters.get(g);
+    const ver = g.userData.ver || 0;
+    if (e && e.ver === ver) return e.list;
+    const list = [];
+    g.traverse((o) => {
+      if (!o.isMesh) return;
+      o.receiveShadow = true;
+      o.castShadow = false;
+      const m = o.material;
+      if (Array.isArray(m) || !m || m.transparent || NO_CAST.has(m.name) || !(m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial)) return;
+      list.push(o);
+    });
+    zoneCasters.set(g, (e = { ver, list }));
+    return list;
+  }
+  // streamed zones: interior meshes never cast the sun shadow, they only receive
+  world.onZoneChange?.((g) => {
+    if (!castersReady) return;
+    castersOf(g);
+    if (activeZones.has(g)) activeZones.delete(g);
+    // lamp shadow maps rendered while the zone was missing / being built: render them again
+    for (const s of shSlots) if (s.lamp >= 0) s.dirty = true;
+  });
   function setMode(m, lights) {
     if (m === 'sun') {
       for (const o of extCasters) o.castShadow = true;
-      for (const g of activeZones) for (const o of zoneCasters.get(g)) o.castShadow = false;
+      for (const g of activeZones) for (const o of castersOf(g)) o.castShadow = false;
       activeZones.clear();
     } else {
       for (const o of extCasters) o.castShadow = false;
@@ -440,8 +460,8 @@ export async function build(world) {
           want.add(g);
         }
       }
-      for (const g of activeZones) if (!want.has(g)) for (const o of zoneCasters.get(g)) o.castShadow = false;
-      for (const g of want) if (!activeZones.has(g)) for (const o of zoneCasters.get(g)) o.castShadow = true;
+      for (const g of activeZones) if (!want.has(g)) for (const o of castersOf(g)) o.castShadow = false;
+      for (const g of want) if (!activeZones.has(g)) for (const o of castersOf(g)) o.castShadow = true;
       activeZones = want;
     }
     mode = m;
@@ -452,11 +472,14 @@ export async function build(world) {
     if (mode !== 'sun') setMode('sun');
     shTimer -= dt;
     if (shTimer > 0) return false;
-    const due = shSlots.filter((s) => s.dirty && s.lamp >= 0);
-    if (!due.length) return false;
-    setMode('lamp', due);
-    for (const s of due) { s.dirty = false; s.light.shadow.needsUpdate = true; }
-    shTimer = SH_EVERY;
+    // one cube map per frame (a second one that is due follows in the next frame): halves the refresh spike
+    let pick = null, more = false;
+    for (const s of shSlots) if (s.dirty && s.lamp >= 0) { if (!pick) pick = s; else more = true; }
+    if (!pick) return false;
+    dueOne[0] = pick;
+    setMode('lamp', dueOne);
+    pick.dirty = false; pick.light.shadow.needsUpdate = true;
+    shTimer = more ? 0 : SH_EVERY;
     return true;
   }
 
@@ -549,7 +572,10 @@ export async function build(world) {
     lightingUniforms.uShipVolK.value = VOL_NIGHT * n;
     lightingUniforms.uWinGlow.value = n * (1 - ins);
     lightingUniforms.uShipAmb.value.setRGB(0.046, 0.036, 0.026).multiplyScalar(n * (1 - ins));
-    halos.points.visible = n > 0.01;
+    // world.updateVisibility hides the exterior where nothing of the outside can be seen (closed hull below C deck):
+    // then sky, sea, smoke, iceberg and the lamp sprites cannot be seen either
+    const out = world.exterior.visible !== false;
+    halos.points.visible = out && n > 0.01;
     halos.material.uniforms.uK.value = n * 6;
     halos.material.uniforms.uScale.value = pxScale;
     hemi.color.lerpColors(hemiDaySky, hemiNightSky, n);
@@ -565,19 +591,23 @@ export async function build(world) {
 
     // sky / ocean / smoke / iceberg / dust
     sky.follow(camPos);
-    sky.stars.visible = n > 0.002;
+    sky.dome.visible = out;
+    sky.stars.visible = out && n > 0.002;
+    ocean.mesh.visible = out;
+    ocean.spray.visible = smoke.points.visible = out && TIER.particles !== false;
     if (renderer) sky.starUniforms.uPx.value = renderer.getPixelRatio();
     ocean.update(camPos, time, n, sunI, pxScale);
     smoke.update(dt, n, cam);
     berg.update(n);
-    dust.points.visible = ins > 0.01;
+    if (!out) berg.mesh.visible = false;
+    dust.points.visible = TIER.particles !== false && ins > 0.01;
     if (dust.points.visible) {
       const U = dust.uniforms;
       U.uCam.value.copy(camPos);
       U.uScale.value = pxScale;
       U.uAmount.value = ins * lerp(0.035, 0.09, machineLin);
       for (let i = 0; i < DUST_LIGHTS; i++) {
-        const s = slots[i];
+        const s = slots[i % slots.length];
         U.uL.value[i].set(s.light.position.x, s.light.position.y, s.light.position.z, s.light.intensity);
         U.uLC.value[i].copy(s.light.color);
       }
@@ -607,7 +637,7 @@ export async function build(world) {
     try {
       const t0 = performance.now();
       world.exterior.updateMatrixWorld(true);
-      const nLamps = bakeLampVolume(world.lamps);
+      const nLamps = TIER.lampVolume === false ? 0 : bakeLampVolume(world.lamps);
       halos.rebuild(world);
       prepareCasters();
       lampCount = -1; // re-index lamps (rooms are known now)

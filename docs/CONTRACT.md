@@ -92,3 +92,9 @@ Info-point titles must be unique (discovered state is keyed by title).
 - Boat-house roof slabs have openings under the two glass domes: x 39.2..44.8, |z| ≤ 3.2 and x −5..0.2, |z| ≤ 2.8.
   Leave the interior ceiling open there so the dome is visible from the staircases.
 - Bridge (boat deck x 66..73) has large unglazed side openings; wing cabs at x 67.6..70.4, |z| 10.4..12.1.
+
+## Streaming (decks are built more than once)
+On all tiers the app first runs every module once to register logical data (colliders, floors, ramps, teleports,
+infos, lamps, rooms) and then rebuilds deck geometry on demand (`src/app/stream.js`). Module builds must therefore be
+deterministic, free of one-time global side effects, and must not rely on the return values of registration calls.
+`node tools/smoke.mjs` and `?nostream=1` build everything without streaming.

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { TIER } from '../core/tier.js';
 import { SHIP, hullHalfWidth, DECK_Y } from '../core/constants.js';
-import { worley, fbm, vnoise, rng } from '../core/tex.js';
+import { worley, fbm, vnoise, rng, releaseTexData } from '../core/tex.js';
 import { SKY_GLSL } from './sky.js';
 
 // Ocean: camera-centred warped grid (dense uniform cells near the camera, geometric growth to the horizon),
@@ -9,9 +10,10 @@ import { SKY_GLSL } from './sky.js';
 // Schlick fresnel with the real sky / cloud colours, GGX sun glitter, sub-surface glow in the crests,
 // analytic hull reflection (incl. the lit portholes at night) and the ship's shadow on the water.
 
-const N = 160;        // quads per half side  -> (2N)^2 * 2 = 204 800 triangles
-const LIN = 96;       // uniform cells per half side
-const CELL = 1.25;    // m, size of the uniform cells = snapping step
+// (weak tiers: fewer quads, same 120 m uniform core – see createOcean)
+let N = 160;          // quads per half side  -> (2N)^2 * 2 = 204 800 triangles
+let LIN = 96;         // uniform cells per half side
+let CELL = 1.25;      // m, size of the uniform cells = snapping step
 const HALF = 6000;    // m, half extent
 export const SHIP_SPEED = 10.8; // m/s (21 kn) – the sea drifts aft (-x) with this speed
 
@@ -114,7 +116,7 @@ void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vec2 g = wp.xz;
   vec2 rel = abs(g - cameraPosition.xz);
-  float cs = ${CELL.toFixed(3)} + max(0.0, max(rel.x, rel.y) - uGrid.x) * uGrid.y;   // local cell size
+  float cs = OCEAN_CELL + max(0.0, max(rel.x, rel.y) - uGrid.x) * uGrid.y;   // local cell size
   vec2 p = g + vec2(uDrift, 0.0);
   vec3 acc = vec3(0.0), nrm = vec3(0.0);
   waves(p, cs, acc, nrm);
@@ -405,6 +407,7 @@ function linearTex(data, size) {
   t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
   t.generateMipmaps = true; t.anisotropy = 8;
   t.needsUpdate = true;
+  t.onUpdate = releaseTexData;
   return t;
 }
 
@@ -523,6 +526,8 @@ function createSpray(shared) {
 }
 
 export function createOcean(shared) {
+  const k = Math.min(1, Math.max(0.2, TIER.oceanSeg || 1));
+  N = Math.round(160 * k); LIN = Math.round(96 * k); CELL = 120 / LIN;
   const grid = buildGrid();
   const uniforms = {
     uNight: shared.uNight, uSunDir: shared.uSunDir, uTime: shared.uTime,
@@ -531,7 +536,7 @@ export function createOcean(shared) {
     uGrid: { value: new THREE.Vector2(LIN * CELL, (grid.growth - 1) / grid.growth) },
   };
   const material = new THREE.ShaderMaterial({
-    name: 'ocean', uniforms, vertexShader: VERT, fragmentShader: FRAG,
+    name: 'ocean', uniforms, vertexShader: VERT.replace('OCEAN_CELL', CELL.toFixed(3)), fragmentShader: FRAG,
     side: THREE.FrontSide, depthTest: true, depthWrite: true, fog: false,
   });
   const mesh = new THREE.Mesh(grid.geometry, material);

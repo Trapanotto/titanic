@@ -10,6 +10,8 @@ import * as G from './geom.js';
 
 const geo = new Map();
 export function cached(key, make) { let g = geo.get(key); if (!g) geo.set(key, (g = make())); return g; }
+/** Deck streaming: forget the cached part geometries and prop templates (rebuilt on demand, frees memory). */
+export function flushKitCaches() { geo.clear(); templates.clear(); }
 const r3 = (v) => Math.round(v * 1000);
 /** global detail factor for round parts (segments of lathes, lofts, cushions, cylinders); 1 = as authored */
 export const DETAIL = { q: 0.5 };

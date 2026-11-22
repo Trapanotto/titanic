@@ -127,7 +127,14 @@ function dataTex(data, size, metres, srgb) {
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.repeat.set(1 / metres, 1 / metres);
   t.needsUpdate = true;
+  t.onUpdate = releaseTexData;
   return t;
+}
+
+/** The pixels live on the GPU after the first upload (mipmaps are generated there): drop the CPU copy. */
+export function releaseTexData(t) {
+  const img = t.image;
+  if (img && img.data) t.image = { data: null, width: img.width, height: img.height, depth: img.depth };
 }
 
 /**
@@ -136,6 +143,28 @@ function dataTex(data, size, metres, srgb) {
  * opts: size, metres, normal (strength), albedo/orm (bool, default true).
  * Returns { map, normalMap, ormMap } (missing ones are null). ORM: R = ao, G = roughness, B = metalness.
  */
+let RAW = false;
+/** Texture worker: surface() returns the raw pixel arrays instead of textures. */
+export function setRawSurfaces(v) { RAW = !!v; }
+
+/** DataTexture for pixels that arrive later (texture worker): 1x1 until fillTexture(). */
+export function pendingTexture(srgb) { return dataTex(new Uint8Array([128, 128, 255, 255]), 1, 1, srgb); }
+/** Put the generated pixels into a texture made by pendingTexture(). */
+export function fillTexture(t, data, size, metres) {
+  t.image = { data, width: size, height: size };
+  t.repeat.set(1 / metres, 1 / metres);
+  t.onUpdate = releaseTexData;
+  t.needsUpdate = true;
+}
+/** Textures of a surface from raw arrays ({A, N, O, size, metres}). */
+export function rawToSurface(r) {
+  return {
+    map: r.A ? dataTex(r.A, r.size, r.metres, true) : null,
+    normalMap: r.N ? dataTex(r.N, r.size, r.metres, false) : null,
+    ormMap: r.O ? dataTex(r.O, r.size, r.metres, false) : null,
+  };
+}
+
 export function surface(opts, fn) {
   const size = opts.size || 512, metres = opts.metres || 1, strength = opts.normal ?? 1;
   const wantAlbedo = opts.albedo !== false, wantOrm = opts.orm !== false, wantNormal = strength > 0;
@@ -172,9 +201,6 @@ export function surface(opts, fn) {
       }
     }
   }
-  return {
-    map: A ? dataTex(A, size, metres, true) : null,
-    normalMap: N ? dataTex(N, size, metres, false) : null,
-    ormMap: O ? dataTex(O, size, metres, false) : null,
-  };
+  if (RAW) return { A, N, O, size, metres };
+  return rawToSurface({ A, N, O, size, metres });
 }

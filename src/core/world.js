@@ -121,11 +121,13 @@ export class World {
       const u = g.userData;
       const near = p.y > u.yMin - 3.3 && p.y < u.yMax + 3.3 && p.x > u.x0 - 70 && p.x < u.x1 + 70;
       const shaft = p.y > u.yMin - 9.2 && p.y < u.yMax + 9.2 && p.x > u.x0 - 14 && p.x < u.x1 + 14;
-      const vis = nearShip && (near || shaft);
+      const vis = nearShip && (near || shaft) && !u.loading; // a zone being (re)built by the streamer is not shown yet
       g.visible = vis;
       const list = u.chunks || EMPTY;
       if (!vis) continue;
       nz++;
+      const bs = u.batches;
+      if (bs) for (let i = 0; i < bs.length; i++) bs[i].visible = false; // switched on by their visible clusters
       const own = p.y >= u.yMin && p.y <= u.yMax;
       // outside near the rail: the adjacent deck as before (looking over the side into the windows below)
       const keep = !own && !inside && near && Math.abs(p.z) > 9.5;
@@ -164,20 +166,36 @@ export class World {
    */
   uploadStep(renderer, budgetMs = 3) {
     if (!renderer || this._uploadDone) return false;
+    const U = this._uploadState();
+    if (!U.scanned) {
+      // whatever was not uploaded during the bake (no renderer then, or a chunk created later)
+      U.scanned = true;
+      for (const g of [this.interior, this.exterior]) g.traverse((o) => { if (o.name === 'baked' && o.geometry?.index?.array) U.list.push(o); });
+    }
+    this._uploadRun(renderer, budgetMs);
+    if (U.i >= U.list.length) { this._uploadDone = true; U.rt.dispose(); U.mat.dispose(); this._upload = null; }
+    return !this._uploadDone;
+  }
+
+  _uploadState() {
     let U = this._upload;
     if (!U) {
-      const list = [];
-      for (const g of [this.interior, this.exterior]) g.traverse((o) => { if (o.name === 'baked' && o.geometry?.index?.array) list.push(o); });
       U = this._upload = {
-        list, i: 0, scene: new THREE.Scene(), cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1),
+        list: [], i: 0, scanned: false, scene: new THREE.Scene(), cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1),
         rt: new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false }), mat: new THREE.MeshBasicMaterial(),
       };
       U.scene.overrideMaterial = U.mat;
       U.scene.matrixWorldAutoUpdate = false;
     }
+    return U;
+  }
+
+  _uploadRun(renderer, budgetMs) {
+    const U = this._upload;
     const t0 = now(), prev = renderer.getRenderTarget(), shadow = renderer.shadowMap.autoUpdate;
     renderer.shadowMap.autoUpdate = false;
     renderer.setRenderTarget(U.rt);
+    _uploading = true;
     try {
       while (U.i < U.list.length && now() - t0 < budgetMs) {
         const batch = [];
@@ -193,12 +211,12 @@ export class World {
         for (const [m, , v, fc] of batch) { m.visible = v; m.frustumCulled = fc; }
       }
     } finally {
+      _uploading = false;
       renderer.setRenderTarget(prev);
       renderer.shadowMap.autoUpdate = shadow;
     }
-    if (U.i >= U.list.length) { this._uploadDone = true; U.rt.dispose(); U.mat.dispose(); this._upload = null; }
-    return !this._uploadDone;
   }
+
 
   /** Mask of another deck (seen through a stairwell), from the camera's plan position at that deck's eye height. */
   _deckMask(deck, p, open) {
@@ -472,16 +490,137 @@ export class World {
   async bake(onProgress) {
     const groups = [...this.zones.values(), ...this._bakeGroups];
     let before = 0, after = 0, tris = 0, bytes = 0, slice = now();
+    const renderer = this.renderer || null;
+    // users of every source geometry: a geometry that only merged meshes used is emptied once they are all merged
+    // (the modules' geometry caches would otherwise keep the whole source scene alive)
+    const users = new Map();
+    this.scene.traverse((o) => { const g = o.geometry; if (g?.isBufferGeometry) users.set(g, (users.get(g) || 0) + 1); });
+    const up = renderer ? this._uploadState() : null;
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i];
-      const r = bakeGroup(this, g, this.zones.get(g.name.slice(5)) === g);
+      const r = bakeGroup(this, g, this.zones.get(g.name.slice(5)) === g, users);
       before += r.before; after += r.after; tris += r.tris; bytes += r.bytes;
-      if (now() - slice > 30) { onProgress?.(i / groups.length); await yieldTask(); slice = now(); }
+      // upload the new chunks right away: their compact CPU arrays are released on upload (lower heap peak)
+      if (up) for (const o of g.children) if (o.name === 'baked' && o.geometry.index?.array) up.list.push(o);
+      if (now() - slice > 30) {
+        if (up) this._uploadRun(renderer, Infinity);
+        onProgress?.(i / groups.length); await yieldTask(); slice = now();
+      }
     }
+    // exterior: the opaque parts of all baked groups, one batch per material
+    if (this._extParts) {
+      for (const parts of this._extParts.values()) {
+        const r = makeExtBatch(this, parts);
+        after++; tris += r.tris; bytes += r.bytes;
+        if (up) up.list.push(r.mesh);
+      }
+      this._extParts = null;
+    }
+    if (up) this._uploadRun(renderer, Infinity);
     registerExteriorInstances(this);
+    this._freezeStatic();
     this._clusterGrids.clear();
     onProgress?.(1);
     console.info(`[world] bake: ${before} meshes -> ${after} chunks, ${(tris / 1e6).toFixed(2)} M triangles, ${(bytes / 1048576).toFixed(0)} MB vertex data`);
+  }
+
+  // ---------- deck streaming (see app/stream.js) ----------
+
+  /** Callback fn(zone, loaded) whenever a zone's content is baked in or thrown away. */
+  onZoneChange(fn) { (this._zoneListeners ??= []).push(fn); }
+  _zoneChanged(g, loaded) {
+    g.userData.ver = (g.userData.ver || 0) + 1;
+    for (const fn of this._zoneListeners || []) fn(g, loaded);
+  }
+
+  /**
+   * Bake (and upload) the given zones after their modules were (re)built. Source geometry is not emptied (the
+   * modules' caches are reused by later rebuilds). Time-sliced; `budgetMs` per slice.
+   */
+  async bakeZones(zones, { budgetMs = 12, onProgress = null } = {}) {
+    const renderer = this.renderer || null, up = renderer ? this._uploadState() : null;
+    let slice = now(), bytes = 0, tris = 0;
+    for (let i = 0; i < zones.length; i++) {
+      const g = zones[i];
+      const r = bakeGroup(this, g, true, null);
+      g.userData.bytes = r.bytes; g.userData.tris = r.tris;
+      bytes += r.bytes; tris += r.tris;
+      if (up) for (const o of g.children) if (o.name === 'baked' && o.geometry.index?.array) up.list.push(o);
+      if (up) this._uploadRun(renderer, Infinity);
+      this._zoneChanged(g, true);
+      if (now() - slice > budgetMs) { onProgress?.((i + 1) / zones.length); await yieldTask(); slice = now(); }
+    }
+    this._clusterGrids.clear();
+    return { bytes, tris };
+  }
+
+  /** Throw away the content of zones (dispose GPU buffers); they can be rebuilt later. */
+  unloadZones(zones) {
+    const set = new Set(zones);
+    for (const g of zones) {
+      g.traverse((o) => {
+        if (o === g) return;
+        if (o.isInstancedMesh) o.dispose();
+        o.geometry?.dispose?.();
+      });
+      for (const c of g.children) c.parent = null;
+      g.children.length = 0;
+      g.userData.chunks = [];
+      g.userData.batches = [];
+      g.userData.bytes = 0; g.userData.tris = 0;
+      this._zoneChanged(g, false);
+    }
+    this.chunks = this.chunks.filter((c) => !set.has(c.zone));
+  }
+
+  /** Detach what was just built into zones that are not wanted (never uploaded: nothing to dispose). */
+  dropBuilt(zone, from) {
+    const kids = zone.children;
+    for (let i = from; i < kids.length; i++) kids[i].parent = null;
+    kids.length = Math.min(kids.length, from);
+  }
+
+  /**
+   * After the bake the interior is static except for the separate ("loose") objects. Freeze the world matrices of
+   * the baked chunks and static instanced meshes, and replace the interior's per-frame matrix traversal (three
+   * visits every node in every render) by an update of the loose objects of the zones that are shown.
+   */
+  _freezeStatic() {
+    const interior = this.interior, zones = this.zones;
+    // the scene root and the two top groups never move: without this, three's matrixAutoUpdate on the scene forces a
+    // full-depth world-matrix update of every node in every frame
+    for (const o of [this.scene, this.exterior, interior]) { o.updateMatrix(); o.matrixAutoUpdate = false; }
+    this.scene.updateMatrixWorld(true);
+    let list = [], n = -1;
+    const collect = () => {
+      list = [];
+      for (const g of zones.values()) {
+        g.matrixAutoUpdate = false;
+        const dyn = [];
+        for (const c of g.children) {
+          if (c.name === 'baked' || (c.isInstancedMesh && !c.userData.noMerge)) { c.matrixAutoUpdate = false; c.matrixWorldAutoUpdate = false; }
+          else dyn.push(c);
+        }
+        g.userData.dyn = dyn;
+        g.userData.nKids = g.children.length;
+        list.push(g);
+      }
+      n = zones.size;
+    };
+    collect();
+    const base = THREE.Object3D.prototype.updateMatrixWorld;
+    interior.updateMatrixWorld = function (force) {
+      if (force || this.matrixWorldNeedsUpdate || this.matrixAutoUpdate) return base.call(this, force);
+      if (zones.size !== n) collect();
+      for (let i = 0; i < list.length; i++) {
+        const g = list[i];
+        if (!g.visible) continue;
+        const u = g.userData;
+        if (g.children.length !== u.nKids) { g.updateMatrixWorld(true); collect(); }
+        const d = u.dyn;
+        for (let k = 0; k < d.length; k++) if (d[k].visible) d[k].updateMatrixWorld(false);
+      }
+    };
   }
 
   /** Cluster id grid (1 m cells) of a deck from world.rooms: large rooms get their own id, the rest 0. */
@@ -538,10 +677,11 @@ function showCluster(c, v, p, now, lodOn) {
   if (v && c.lod) {
     const d = lodOn ? distXYZ(c, p) : 0, L = c.lod;
     const n = d > LOD_SMALL.d ? L[0] : d > LOD_TINY.d ? L[1] : L[2];
-    if (n !== c.n) { c.n = n; c.mesh.geometry.drawRange.count = n; }
+    if (c.batch) c.n = n;
+    else if (n !== c.n) { c.n = n; c.mesh.geometry.drawRange.count = n; }
     if (!n) v = false;
   }
-  c.mesh.visible = v;
+  if (c.batch) { c.on = v; if (v) c.mesh.visible = true; } else c.mesh.visible = v;
   if (v) { c.seen = now; c.live = true; }
 }
 
@@ -553,7 +693,7 @@ function newBucket(o, cid) {
   return { n: ++_bucketN, material: o.material, cast: o.castShadow, receive: o.receiveShadow, order: o.renderOrder, cid, nv: 0, vtx: new Float32Array(256 * 8), ix: [new IGrow(), new IGrow(), new IGrow()] };
 }
 
-function bakeGroup(world, root, isZone) {
+function bakeGroup(world, root, isZone, users = null) {
   root.updateWorldMatrix(true, true);
   const rootM = root.matrixWorld, identity = isIdentity(rootM);
   const inv = new THREE.Matrix4().copy(rootM).invert();
@@ -580,6 +720,7 @@ function bakeGroup(world, root, isZone) {
     const flip = _m.determinant() < 0;
     if (!g.boundingSphere) g.computeBoundingSphere();
     const rad = g.boundingSphere.radius * _m.getMaxScaleOnAxis();
+    if (world.dropRadius && rad < world.dropRadius) continue; // weak devices: tiny clutter is left out entirely
     const bin = rad < LOD_TINY.r ? 2 : rad < LOD_SMALL.r ? 1 : 0;
     // transform once into root space
     const tp = new Float32Array(nv * 3), tn = new Float32Array(nv * 3), tu = new Float32Array(nv * 2);
@@ -624,11 +765,31 @@ function bakeGroup(world, root, isZone) {
       B.ix[bin].push3(vert(B, a, tp, tn, tu, rb, rk), vert(B, b, tp, tn, tu, rb, rk), vert(B, c, tp, tn, tu, rb, rk));
     }
   }
-  for (const o of originals) o.parent.remove(o);
+  for (const o of originals) {
+    o.parent.remove(o);
+    if (!users) continue;
+    const g = o.geometry, n = (users.get(g) || 1) - 1;
+    users.set(g, n);
+    if (n === 0) emptyGeometry(g);
+  }
+  // the groups that only held merged meshes are empty now: drop them (tens of thousands of nodes that three would
+  // otherwise visit in every matrix update / render traversal)
+  if (isZone) pruneEmpty(root);
 
   // one mesh per material and cluster; small / tiny objects at the end of the index buffer (distance LOD = drawRange)
   const chunks = isZone ? (root.userData.chunks ??= []) : null;
   for (const M of byMat.values()) {
+    // interior, opaque: all clusters of a material share one mesh (multi-draw of the visible clusters)
+    if (isZone && M.list.length && !M.list[0].material.transparent) { bakeBatches(world, root, M.list, res, chunks); continue; }
+    // exterior, opaque: collected over all groups (World.bake builds one batch per material with float positions)
+    if (!isZone && M.list.length && !M.list[0].material.transparent) {
+      world._extParts ??= new Map();
+      const B0 = M.list[0], k = B0.material.uuid + (B0.cast ? 'c' : '') + (B0.receive ? 'r' : '') + '|' + B0.order;
+      let L = world._extParts.get(k);
+      if (!L) world._extParts.set(k, (L = []));
+      for (const B of M.list) { const part = extPart(B, root); if (part) L.push(part); }
+      continue;
+    }
     for (const B of M.list) {
       const r = compactGeometry(B, res);
       if (!r) continue;
@@ -676,6 +837,28 @@ function bakeGroup(world, root, isZone) {
     }
   }
   return res;
+}
+
+/** Drop the vertex data of a source geometry that no object uses any more (it stays a valid, empty geometry). */
+function emptyGeometry(g) {
+  for (const k of Object.keys(g.attributes)) g.deleteAttribute(k);
+  g.morphAttributes = {};
+  g.setIndex(null);
+  g.dispose();
+}
+
+/** Remove the descendant groups of `root` whose subtree holds nothing but empty groups. Returns true if root is empty. */
+function pruneEmpty(root) {
+  let keep = 0;
+  const kids = root.children;
+  for (let i = 0; i < kids.length; i++) {
+    const c = kids[i];
+    const plain = c.isGroup || c.type === 'Object3D';
+    if (plain && !c.userData.noMerge && pruneEmpty(c)) { c.parent = null; continue; }
+    kids[keep++] = c;
+  }
+  kids.length = keep;
+  return keep === 0;
 }
 
 function releaseArray() { this.array = null; }
@@ -749,14 +932,246 @@ function compactGeometry(B, res) {
   for (const a of [geo.attributes.position, geo.attributes.normal, geo.attributes.uv, geo.index]) a.onUpload(releaseArray);
   res.tris += nIdx / 3;
   res.bytes += pa.byteLength + na.byteLength + ua.byteLength + ia.byteLength;
+  geo.userData.gpuBytes = pa.byteLength + na.byteLength + ua.byteLength + ia.byteLength;
   const out = { geo, q, cx: cx * q, cy: cy * q, cz: cz * q, lod, material: B.material, cast: B.cast, receive: B.receive, order: B.order };
   B.vtx = B.ix = null;
   return out;
 }
 
 
+// ------------------------------------------------------------------ batched clusters (multi-draw)
+//
+// Draw calls, not triangles, bound the frame (three spends ~6 µs of CPU per draw call). The clusters of one zone and
+// material therefore share a single mesh: one index buffer with the clusters one after the other (each with its
+// small / tiny LOD parts at its end), one quantisation frame. Every frame the visible clusters (occlusion mask, LOD,
+// per-cluster frustum test against the rendering camera, also for the lamp shadow faces) are turned into index ranges;
+// three draws the first one, the rest go out in the same state with one WEBGL_multi_draw call right after it.
+
+const BATCH_VERTS = 1 << 20; // one batch per zone and material (32-bit indices where needed)
+let _uploading = false;
+let _mdExt; // WEBGL_multi_draw (null: not available)
+const _pm = new THREE.Matrix4(), _fr = new THREE.Frustum();
+
+function bakeBatches(world, root, list, res, chunks) {
+  let cur = [], nv = 0;
+  const flush = () => { if (cur.length) makeBatch(world, root, cur, res, chunks); cur = []; nv = 0; };
+  for (const B of list) {
+    if (!B.nv || !(B.ix[0].n + B.ix[1].n + B.ix[2].n)) continue;
+    if (cur.length && nv + B.nv > BATCH_VERTS) flush();
+    cur.push(B); nv += B.nv;
+  }
+  flush();
+}
+
+/** Bounds of a bucket's (root space) vertices; null if there are only NaN positions. */
+function bucketBounds(B) {
+  const A = B.vtx;
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0, o = 0; i < B.nv; i++, o += 8) {
+    const x = A[o], y = A[o + 1], z = A[o + 2];
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z;
+  }
+  if (!(x1 >= x0) || !(y1 >= y0) || !(z1 >= z0)) return null;
+  return [x0, y0, z0, x1, y1, z1];
+}
+
+function makeBatch(world, root, Bs, res, chunks) {
+  const parts = [];
+  let X0 = Infinity, Y0 = Infinity, Z0 = Infinity, X1 = -Infinity, Y1 = -Infinity, Z1 = -Infinity, nv = 0, nIdx = 0;
+  for (const B of Bs) {
+    const b = bucketBounds(B);
+    if (!b) { B.vtx = B.ix = null; continue; }
+    parts.push({ B, b });
+    X0 = Math.min(X0, b[0]); Y0 = Math.min(Y0, b[1]); Z0 = Math.min(Z0, b[2]); X1 = Math.max(X1, b[3]); Y1 = Math.max(Y1, b[4]); Z1 = Math.max(Z1, b[5]);
+    nv += B.nv; nIdx += B.ix[0].n + B.ix[1].n + B.ix[2].n;
+  }
+  if (!parts.length) return;
+  const half = Math.max(X1 - X0, Y1 - Y0, Z1 - Z0, 1e-3) / 2;
+  const q = Math.max(2 ** Math.ceil(Math.log2(half / 32000)), 2 ** -16), iq = 1 / q;
+  const cx = Math.round((X0 + X1) / 2 * iq), cy = Math.round((Y0 + Y1) / 2 * iq), cz = Math.round((Z0 + Z1) / 2 * iq);
+  const pa = new Int16Array(nv * 4), na = new Int8Array(nv * 4), ua = new Float32Array(nv * 2);
+  const ia = nv <= 65536 ? new Uint16Array(nIdx) : new Uint32Array(nIdx);
+  const first = parts[0].B;
+  const clusters = [];
+  let vo = 0, io = 0;
+  root.updateWorldMatrix(true, false);
+  for (const { B, b } of parts) {
+    const A = B.vtx;
+    for (let i = 0, o = 0; i < B.nv; i++, o += 8) {
+      const p = (vo + i) * 4;
+      pa[p] = Math.round(A[o] * iq) - cx || 0; pa[p + 1] = Math.round(A[o + 1] * iq) - cy || 0; pa[p + 2] = Math.round(A[o + 2] * iq) - cz || 0;
+      na[p] = Math.round(A[o + 3] * 127) || 0; na[p + 1] = Math.round(A[o + 4] * 127) || 0; na[p + 2] = Math.round(A[o + 5] * 127) || 0;
+      ua[(vo + i) * 2] = A[o + 6]; ua[(vo + i) * 2 + 1] = A[o + 7];
+    }
+    const start = io;
+    for (let k = 0; k < 3; k++) {
+      const src = B.ix[k].a, n = B.ix[k].n;
+      for (let j = 0; j < n; j++) ia[io + j] = src[j] + vo;
+      io += n;
+    }
+    const I0 = B.ix[0].n, I1 = B.ix[1].n, I2 = B.ix[2].n;
+    _box.min.set(b[0], b[1], b[2]); _box.max.set(b[3], b[4], b[5]);
+    _box.applyMatrix4(root.matrixWorld);
+    clusters.push({ mesh: null, batch: null, zone: root, x0: _box.min.x, x1: _box.max.x, y0: _box.min.y, y1: _box.max.y, z0: _box.min.z, z1: _box.max.z, lod: [I0, I0 + I1, I0 + I1 + I2], n: -1, start, on: false });
+    vo += B.nv;
+    B.vtx = B.ix = null;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pa, 4));
+  geo.setAttribute('normal', new THREE.BufferAttribute(na, 4, true));
+  geo.setAttribute('uv', new THREE.BufferAttribute(ua, 2));
+  geo.setIndex(new THREE.BufferAttribute(ia, 1));
+  geo.boundingBox = new THREE.Box3(new THREE.Vector3(Math.floor(X0 * iq) - cx - 1, Math.floor(Y0 * iq) - cy - 1, Math.floor(Z0 * iq) - cz - 1),
+    new THREE.Vector3(Math.ceil(X1 * iq) - cx + 1, Math.ceil(Y1 * iq) - cy + 1, Math.ceil(Z1 * iq) - cz + 1));
+  geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
+  for (const a of [geo.attributes.position, geo.attributes.normal, geo.attributes.uv, geo.index]) a.onUpload(releaseArray);
+  res.tris += nIdx / 3;
+  res.bytes += pa.byteLength + na.byteLength + ua.byteLength + ia.byteLength;
+  geo.userData.gpuBytes = pa.byteLength + na.byteLength + ua.byteLength + ia.byteLength;
+  const mesh = new THREE.Mesh(geo, first.material);
+  mesh.position.set(cx * q, cy * q, cz * q);
+  mesh.scale.setScalar(q);
+  mesh.castShadow = first.cast; mesh.receiveShadow = first.receive; mesh.renderOrder = first.order;
+  mesh.name = 'baked';
+  const n = clusters.length;
+  const batch = {
+    clusters, bpe: ia.BYTES_PER_ELEMENT, type: ia instanceof Uint16Array ? 0x1403 : 0x1405,
+    counts: new Int32Array(n), offs: new Int32Array(n), m: 0, extraTris: 0,
+  };
+  for (const c of clusters) { c.mesh = mesh; c.batch = batch; }
+  mesh.userData.batch = batch;
+  mesh.onBeforeRender = batchBeforeRender;
+  mesh.onAfterRender = batchAfterRender;
+  mesh.onBeforeShadow = batchBeforeShadow;
+  mesh.onAfterShadow = batchAfterRender;
+  root.add(mesh);
+  mesh.updateMatrixWorld(true);
+  (root.userData.batches ??= []).push(mesh);
+  for (const c of clusters) { chunks.push(c); world.chunks.push(c); }
+  res.after++;
+}
+
+const _nm3 = new THREE.Matrix3();
+/** One exterior bucket in world space: float positions, Int8 normals, uv, indices (all LOD bins), box, LOD counts. */
+function extPart(B, root) {
+  const b = bucketBounds(B);
+  if (!b) { B.vtx = B.ix = null; return null; }
+  root.updateWorldMatrix(true, false);
+  const M = root.matrixWorld, id = isIdentity(M), e = M.elements;
+  _nm3.getNormalMatrix(M);
+  const ne = _nm3.elements, A = B.vtx, nv = B.nv;
+  const pos = new Float32Array(nv * 3), nrm = new Int8Array(nv * 4), uv = new Float32Array(nv * 2);
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0, o = 0; i < nv; i++, o += 8) {
+    let x = A[o], y = A[o + 1], z = A[o + 2], nx = A[o + 3], ny = A[o + 4], nz = A[o + 5];
+    if (!id) {
+      const X = e[0] * x + e[4] * y + e[8] * z + e[12], Y = e[1] * x + e[5] * y + e[9] * z + e[13], Z = e[2] * x + e[6] * y + e[10] * z + e[14];
+      x = X; y = Y; z = Z;
+      const NX = ne[0] * nx + ne[3] * ny + ne[6] * nz, NY = ne[1] * nx + ne[4] * ny + ne[7] * nz, NZ = ne[2] * nx + ne[5] * ny + ne[8] * nz;
+      const l = Math.hypot(NX, NY, NZ) || 1; nx = NX / l; ny = NY / l; nz = NZ / l;
+    }
+    pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+    if (x === x) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    nrm[i * 4] = Math.round(nx * 127) || 0; nrm[i * 4 + 1] = Math.round(ny * 127) || 0; nrm[i * 4 + 2] = Math.round(nz * 127) || 0;
+    uv[i * 2] = A[o + 6]; uv[i * 2 + 1] = A[o + 7];
+  }
+  const I0 = B.ix[0].n, I1 = B.ix[1].n, I2 = B.ix[2].n, ix = new Uint32Array(I0 + I1 + I2);
+  ix.set(B.ix[0].a.subarray(0, I0), 0); ix.set(B.ix[1].a.subarray(0, I1), I0); ix.set(B.ix[2].a.subarray(0, I2), I0 + I1);
+  const part = { pos, nrm, uv, ix, nv, lod: [I0, I0 + I1, I0 + I1 + I2], box: [x0, y0, z0, x1, y1, z1], material: B.material, cast: B.cast, receive: B.receive, order: B.order };
+  B.vtx = B.ix = null;
+  return part;
+}
+
+/** Exterior batch of one material: all its parts in one mesh at the origin (float positions, no quantisation). */
+function makeExtBatch(world, parts) {
+  let nv = 0, nIdx = 0;
+  for (const p of parts) { nv += p.nv; nIdx += p.ix.length; }
+  const pa = new Float32Array(nv * 3), na = new Int8Array(nv * 4), ua = new Float32Array(nv * 2);
+  const ia = nv <= 65536 ? new Uint16Array(nIdx) : new Uint32Array(nIdx);
+  const clusters = [];
+  let vo = 0, io = 0, X0 = Infinity, Y0 = Infinity, Z0 = Infinity, X1 = -Infinity, Y1 = -Infinity, Z1 = -Infinity;
+  for (const p of parts) {
+    pa.set(p.pos, vo * 3); na.set(p.nrm, vo * 4); ua.set(p.uv, vo * 2);
+    for (let j = 0; j < p.ix.length; j++) ia[io + j] = p.ix[j] + vo;
+    const [x0, y0, z0, x1, y1, z1] = p.box;
+    X0 = Math.min(X0, x0); Y0 = Math.min(Y0, y0); Z0 = Math.min(Z0, z0); X1 = Math.max(X1, x1); Y1 = Math.max(Y1, y1); Z1 = Math.max(Z1, z1);
+    const n = p.ix.length;
+    clusters.push({ mesh: null, batch: null, zone: null, x0, x1, y0, y1, z0, z1, lod: p.lod[0] < n ? p.lod : null, n, start: io, on: true });
+    vo += p.nv; io += n;
+    p.pos = p.nrm = p.uv = p.ix = null;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pa, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(na, 4, true));
+  geo.setAttribute('uv', new THREE.BufferAttribute(ua, 2));
+  geo.setIndex(new THREE.BufferAttribute(ia, 1));
+  geo.boundingBox = new THREE.Box3(new THREE.Vector3(X0, Y0, Z0), new THREE.Vector3(X1, Y1, Z1));
+  geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
+  for (const a of [geo.attributes.position, geo.attributes.normal, geo.attributes.uv, geo.index]) a.onUpload(releaseArray);
+  geo.userData.gpuBytes = pa.byteLength + na.byteLength + ua.byteLength + ia.byteLength;
+  const first = parts[0];
+  const mesh = new THREE.Mesh(geo, first.material);
+  mesh.castShadow = first.cast; mesh.receiveShadow = first.receive; mesh.renderOrder = first.order;
+  mesh.name = 'baked';
+  const batch = { clusters, bpe: ia.BYTES_PER_ELEMENT, type: ia instanceof Uint16Array ? 0x1403 : 0x1405, counts: new Int32Array(clusters.length), offs: new Int32Array(clusters.length), m: 0, extraTris: 0 };
+  for (const c of clusters) { c.mesh = mesh; c.batch = batch; if (c.lod) world.extChunks.push(c); }
+  mesh.userData.batch = batch;
+  mesh.onBeforeRender = batchBeforeRender;
+  mesh.onAfterRender = batchAfterRender;
+  mesh.onBeforeShadow = batchBeforeShadow;
+  mesh.onAfterShadow = batchAfterRender;
+  world.exterior.add(mesh);
+  mesh.updateMatrixWorld(true);
+  return { mesh, tris: nIdx / 3, bytes: pa.byteLength + na.byteLength + ua.byteLength + ia.byteLength };
+}
+
+/** Index ranges of the clusters that are on and inside the camera's frustum -> drawRange + extra ranges. */
+function fillRanges(mesh, camera, geometry) {
+  const b = mesh.userData.batch, cl = b.clusters, counts = b.counts, offs = b.offs, bpe = b.bpe;
+  let m = 0, end = -1, fr = null;
+  if (!_uploading) {
+    _pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    fr = _fr.setFromProjectionMatrix(_pm);
+  }
+  if (fr) {
+    const P = fr.planes;
+    for (let i = 0; i < cl.length; i++) {
+      const c = cl[i];
+      if (!c.on) continue;
+      let inside = true;
+      for (let k = 0; k < 6; k++) {
+        const p = P[k], nn = p.normal;
+        if (nn.x * (nn.x > 0 ? c.x1 : c.x0) + nn.y * (nn.y > 0 ? c.y1 : c.y0) + nn.z * (nn.z > 0 ? c.z1 : c.z0) + p.constant < 0) { inside = false; break; }
+      }
+      if (!inside) continue;
+      if (c.start === end) counts[m - 1] += c.n; // contiguous with the previous range
+      else { offs[m] = c.start; counts[m] = c.n; m++; }
+      end = c.start + c.n;
+    }
+  }
+  const dr = geometry.drawRange;
+  if (m) { dr.start = offs[0]; dr.count = counts[0]; } else { dr.start = 0; dr.count = 0; }
+  let t = 0;
+  for (let i = 1; i < m; i++) { t += counts[i]; offs[i] *= bpe; }
+  b.m = m; b.extraTris = t / 3;
+}
+function batchBeforeRender(renderer, scene, camera, geometry) { fillRanges(this, camera, geometry); }
+function batchBeforeShadow(renderer, object, camera, shadowCamera, geometry) { fillRanges(this, shadowCamera, geometry); }
+function batchAfterRender(renderer) {
+  const b = this.userData.batch;
+  if (b.m <= 1) return;
+  const gl = renderer.getContext();
+  if (_mdExt === undefined) _mdExt = gl.getExtension('WEBGL_multi_draw') || null;
+  if (_mdExt) _mdExt.multiDrawElementsWEBGL(gl.TRIANGLES, b.counts, 1, b.type, b.offs, 1, b.m - 1);
+  else for (let i = 1; i < b.m; i++) gl.drawElements(gl.TRIANGLES, b.counts[i], b.type, b.offs[i]);
+  const info = renderer.info.render;
+  info.triangles += b.extraTris;
+  b.m = 0;
+}
+
 /** Exterior instanced details made of tiny instances (rivet heads) are hidden beyond TINY_INST.d from their box. */
 function registerExteriorInstances(world) {
+  const drop = [];
   world.exterior.traverse((o) => {
     if (!o.isInstancedMesh || o.userData.noMerge) return;
     const g = o.geometry;
@@ -765,11 +1180,13 @@ function registerExteriorInstances(world) {
     let maxScale = 0;
     for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); m.decompose(p, q, s); maxScale = Math.max(maxScale, s.x, s.y, s.z); }
     if (g.boundingSphere.radius * maxScale >= TINY_INST.r) return;
+    if (world.dropTinyInstances) { drop.push(o); return; } // weak devices: no rivet heads at all
     o.updateWorldMatrix(true, false);
     o.computeBoundingBox();
     _box.copy(o.boundingBox).applyMatrix4(o.matrixWorld);
     world.extChunks.push({ mesh: o, x0: _box.min.x, x1: _box.max.x, y0: _box.min.y, y1: _box.max.y, z0: _box.min.z, z1: _box.max.z, lod: null, far: TINY_INST.d });
   });
+  for (const o of drop) { o.parent?.remove(o); o.dispose(); }
 }
 
 

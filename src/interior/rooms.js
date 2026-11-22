@@ -108,6 +108,8 @@ function rngOf(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) |
 // door leaf templates (merged per size + style + variant): origin at the hinge, leaf along +x, thickness along z.
 // variant: 'louvre' (cabin doors: ventilation louvre in the lower panel), 'glazed' (public rooms), '' (panelled)
 const leafCache = new Map();
+/** Deck streaming: forget the cached door-leaf templates (rebuilt on demand, frees memory). */
+export function flushRoomCaches() { leafCache.clear(); }
 function doorLeaf(w, h, style, variant = '') {
   const key = `${Math.round(w * 100)}_${Math.round(h * 100)}_${style}_${variant}`;
   let t = leafCache.get(key);

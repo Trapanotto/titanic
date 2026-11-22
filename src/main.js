@@ -7,10 +7,36 @@ import { Player } from './app/player.js';
 import { Controls } from './app/controls.js';
 import { UI } from './app/ui.js';
 import { PostPipeline, QUALITY_LEVELS } from './app/post.js';
+import { TIER, TIERS, setTier, detectTier, probeCaps, applyDebugCaps, lowerTier } from './core/tier.js';
+import { DeckStreamer } from './app/stream.js';
 
 const params = new URLSearchParams(location.search);
 const flag = (name) => { const v = params.get(name); return v !== null && v !== '0' && v !== 'false'; };
 const DEG = Math.PI / 180;
+
+// ------------------------------------------------------------------ device tier (before anything heavy exists)
+applyDebugCaps(params);
+const caps = probeCaps();
+const tierPick = detectTier(params, caps);
+setTier(tierPick.name, tierPick.reason, { ...tierPick.info, ...(caps || {}) });
+TIER.streaming = !flag('nostream');
+
+/** Reload one tier lower (after a lost context or an out-of-memory failure); at most once per tier and session. */
+function fallbackTier(why) {
+  const lower = lowerTier(TIER.name);
+  let tried = '';
+  try { tried = sessionStorage.getItem('titanicTierDrop') || ''; } catch { /* storage blocked */ }
+  if (lower === TIER.name || tried.split(',').includes(TIER.name)) return false;
+  try { sessionStorage.setItem('titanicTierDrop', (tried ? tried + ',' : '') + TIER.name); } catch { return false; }
+  console.warn(`[app] ${why} – neuer Versuch mit Stufe "${lower}"`);
+  const u = new URL(location.href);
+  u.searchParams.set('tier', lower);
+  location.replace(u.toString());
+  return true;
+}
+const isOOM = (e) => e instanceof RangeError || /allocation|out of memory|memory/i.test(String(e?.message || e));
+const MEMORY_FAIL = 'Dieses Gerät hat nicht genug Arbeits- oder Grafikspeicher für den Rundgang – auch in der einfachsten '
+  + 'Darstellung nicht. Bitte schließe andere Tabs und Apps und lade die Seite neu, oder verwende einen Computer.';
 
 const canvas = document.getElementById('view');
 const scene = new THREE.Scene();
@@ -29,14 +55,20 @@ const controls = new Controls(player, canvas, {
 });
 ui.controls = controls;
 
-const debug = (window.__titanic = { world, scene, camera, renderer: null, player, ui, controls, errors: [], ready: false, frame: null, params });
+const debug = (window.__titanic = { world, scene, camera, renderer: null, player, ui, controls, errors: [], ready: false, frame: null, params, tier: TIER });
+world.tier = TIER;
+world.dropRadius = TIER.dropRadius;
+world.dropTinyInstances = !TIER.tinyInstances;
+ui.tier = TIER;
 
 // ------------------------------------------------------------------ renderer
 
 // Quality: ?q=low|med|high (or niedrig|mittel|hoch), key G cycles. Default 'hoch' on desktop, 'mittel' on touch devices.
 const Q_ALIAS = { low: 'niedrig', med: 'mittel', medium: 'mittel', mid: 'mittel', high: 'hoch', niedrig: 'niedrig', mittel: 'mittel', hoch: 'hoch' };
 const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-const quality0 = Q_ALIAS[(params.get('q') || '').toLowerCase()] || (coarse ? 'mittel' : 'hoch');
+Q_ALIAS.mobil = Q_ALIAS.mobile = 'mobil';
+const qWanted = Q_ALIAS[(params.get('q') || '').toLowerCase()];
+const quality0 = qWanted && (TIER.qualities.includes(qWanted) || params.get('q')) ? qWanted : TIER.quality;
 world.quality = quality0;
 
 /** WebGL 2 test on a throw-away canvas (the real one must be created by three.js with its own attributes). */
@@ -54,14 +86,14 @@ const NO_WEBGL2 = 'Dein Browser oder deine Grafikkarte unterstützt WebGL 2 nich
 
 let renderer = null, post = null;
 try {
-  if (!hasWebGL2()) throw new Error('no webgl2');
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  if (!caps && !hasWebGL2()) throw new Error('no webgl2');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: TIER.antialias, powerPreference: 'high-performance' });
   ui.renderer = renderer;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2)); // phones: cap the pixel ratio
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, TIER.maxPixelRatio, coarse ? 1.5 : 2)); // phones: cap the pixel ratio
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = TIER.sunShadow > 0 || TIER.lampShadows > 0;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   world.renderer = renderer;
   debug.renderer = renderer;
@@ -93,6 +125,7 @@ window.addEventListener('resize', resize);
 
 const updates = [];
 let time = 0, last = 0, raf = 0, running = false, contextLost = false, loopErrors = 0;
+let streamer = null;
 
 function step(dt) {
   time += dt;
@@ -102,6 +135,7 @@ function step(dt) {
   try {
     world.update(dt, time);
     for (let i = 0; i < updates.length; i++) updates[i](dt, time);
+    streamer?.update(dt, time, camera.position);
   } catch (e) {
     if (loopErrors++ < 5) console.error('[app] Fehler in einem update()', e);
   }
@@ -114,10 +148,19 @@ function step(dt) {
 const autoQ = { on: !flag('noauto'), manual: false, ema: 1 / 60, slow: 0, fast: 0, ups: 0, downs: 0, cool: 5 };
 function autoQuality(raw) {
   const a = autoQ;
-  if (!a.on || a.manual || !post || ui.modal) return;
+  if (!a.on || !post || ui.modal || streamer?.busy) return;
   // frames > 100 ms are hitches (uploads, GC) or a throttled / hidden window – not a slow GPU: ignore them
   if (raw > 0.1) return;
   a.ema += (raw - a.ema) * 0.05;
+  // weak tiers: dynamic resolution between the tier's minimum and the preset's pixel ratio (hysteresis)
+  if (TIER.minPixelRatio < 1) {
+    a.drsSlow = a.ema > 0.024 ? (a.drsSlow || 0) + raw : 0;
+    a.drsFast = a.ema < 0.014 ? (a.drsFast || 0) + raw : 0;
+    const sc = post.resScale ?? 1;
+    if (a.drsSlow > 1.5 && sc > TIER.minPixelRatio + 0.01) { post.setResolutionScale(Math.max(TIER.minPixelRatio, sc - 0.1)); a.drsSlow = 0; a.ema = 1 / 60; }
+    else if (a.drsFast > 4 && sc < 0.999) { post.setResolutionScale(Math.min(1, sc + 0.1)); a.drsFast = 0; }
+  }
+  if (a.manual) return;
   if (a.cool > 0) { a.cool -= raw; a.slow = a.fast = 0; return; }
   a.slow = a.ema > 0.025 ? a.slow + raw : 0;
   a.fast = a.ema < 0.012 ? a.fast + raw : 0;
@@ -125,7 +168,7 @@ function autoQuality(raw) {
   let q = null;
   if (a.slow > 3 && i > 0) { q = QUALITY_LEVELS[i - 1]; a.downs++; }
   else if (a.fast > 30 && a.downs > 0 && a.ups < 1 && i < QUALITY_LEVELS.length - 1) { q = QUALITY_LEVELS[i + 1]; a.ups++; }
-  if (!q) return;
+  if (!q || !TIER.qualities.includes(q)) return;
   post.setQuality(q);
   a.cool = 6; a.slow = a.fast = 0; a.ema = 1 / 60;
   ui.toast(`Grafikqualität automatisch auf „${q}“ ${QUALITY_LEVELS.indexOf(q) > i ? 'erhöht' : 'gesenkt'} (G zum Ändern)`, 3.5);
@@ -139,6 +182,7 @@ function frame(now) {
   last = now;
   // after the start: upload the remaining baked chunks in ~3 ms slices (frees their CPU copies)
   if (!contextLost) { try { world.uploadStep(renderer, 3); } catch (e) { if (loopErrors++ < 5) console.error('[app] upload', e); } }
+  if (streamer?.blocking) return; // the player's deck is being built behind the veil
   step(dt);
   autoQuality(raw);
 }
@@ -161,6 +205,8 @@ canvas.addEventListener('webglcontextlost', (e) => {
   contextLost = true;
   stop();
   controls.clearKeys();
+  // most often the GPU ran out of memory: start again one tier lower (once per tier and session)
+  if (fallbackTier('WebGL-Kontext verloren')) return;
   hideLost = ui.showError('Grafik unterbrochen',
     'Die Verbindung zur Grafikkarte ist verloren gegangen (zum Beispiel durch einen Treiber-Neustart oder Speichermangel). '
     + 'Es wird versucht, sie wiederherzustellen – falls das Bild nicht zurückkommt, lade die Seite bitte neu.', true);
@@ -171,12 +217,13 @@ canvas.addEventListener('webglcontextrestored', () => {
 });
 
 // G: cycle the graphics quality (niedrig -> mittel -> hoch)
-const Q_LABEL = { niedrig: 'niedrig (ohne Nachbearbeitung)', mittel: 'mittel', hoch: 'hoch' };
+const Q_LABEL = { mobil: 'mobil (sparsam)', niedrig: 'niedrig (ohne Nachbearbeitung)', mittel: 'mittel', hoch: 'hoch' };
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'KeyG' || e.repeat || e.ctrlKey || e.altKey || e.metaKey || !post) return;
   const tag = e.target?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-  const q = QUALITY_LEVELS[(QUALITY_LEVELS.indexOf(post.quality) + 1) % QUALITY_LEVELS.length];
+  const L = TIER.qualities;
+  const q = L[(L.indexOf(post.quality) + 1) % L.length];
   autoQ.manual = true; // the user decides from now on
   post.setQuality(q);
   ui.toast?.(`Grafikqualität: ${Q_LABEL[q]}`, 1.8);
@@ -185,7 +232,7 @@ ui.qualityName = () => post?.quality || '';
 debug.setQuality = (q) => { post?.setQuality(Q_ALIAS[q] || q); return post?.quality; };
 
 /** Manual stepping for automated tests (works even when the tab is hidden): __titanic.frame(1/60, 10). */
-debug.frame = (dt = 1 / 60, count = 1) => { if (renderer) for (let i = 0; i < count; i++) step(Math.min(0.05, dt)); };
+debug.frame = (dt = 1 / 60, count = 1) => { if (renderer) for (let i = 0; i < count; i++) { if (streamer?.blocking) break; step(Math.min(0.05, dt)); } };
 
 // ------------------------------------------------------------------ build
 
@@ -203,15 +250,32 @@ function nextPaint() {
   });
 }
 
+const STREAMABLE = (m) => !['environment', 'exterior', 'fittings'].includes(m.id);
+
 async function buildModules() {
   const only = params.get('only')?.split(',').map((s) => s.trim()).filter(Boolean);
   const list = only?.length ? MODULES.filter((m) => only.includes(m.id)) : MODULES;
   const total = list.length + 1.5;
   const heap = () => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : -1);
   debug.timings = [];
-  for (let i = 0; i < list.length; i++) {
-    const m = list[i];
-    ui.setProgress(i / total, m.label + ' …');
+  debug.heapPeak = 0;
+  const peak = () => { const h = heap(); if (h > debug.heapPeak) debug.heapPeak = h; return h; };
+  // geometry detail of the interior kit (round parts) per tier – before the first deck is built
+  const kit = await import('./interior/props-core.js');
+  const rooms = await import('./interior/rooms.js');
+  kit.DETAIL.q = TIER.detail;
+  const flush = () => { kit.flushKitCaches(); rooms.flushRoomCaches(); };
+  const fixed = TIER.streaming ? list.filter((m) => !STREAMABLE(m)) : list;
+  const streamed = TIER.streaming ? list.filter(STREAMABLE) : [];
+  let done = 0;
+  const fail = (m, e) => {
+    console.error(`[app] Modul "${m.id}" konnte nicht gebaut werden:`, e);
+    debug.errors.push({ id: m.id, error: e });
+    if (isOOM(e)) throw e;
+    ui.loadingWarn(`⚠ ${m.label} (${m.id}): ${e?.message || e}`);
+  };
+  for (const m of fixed) {
+    ui.setProgress(done / total, m.label + ' …');
     await nextPaint();
     try {
       world.colliderTag = m.id; // exterior colliders (windows!) never occlude the interior
@@ -219,23 +283,42 @@ async function buildModules() {
       const mod = await m.load();
       const t1 = performance.now();
       const res = await mod.build(world);
-      debug.timings.push({ id: m.id, load: Math.round(t1 - t0), build: Math.round(performance.now() - t1), heap: heap(), at: Math.round(performance.now()) });
+      debug.timings.push({ id: m.id, load: Math.round(t1 - t0), build: Math.round(performance.now() - t1), heap: peak(), at: Math.round(performance.now()) });
       if (typeof res?.update === 'function') updates.push(res.update);
-    } catch (e) {
-      console.error(`[app] Modul "${m.id}" konnte nicht gebaut werden:`, e);
-      debug.errors.push({ id: m.id, error: e });
-      ui.loadingWarn(`⚠ ${m.label} (${m.id}): ${e?.message || e}`);
-    }
+    } catch (e) { fail(m, e); }
+    done++;
   }
-  ui.setProgress(list.length / total, 'Das Schiff wird zusammengesetzt …');
+  if (streamed.length) {
+    // dry pass: every deck once for the logical data; its geometry is dropped right away (programs are compiled)
+    streamer = debug.streamer = new DeckStreamer(world, TIER, { flush, onError: (e) => { if (isOOM(e)) fallbackTier('Speichermangel beim Nachladen'); } });
+    // programs of a deck are compiled (in parallel, off the main thread where supported) before it is shown
+    streamer.compileZones = async (zones) => {
+      if (!renderer?.compileAsync) return;
+      const tmp = new THREE.Scene();
+      for (const g of zones) for (const c of g.children) tmp.children.push(c);
+      try { await renderer.compileAsync(tmp, camera, scene); } catch { /* compiled on first use */ }
+      tmp.children.length = 0;
+    };
+    try {
+      await streamer.dryPass(streamed, async (m, phase) => {
+        if (phase === 'start') { ui.setProgress(done / total, m.label + ' …'); await nextPaint(); return; }
+        debug.timings.push({ id: m.id, build: m.buildMs, heap: peak(), at: Math.round(performance.now()) });
+        done++;
+        // a little idle time: the garbage of the dropped deck geometry gets collected before the next deck (heap peak)
+        if (!document.hidden) await new Promise((r) => setTimeout(r, 40));
+      });
+    } catch (e) { fail({ id: 'stream', label: 'Decks' }, e); }
+  }
+  ui.setProgress(done / total, 'Das Schiff wird zusammengesetzt …');
   await nextPaint();
   try {
     const t0 = performance.now();
-    await world.bake((p) => ui.setProgress((list.length + p) / total));
-    debug.timings.push({ id: 'bake', build: Math.round(performance.now() - t0), heap: heap(), at: Math.round(performance.now()) });
+    await world.bake((p) => ui.setProgress((done + p) / total));
+    debug.timings.push({ id: 'bake', build: Math.round(performance.now() - t0), heap: peak(), at: Math.round(performance.now()) });
   } catch (e) {
     console.error('[app] bake fehlgeschlagen:', e);
     debug.errors.push({ id: 'bake', error: e });
+    if (isOOM(e)) throw e;
     ui.loadingWarn(`⚠ Zusammensetzen: ${e?.message || e}`);
   }
 }
@@ -294,8 +377,24 @@ async function main() {
   addFallbackEnvironment();
   if (flag('night')) world.setNight(true);
   placePlayer();
+  if (streamer) {
+    // only the player's own deck before going interactive; neighbours follow in idle time
+    ui.setProgress(0.97, 'Das Deck wird eingerichtet …');
+    await nextPaint();
+    const t0 = performance.now();
+    // only the own deck before going interactive (time to interactive); stairwell views and neighbours follow right
+    // after the start in idle slices
+    const { own } = streamer.wanted(camera.position, new Set(), 0);
+    await streamer.load(streamer.zonesByDeck[own] || []);
+    debug.timings.push({ id: 'deck ' + own, build: Math.round(performance.now() - t0), heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : -1 });
+  }
   ui.setProgress(1, 'Leinen los!');
   await nextPaint();
+  try { // the procedural textures are generated in a worker while the ship is built
+    const t0 = performance.now();
+    await (await import('./core/materials.js')).texturesReady();
+    debug.timings?.push({ id: 'texWait', build: Math.round(performance.now() - t0), tex: Math.round(window.__titanicTexMs || 0) });
+  } catch (e) { console.warn('[app] Texturen', e); }
   try {
     world.onAfterBake?.(); // environment: exterior lamp volume, lamp-shadow casters
   } catch (e) {
@@ -324,5 +423,7 @@ async function main() {
 
 main().catch((e) => {
   console.error('[app] Start fehlgeschlagen:', e);
+  if (isOOM(e) && fallbackTier('Speichermangel beim Aufbau')) return;
+  if (isOOM(e)) { ui.loadingFatal('Nicht genug Speicher.'); ui.showError('Nicht genug Speicher', MEMORY_FAIL, true); return; }
   ui.loadingFatal('Beim Start ist ein Fehler aufgetreten – Details in der Konsole.');
 });

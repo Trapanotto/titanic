@@ -510,3 +510,52 @@ export function ropeLay({ size = 256, metres = 0.12, seed = 101 } = {}) {
     o.rough = 1;
   });
 }
+
+// ------------------------------------------------------------------ the shared library's surfaces
+// (generated in a worker in the browser, see core/tex-worker.js; synchronously in node)
+const RECIPES = {
+  woodPlanks, woodSolid, woodPanel, paintedPanel, pineBoards, mahoganyFigure, rivetedSteel, hullPlating, treadPlate,
+  metalSmudge, paintSurface, rustSurface, carpet, linoTiles, ceramicTiles, brickWall, coalLumps, plasterCeiling,
+  marbleSurface, weave, leatherGrain, basketWeave, ropeLay,
+};
+export const SURFACES = {
+  deck: ['woodPlanks', { size: 1024, metres: 4, planks: 32, base: '#b6a283', seed: 3 }],
+  oak: ['woodSolid', { base: '#85603a', fleck: 0.5, contrast: 0.13, seed: 5, rough: 0.5 }],
+  oakPanel: ['woodPanel', { base: '#805c37', seed: 7 }],
+  mahogany: ['mahoganyFigure', { base: '#44251a', seed: 9 }],
+  pine: ['pineBoards', { base: '#c3a473', seed: 11 }],
+  whitePanel: ['paintedPanel', { base: '#e6e3da', seed: 13 }],
+  steel: ['rivetedSteel', { metres: 2.4, base: '#8b8e90', seed: 15 }],
+  hull: ['hullPlating', { size: 1024, metres: 6, seed: 17 }],
+  carpetRed: ['carpet', { ground: '#5a1f1d', motif: '#97794a', accent: '#2f3a2c', seed: 21 }],
+  carpetGreen: ['carpet', { ground: '#2c3a2b', motif: '#958452', accent: '#57261f', seed: 23 }],
+  carpetBlue: ['carpet', { ground: '#252e44', motif: '#a09368', accent: '#5a2a25', seed: 25 }],
+  // 30 cm tiles, 8 x 8 per texture (2.4 m repeat, so the mottling / wax sheen does not visibly tile)
+  linoCream: ['linoTiles', { a: '#bdb193', b: '#784e42', inset: true, metres: 2.4, n: 8, seed: 27, mottle: 0.1 }],
+  linoBlue: ['linoTiles', { a: '#c9c2ae', b: '#505d6e', inset: true, metres: 2.4, n: 8, seed: 29, mottle: 0.1 }],
+  linoRed: ['linoTiles', { a: '#7f4535', b: '#74402f', metres: 1.0, rough: 0.5, seed: 31, mottle: 0.12 }],
+  tileWhite: ['ceramicTiles', { seed: 33 }],
+  steelFloor: ['treadPlate', { seed: 35 }],
+  coal: ['coalLumps', { seed: 37 }],
+  plaster: ['plasterCeiling', { seed: 39 }],
+  brick: ['brickWall', { seed: 41 }],
+  paint: ['paintSurface', { seed: 85 }],
+  smudge: ['metalSmudge', { seed: 81 }],
+  rust: ['rustSurface', { seed: 87 }],
+  marble: ['marbleSurface', { seed: 91 }],
+  fabric: ['weave', { thread: 2, metres: 0.5, seed: 95 }],
+  canvas: ['weave', { thread: 4, metres: 0.6, depth: 1, varK: 0.16, stains: 1, seed: 97 }],
+  leather: ['leatherGrain', { seed: 99 }],
+  wicker: ['basketWeave', { seed: 101 }],
+  rope: ['ropeLay', { seed: 103 }],
+};
+/** Build one surface of the shared library by name. */
+const DEFAULT_SIZE = { woodPlanks: 1024, hullPlating: 1024, ropeLay: 256 };
+/** Build one surface of the shared library by name; maxSize caps the resolution (weak tiers: 256 / 512). */
+export function makeSurface(name, maxSize = 4096) {
+  const [fn, opts] = SURFACES[name];
+  const size = opts.size ?? DEFAULT_SIZE[fn] ?? 512;
+  // below 512 the small ones shrink as well (keeps the relative detail of e.g. the rope texture)
+  const s = maxSize >= size ? size : maxSize >= 512 ? maxSize : Math.max(64, Math.min(maxSize, size / 2));
+  return RECIPES[fn](s === size ? opts : { ...opts, size: s });
+}

@@ -1,9 +1,7 @@
 import * as THREE from 'three';
-import {
-  woodPlanks, woodSolid, woodPanel, paintedPanel, pineBoards, mahoganyFigure, rivetedSteel, hullPlating, treadPlate,
-  metalSmudge, paintSurface, rustSurface, carpet, linoTiles, ceramicTiles, brickWall, coalLumps, plasterCeiling,
-  marbleSurface, weave, leatherGrain, basketWeave, ropeLay,
-} from './tex-lib.js';
+import { SURFACES, makeSurface } from './tex-lib.js';
+import { pendingTexture, fillTexture } from './tex.js';
+import { TIER } from './tier.js';
 
 // Shared material library. ALWAYS reuse these (meshes are merged per material).
 // Textures are authored "per metre": use tiledBox()/tiledPlane() from core/geo.js so UVs are in metres.
@@ -28,39 +26,54 @@ export function canvasTexture(size, metres, draw, seed = 1) {
 // ------------------------------------------------------------------ procedural surfaces
 
 const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
-const S = {
-  deck: woodPlanks({ size: 1024, metres: 4, planks: 32, base: '#b6a283', seed: 3 }),
-  oak: woodSolid({ base: '#85603a', fleck: 0.5, contrast: 0.13, seed: 5, rough: 0.5 }),
-  oakPanel: woodPanel({ base: '#805c37', seed: 7 }),
-  mahogany: mahoganyFigure({ base: '#44251a', seed: 9 }),
-  pine: pineBoards({ base: '#c3a473', seed: 11 }),
-  whitePanel: paintedPanel({ base: '#e6e3da', seed: 13 }),
-  steel: rivetedSteel({ metres: 2.4, base: '#8b8e90', seed: 15 }),
-  hull: hullPlating({ size: 1024, metres: 6, seed: 17 }),
-  carpetRed: carpet({ ground: '#5a1f1d', motif: '#97794a', accent: '#2f3a2c', seed: 21 }),
-  carpetGreen: carpet({ ground: '#2c3a2b', motif: '#958452', accent: '#57261f', seed: 23 }),
-  carpetBlue: carpet({ ground: '#252e44', motif: '#a09368', accent: '#5a2a25', seed: 25 }),
-  // 30 cm tiles, 8 x 8 per texture (2.4 m repeat, so the mottling / wax sheen does not visibly tile)
-  linoCream: linoTiles({ a: '#bdb193', b: '#784e42', inset: true, metres: 2.4, n: 8, seed: 27, mottle: 0.1 }),
-  linoBlue: linoTiles({ a: '#c9c2ae', b: '#505d6e', inset: true, metres: 2.4, n: 8, seed: 29, mottle: 0.1 }),
-  linoRed: linoTiles({ a: '#7f4535', b: '#74402f', metres: 1.0, rough: 0.5, seed: 31, mottle: 0.12 }),
-  tileWhite: ceramicTiles({ seed: 33 }),
-  steelFloor: treadPlate({ seed: 35 }),
-  coal: coalLumps({ seed: 37 }),
-  plaster: plasterCeiling({ seed: 39 }),
-  brick: brickWall({ seed: 41 }),
-  paint: paintSurface({ seed: 85 }),
-  smudge: metalSmudge({ seed: 81 }),
-  rust: rustSurface({ seed: 87 }),
-  marble: marbleSurface({ seed: 91 }),
-  fabric: weave({ thread: 2, metres: 0.5, seed: 95 }),
-  canvas: weave({ thread: 4, metres: 0.6, depth: 1, varK: 0.16, stains: 1, seed: 97 }),
-  leather: leatherGrain({ seed: 99 }),
-  wicker: basketWeave({ seed: 101 }),
-  rope: ropeLay({ seed: 103 }),
-};
-const genMs = (typeof performance !== 'undefined' ? performance.now() : 0) - t0;
-if (typeof window !== 'undefined' && window.__titanicTexMs === undefined) window.__titanicTexMs = genMs;
+const S = {};
+const NAMES = Object.keys(SURFACES);
+let genMs = 0, texReady;
+// In the browser the ~1.5 s of pixel generation runs in a worker while the modules build the ship; the materials get
+// 1x1 placeholder textures that are filled before the first frame (main.js awaits texturesReady()).
+const useWorker = typeof window !== 'undefined' && typeof Worker !== 'undefined' && typeof document !== 'undefined'
+  && typeof document.querySelector === 'function';
+if (useWorker) {
+  for (const k of NAMES) S[k] = { map: pendingTexture(true), normalMap: pendingTexture(false), ormMap: pendingTexture(false) };
+  texReady = new Promise((resolve) => {
+    const left = new Set(NAMES);
+    const fill = (k, r) => {
+      if (!left.has(k)) return;
+      left.delete(k);
+      const s = S[k];
+      if (r.A) fillTexture(s.map, r.A, r.size, r.metres);
+      if (r.N) fillTexture(s.normalMap, r.N, r.size, r.metres);
+      if (r.O) fillTexture(s.ormMap, r.O, r.size, r.metres);
+    };
+    const done = () => { genMs = performance.now() - t0; window.__titanicTexMs ??= genMs; resolve(); };
+    const fallback = () => { // worker failed: generate what is left on the main thread
+      for (const k of [...left]) { const r = rawSurface(k); fill(k, r); }
+      done();
+    };
+    let w;
+    try { w = new Worker(new URL('./tex-worker.js', import.meta.url), { type: 'module' }); } catch { fallback(); return; }
+    w.onmessage = (e) => {
+      const { k, r, error } = e.data;
+      if (error) { console.warn('[materials] texture worker', k, error); return; }
+      fill(k, r);
+      if (!left.size) { w.terminate(); done(); }
+    };
+    w.onerror = (e) => { console.warn('[materials] texture worker failed, generating on the main thread', e?.message || e); w.terminate(); fallback(); };
+    w.postMessage({ names: NAMES, maxSize: TIER.texMax });
+  });
+} else {
+  for (const k of NAMES) S[k] = makeSurface(k, TIER.texMax);
+  genMs = (typeof performance !== 'undefined' ? performance.now() : 0) - t0;
+  if (typeof window !== 'undefined' && window.__titanicTexMs === undefined) window.__titanicTexMs = genMs;
+  texReady = Promise.resolve();
+}
+/** Main-thread fallback: raw arrays of one surface. */
+function rawSurface(k) {
+  const s = makeSurface(k, TIER.texMax), img = (t) => t?.image;
+  return { A: img(s.map)?.data, N: img(s.normalMap)?.data, O: img(s.ormMap)?.data, size: img(s.map).width, metres: 1 / s.map.repeat.x };
+}
+/** Resolves once every procedural texture has its pixels. */
+export function texturesReady() { return texReady; }
 
 /**
  * Attach a surface's maps to material options.
@@ -85,7 +98,15 @@ if (!THREE.ShaderChunk.lights_pars_begin.includes('TITANIC_SOFT_FALLOFF')) {
 }
 
 function std(opts) { return new THREE.MeshStandardMaterial(opts); }
-function phys(opts) { return new THREE.MeshPhysicalMaterial(opts); }
+// weak tiers: no clearcoat / sheen (MeshPhysicalMaterial costs a lot more per pixel and to compile)
+const PHYS_ONLY = ['clearcoat', 'clearcoatRoughness', 'sheen', 'sheenRoughness', 'sheenColor', 'ior', 'specularIntensity', 'transmission', 'thickness'];
+function phys(opts) {
+  if (TIER.physical) return new THREE.MeshPhysicalMaterial(opts);
+  const o = { ...opts };
+  if (o.clearcoat) o.roughness = Math.min(o.roughness ?? 1, 0.55 + 0.45 * (o.clearcoatRoughness ?? 0.3)); // a little of the sheen of the lacquer
+  for (const k of PHYS_ONLY) delete o[k];
+  return new THREE.MeshStandardMaterial(o);
+}
 
 // ------------------------------------------------------------------ shared lighting uniforms
 // Written by the environment every frame. Fixed set of uniforms -> no shader recompiles.
@@ -262,7 +283,7 @@ for (const [name, m] of Object.entries(mats)) {
 /** Generated textures by surface name (albedo / normal / orm). */
 export const textures = Object.fromEntries(Object.entries(S).map(([k, s]) => [k, s.map]));
 export const surfaces = S;
-export const textureGenMs = genMs;
+export const textureGenMs = () => genMs;
 
 /** Called by the environment on day/night change. */
 export function applyNightToMaterials(night) {

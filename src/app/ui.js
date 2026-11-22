@@ -225,7 +225,9 @@ export class UI {
     const pm = performance.memory;
     if (pm && pm.usedJSHeapSize) L.push(`JS-Speicher ${Math.round(pm.usedJSHeapSize / 1048576)} MB`);
     const q = this.qualityName?.();
-    if (q) L.push('Qualität ' + q);
+    if (q) L.push('Qualität ' + q + (this.tier ? ' · Stufe ' + this.tier.name : ''));
+    const sm = window.__titanic?.streamer?.stats;
+    if (sm) L.push(`Decks ${sm.decks || '–'} · ${sm.mb} MB Geometrie`);
     this.fpsEl.textContent = L.join('\n');
   }
 

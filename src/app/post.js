@@ -6,6 +6,8 @@ import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 export const QUALITY_LEVELS = ['niedrig', 'mittel', 'hoch'];
 const PRESETS = {
+  // phones / weak devices: direct rendering, at most 1 pixel per CSS pixel (dynamic resolution may go lower)
+  mobil: { post: false, pixelRatio: 1.0, samples: 0, ao: 0, rays: false, bloomLevels: 0, shadow: 0 },
   niedrig: { post: false, pixelRatio: 1.0, samples: 0, ao: 0, rays: false, bloomLevels: 0, shadow: 2048 },
   mittel: { post: true, pixelRatio: 1.0, samples: 2, ao: 8, rays: false, bloomLevels: 4, shadow: 2048 },
   hoch: { post: true, pixelRatio: 1.5, samples: 4, ao: 12, rays: true, bloomLevels: 5, shadow: 4096 },
@@ -306,11 +308,24 @@ export class PostPipeline {
     this._camDir = new THREE.Vector3();
     this.listeners = [];
     this.quad = new FullScreenQuad(null);
-    this.failed = false;
+    this.resScale = 1;
+    // HDR targets need renderable float / half-float colour buffers (missing on many phones): else direct output
+    const ext = renderer.extensions;
+    this.failed = !(ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float'));
+    if (this.failed) console.warn('[post] keine Float-Rendertargets – Nachbearbeitung aus');
     this.setQuality(quality);
   }
 
   onQuality(fn) { this.listeners.push(fn); }
+
+  /** Dynamic resolution: factor on the preset's pixel ratio (weak tiers). */
+  setResolutionScale(k) {
+    k = Math.max(0.3, Math.min(1, k));
+    if (Math.abs(k - this.resScale) < 1e-3) return;
+    this.resScale = k;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio) * k);
+    this.resize();
+  }
 
   setQuality(name) {
     if (!PRESETS[name]) name = 'hoch';
@@ -319,8 +334,8 @@ export class PostPipeline {
     this.preset = PRESETS[name];
     this._dispose();
     const r = this.renderer;
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio));
-    r.toneMapping = this.preset.post ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio) * this.resScale);
+    r.toneMapping = this.preset.post && !this.failed ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
     this._build();
     this.resize();
     for (const fn of this.listeners) fn(name, this.preset);
