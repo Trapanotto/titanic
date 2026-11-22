@@ -35,7 +35,8 @@ export class Controls {
   }
 
   /** True when the player may look/move (pointer locked, or a mode that needs no lock). */
-  get active() { return (this.locked || this.noLock || this.touch) && !this.isBlocked(); }
+  // No confirmation step: keys work immediately; the pointer is locked on the first key press or click.
+  get active() { return !this.isBlocked(); }
 
   requestLock() {
     if (this.noLock || this.touch || this.locked || this.isBlocked()) return;
@@ -90,7 +91,7 @@ export class Controls {
       if (typing && e.code !== 'Escape') return;
       if (e.altKey || e.metaKey) return;
       if (MOVE_KEYS.has(e.code)) {
-        if (!this.isBlocked()) this.keys.add(e.code);
+        if (!this.isBlocked()) { this.keys.add(e.code); if (!this.locked && !e.repeat) this.requestLock(); }
         if (e.code !== 'ControlLeft' && e.code !== 'ControlRight' && !e.ctrlKey) e.preventDefault();
       }
       if (e.repeat || e.ctrlKey) return;
@@ -103,14 +104,15 @@ export class Controls {
 
     document.addEventListener('mousemove', (e) => {
       if (this.isBlocked()) return;
-      if (this.locked || (this._drag && (this.noLock || this.touch))) {
+      if (this.locked || this._drag) {
         // some browsers report huge spikes right after locking
         const dx = Math.max(-150, Math.min(150, e.movementX || 0)), dy = Math.max(-150, Math.min(150, e.movementY || 0));
         this.player.look(dx * LOOK_SENS, dy * LOOK_SENS);
       }
     });
     c.addEventListener('mousedown', (e) => {
-      if (this.noLock || this.touch) { if (e.button === 0) this._drag = true; return; }
+      if (e.button === 0) this._drag = true; // drag-look works even without pointer lock
+      if (this.noLock || this.touch) return;
       if (!this.locked) this.requestLock();
     });
     window.addEventListener('mouseup', () => { this._drag = false; });

@@ -123,7 +123,7 @@ export class UI {
       if (!this.startEl) return;
       const c = this.controls;
       const free = !c || c.locked || c.noLock || c.touch;
-      const show = this.started && this.modal === null && !(free && this.entered);
+      const show = false; // start directly: no click-to-start / pause overlay (controls lock the pointer on first input)
       this.startEl.hidden = !show;
       this.startEl.classList.toggle('paused', this.entered);
       const title = $('start-title');
