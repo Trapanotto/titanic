@@ -257,7 +257,7 @@ function endTemplate(id, open, o = {}) {
   });
   // smokebox: casing, three doors with strap hinges and dogs (variant: middle door open, tube plate visible)
   const { x1: sx1, y0: sy0, y1: sy1, hw } = SB, ym = (sy0 + sy1) / 2;
-  b.box(mats.steelDark, 0, sy0, -hw, sx1, sy1, hw, 'XzZyY');
+  b.box(mats.steelDark, 0, sy0, -hw, sx1, sy1, hw); // closed: its upper corners stand clear of the round end plate
   b.box(mats.iron, sx1, sy0 - 0.04, -hw - 0.04, sx1 + 0.05, sy0 + 0.06, hw + 0.04);
   rivetLine(b, [sx1 + 0.05, sy0 + 0.01, -hw + 0.05], [sx1 + 0.05, sy0 + 0.01, hw - 0.05], n, 0.12);
   [-1.17, 0, 1.17].forEach((dz, k) => {
@@ -279,9 +279,10 @@ function endTemplate(id, open, o = {}) {
   // uptake hood, vertical uptake with riveted bands, slanted part to the breeching, damper quadrant
   b.poly(mats.steelDark, [[sx1, sy1, -hw], [sx1, sy1, hw], [sx1, 5.15, 1.3], [sx1, 5.15, -1.3]], n);
   for (const s of [-1, 1]) b.poly(mats.steelDark, [[0, sy1, s * hw], [sx1, sy1, s * hw], [sx1, 5.15, s * 1.3], [0, 5.15, s * 1.3]], [0, 0.77, s * 0.64]);
+  b.poly(mats.steelDark, [[0, sy1, -hw], [0, sy1, hw], [0, 5.15, 1.3], [0, 5.15, -1.3]], [-1, 0, 0]);
   b.box(mats.steelDark, 0, 5.15, -1.3, sx1, 6.4, 1.3, 'XzZx');
   for (const y of [5.15, 5.8, 6.4]) {
-    b.box(mats.iron, -0.02, y - 0.04, -1.34, sx1 + 0.04, y + 0.04, 1.34, 'XzZ');
+    b.box(mats.iron, -0.02, y - 0.04, -1.34, sx1 + 0.04, y + 0.04, 1.34);
     rivetLine(b, [sx1 + 0.04, y, -1.25], [sx1 + 0.04, y, 1.25], n, 0.12, mats.iron);
   }
   const hi = [[-1.55, 7.45], [-0.85, 7.45]];
@@ -402,7 +403,7 @@ export function buildBoilerRooms(world, b, inst) {
       }
     }
     // ---- breeching (collecting flue) over the boiler row with flanged, riveted sections; trunk to the funnel casing
-    const cx0 = r.de ? r.xc - 1.9 : r.xc - 0.9, cx1 = r.de ? r.xc + 1.9 : r.xc + 1.3;
+    const cx0 = r.de ? r.xc - 2.3 : r.xc - 0.9, cx1 = r.de ? r.xc + 2.3 : r.xc + 1.3; // covers the mouths of the uptakes
     const cz = zo + 1.6, cy0 = Y + 7.2, cy1 = Y + 9.2;
     b.box(mats.steelDark, cx0, cy0, -cz, cx1, cy1, cz);
     for (let x = cx0 + 0.6; x < cx1 - 0.3; x += 1.2) {

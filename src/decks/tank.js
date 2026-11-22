@@ -133,7 +133,10 @@ export async function build(world) {
   // ============================================================== details in the low spaces
   // firemen's tunnel: pipes along the crown, spiral-stair trunk at the forward end
   for (const z of [-0.55, 0.55]) pipeRun(b, z < 0 ? mats.paintWhite : mats.steelDark, [[MX1 + 0.2, LOW - 0.35, z], [103.8, LOW - 0.35, z]], z < 0 ? 0.09 : 0.06, { seg: 8 });
-  for (let x = 68; x < 104; x += 3) b.box(mats.iron, x - 0.03, LOW - 0.48, -0.7, x + 0.03, LOW - 0.42, 0.7);
+  for (let x = 68; x < 104; x += 3) {
+    b.box(mats.iron, x - 0.03, LOW - 0.48, -0.7, x + 0.03, LOW - 0.42, 0.7);
+    for (const z of [-0.68, 0.68]) b.box(mats.iron, x - 0.012, LOW - 0.42, z - 0.012, x + 0.012, LOW, z + 0.012, 'xXzZ'); // drop rods to the deck above
+  }
   tube(b, mats.steel, 'y', [106.1, 0], 1.15, Y, LOW, { seg: 18, caps: false });
   for (let y = Y + 0.4; y < LOW; y += 1.2) tube(b, mats.iron, 'y', [106.1, 0], 1.18, y - 0.04, y + 0.04, { seg: 18, caps: false });
   b.box(mats.steelDark, 104.9, Y, -0.55, 104.98, Y + 2.0, 0.55, 'x');

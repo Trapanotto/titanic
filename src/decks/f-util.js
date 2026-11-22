@@ -267,6 +267,21 @@ export function ceilingPipes(world, deck, pipeFn, x0, x1, zs, mat = 'steelDark',
       const b = Math.min(x1, a + ZONE_LEN);
       pipeFn(world.zone(deck, (a + b) / 2), mat, [[a, y, z], [b, y, z]], r);
     }
+    pipeHangers(world, deck, x0, x1, y, z, r, ceilingY(deck));
+  }
+}
+const _hgGeo = new Map();
+/** Hangers for a pipe along x (axis height y, radius r) up to the ceiling `top`: drop rod + strap round the pipe every 2.4 m. */
+export function pipeHangers(world, deck, x0, x1, y, z, r, top) {
+  const iron = matOf('iron'), k = `${Math.round(r * 1000)}_${Math.round((top - y) * 1000)}`;
+  let g = _hgGeo.get(k);
+  if (!g) _hgGeo.set(k, (g = { rod: tiledBoxGeometry(0.02, top - y - r + 0.01, 0.02), strap: tiledBoxGeometry(0.03, 0.012, 2 * r + 0.02), side: tiledBoxGeometry(0.03, 2 * r, 0.01) }));
+  for (let x = x0 + 0.6; x < x1 - 0.3; x += 2.4) {
+    const zone = world.zone(deck, x);
+    const add = (geo, yy, zz) => { const m = new THREE.Mesh(geo, iron); m.position.set(x, yy, zz); zone.add(m); };
+    add(g.rod, (y + r + top) / 2, z);
+    add(g.strap, y - r - 0.006, z);
+    for (const s of [-1, 1]) add(g.side, y, z + s * (r + 0.005));
   }
 }
 

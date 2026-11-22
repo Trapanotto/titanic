@@ -173,7 +173,7 @@ export function restaurant(ctx, R) {
   curtainWindows(d, f.port, wins);
   // gilt sconces on the piers of the inboard and end walls
   let k = 0;
-  for (const s of ['stbd', 'aft', 'fwd']) for (const a of pl[s] ?? []) { d.mount(sconce(), f[s].F, a, 1.78, 0.085); if (k++ % 2 === 0) { const [x, z] = d.xz(f[s].F, a, 0.35); d.lamp(x, 1.8, z, 0xffd9a8, 0.35); } }
+  for (const s of ['stbd', 'aft', 'fwd']) for (const a of pl[s] ?? []) { if (a - f[s].a < 0.45 || f[s].e - a < 0.45) continue; d.mount(sconce(), f[s].F, a, 1.78, 0.058); /* on the pilaster face, not on corner piers */ if (k++ % 2 === 0) { const [x, z] = d.xz(f[s].F, a, 0.35); d.lamp(x, 1.8, z, 0xffd9a8, 0.35); } }
 
   // moulded ceiling: beams on the column lines, gilt-beaded panels, flower-basket medallions, cut-glass fixtures
   const xs = [-20.4, -17.1], zs = [-8.0, -3.9, 0.3, 4.6], top = plan.y + plan.h;
@@ -367,7 +367,8 @@ export function suiteBedroom(ctx) {
   ctx.mount(sconce(), 'far', ctx.W * 0.25, 1.8); ctx.mount(sconce(), 'far', ctx.W * 0.75, 1.8);
   const d = new Deco(ctx.plan), f = roomFaces(ctx), pn = typeof st.panel === 'function' ? st.panel() : st.panel;
   const pil = panelRoom(d, f, { pilPitch: 1.8, ...pn });
-  if (st.wreaths) for (const side of ['fwd', 'aft', 'port', 'stbd']) for (const a of pil[side] ?? []) d.mount(bcWreath(), f[side].F, a, 1.85, 0.08);
+  // wreaths on the pilaster faces (front at 0.058 off the wall); not on the corner piers, where two would collide
+  if (st.wreaths) for (const side of ['fwd', 'aft', 'port', 'stbd']) for (const a of pil[side] ?? []) if (a - f[side].a > 0.45 && f[side].e - a > 0.45) d.mount(bcWreath(), f[side].F, a, 1.85, 0.056);
   d.beadRect(f.x0 + 0.35, f.x1 - 0.35, f.z0 + 0.35, f.z1 - 0.35, pn.gilt ?? pn.rail);
   d.flush();
 }

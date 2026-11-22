@@ -317,7 +317,7 @@ export function furnishGalley(ctx) {
     b.box(steel, XC - 0.4, Y + 2.3, s * 1.4, XC + 0.4, Y + h, s * 10.6, 'xXzZ');
     for (let z = 1.6; z < 10.6; z += 1.2) b.box(iron, XC - 1.27, Y + 2.04, s * z - 0.02, XC + 1.27, Y + 2.31, s * z + 0.02, 'xXyzZ'); // hood stiffeners
     // coal bunker boxes at the ends of the ranges
-    for (const dx of [-0.5, 0.5]) { b.box(iron, XC + dx - 0.3, Y, s * 11.0, XC + dx + 0.3, Y + 0.42, s * 11.6); b.box(mats.coal, XC + dx - 0.27, Y + 0.42, s * 11.03, XC + dx + 0.27, Y + 0.44, s * 11.57, 'Y'); }
+    for (const dx of [-0.5, 0.5]) { b.box(iron, XC + dx - 0.3, Y, s * 11.0, XC + dx + 0.3, Y + 0.42, s * 11.6); b.box(mats.coal, XC + dx - 0.27, Y + 0.42, s * 11.03, XC + dx + 0.27, Y + 0.44, s * 11.57, 'xXzZY'); }
   }
   // forward (pantry) side: hot presses, bains-marie and plate warmers; aft: ovens, stock kettles, work tables, blocks
   for (const s of [-1, 1]) {
@@ -344,7 +344,7 @@ export function furnishGalley(ctx) {
       const za = s * 1.3, zb = s * 10.6;
       b.bar(iron, [xr, Y + 2.3, za], [xr, Y + 2.3, zb], 0.04, 0.04);
       for (const z of [za, (za + zb) / 2, zb]) b.box(iron, xr - 0.015, Y + 2.3, z - 0.015, xr + 0.015, Y + h, z + 0.015, 'xXzZ');
-      for (let z = Math.min(za, zb) + 0.3; z < Math.max(za, zb) - 0.2; z += 0.42) f.add('pot', xr, Y + 2.26 - ((Math.round(z * 10) % 3) * 0.05), z, 0, 1 + (Math.round(z * 7) % 3) * 0.15, 1, 1 + (Math.round(z * 7) % 3) * 0.15);
+      for (let z = Math.min(za, zb) + 0.3; z < Math.max(za, zb) - 0.2; z += 0.42) f.add('pot', xr, Y + 2.3, z, 0, 1 + (Math.round(z * 7) % 3) * 0.15, 1, 1 + (Math.round(z * 7) % 3) * 0.15);
     }
   }
   f.flush();
@@ -353,7 +353,8 @@ export function furnishGalley(ctx) {
     b.box(mats.iron, x - 0.18, Y + 0.004, z - 0.18, x + 0.18, Y + 0.012, z + 0.18, 'Y');
     for (let k = -2; k <= 2; k++) b.box(mats.coal, x - 0.14, Y + 0.0125, z + k * 0.06 - 0.012, x + 0.14, Y + 0.013, z + k * 0.06 + 0.012, 'Y');
   }
-  pipe(plan.zone(-16.3), 'copper', [[-16.15, Y + 2.35, -12], [-16.15, Y + 2.35, 12]], 0.035);
+  pipe(plan.zone(-16.3), 'copper', [[-16.15, Y + 2.35, -12.3], [-16.15, Y + 2.35, 12.3]], 0.035);
+  for (let z = -10.8; z <= 10.8; z += 2.4) b.box(iron, -16.17, Y + 2.35, z - 0.015, -16.13, Y + h, z + 0.015, 'xXzZ'); // pipe hangers
 }
 
 /** Bakery: bread ovens along the far wall, dough troughs, bread racks, flour sacks. */

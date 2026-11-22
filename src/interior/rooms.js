@@ -431,7 +431,12 @@ class DeckPlan {
           const t0 = W(p0, TOP - 0.17, 0.62), t1 = W(p1, TOP - 0.16, 0.82);
           b.box(mats.steelDark, t0[0], t0[1], t0[2], t1[0], t1[1], t1[2], 'xXyYzZ');
           for (const t of [0.67, 0.72, 0.77]) b.prism(mats.rubber, W(p0, TOP - 0.15, t), W(p1, TOP - 0.15, t), 0.009, 4);
-          for (let a = p0 + 0.3; a < p1; a += 1.5) { const h0 = W(a - 0.01, TOP - 0.21, 0.2), h1 = W(a + 0.01, TOP, 0.24); b.box(mats.iron, h0[0], h0[1], h0[2], h1[0], h1[1], h1[2], 'xXzZ'); }
+          for (let a = p0 + 0.3; a < p1; a += 1.5) {
+            const h0 = W(a - 0.01, TOP - 0.21, 0.2), h1 = W(a + 0.01, TOP, 0.24); b.box(mats.iron, h0[0], h0[1], h0[2], h1[0], h1[1], h1[2], 'xXzZ');
+            // tray hangers: two drop rods from the deck head to a cross bar under the tray (the tray tilts 0.17 → 0.16 below TOP)
+            for (const t of [0.61, 0.83]) { const r0 = W(a - 0.008, TOP - 0.185, t - 0.008), r1 = W(a + 0.008, TOP, t + 0.008); b.box(mats.iron, Math.min(r0[0], r1[0]), r0[1], Math.min(r0[2], r1[2]), Math.max(r0[0], r1[0]), r1[1], Math.max(r0[2], r1[2]), 'xXzZ'); }
+            const c0 = W(a - 0.015, TOP - 0.19, 0.6), c1 = W(a + 0.015, TOP - 0.17, 0.84); b.box(mats.iron, Math.min(c0[0], c1[0]), c0[1], Math.min(c0[2], c1[2]), Math.max(c0[0], c1[0]), c1[1], Math.max(c0[2], c1[2]));
+          }
         }
       } else if (kind === 'panel' || kind === 'wainscot') {
         // moulded ceiling battens across the corridor

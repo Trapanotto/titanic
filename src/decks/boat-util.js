@@ -573,15 +573,21 @@ export function statue(parent, x, y, z, rotY = 0, scale = 0.9, mat = mats.marble
   const head = (_geo.head ??= new THREE.SphereGeometry(0.045, 12, 8)), sph = (_geo.sph ??= new THREE.SphereGeometry(1, 8, 6));
   const limb = (pts, r) => G.loft(pts, r, 6);
   const add = (geo, px = 0, py = 0, pz = 0, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, mat); m.position.set(px, py, pz); m.scale.set(sx, sy, sz); g.add(m); return m; };
-  add(body, 0, 0, 0, 1, 1, 0.82);
-  add(head, 0.005, 0.8, 0); add(sph, -0.012, 0.83, 0, 0.04, 0.03, 0.035); // hair knot
-  add((_geo.armR ??= limb([[0, 0.7, 0.07], [-0.03, 0.8, 0.09], [-0.05, 0.88, 0.08]], [0.02, 0.018, 0.015])));   // right arm reaching for the quiver
-  add((_geo.armL ??= limb([[0, 0.7, -0.07], [0.04, 0.6, -0.1], [0.06, 0.52, -0.12]], [0.02, 0.018, 0.015]))); // left arm on the hind
-  add((_geo.quiver ??= G.lathe([[0, 0], [0.018, 0], [0.02, 0.2], [0, 0.21]], 8)), -0.06, 0.62, 0.03).rotation.set(0.3, 0, 0.25);
-  add((_geo.hind ??= G.loft([[-0.06, 0.32, -0.14], [0.02, 0.33, -0.14], [0.08, 0.38, -0.14], [0.1, 0.46, -0.13]], [[0.04, 0.05], [0.05, 0.06], [0.04, 0.04], [0.02, 0.02]], 8)));
-  add(sph, 0.02, 0.4, 0.02, 0.09, 0.03, 0.09); // drapery fold over the hip
-  for (const s of [-1, 1]) add((_geo.leg ??= G.lathe([[0, 0], [0.02, 0], [0.016, 0.1], [0, 0.12]], 6)), 0.03, 0.05, s * 0.035);
-  const socle = (_geo.socle ??= G.lathe([[0, 0], [0.13, 0], [0.13, 0.02], [0.11, 0.03], [0.1, 0.09], [0.115, 0.1], [0, 0.1]], 16));
+  void body;
+  // striding goddess (left leg forward, +x), short chiton, right hand reaching back to the quiver, left hand on the hind's head
+  add((_geo.legL ??= limb([[0.09, 0.0, -0.04], [0.055, 0.22, -0.04], [0.02, 0.44, -0.035]], [0.024, 0.03, 0.045])));
+  add((_geo.legR ??= limb([[-0.08, 0.0, 0.04], [-0.045, 0.22, 0.04], [-0.01, 0.44, 0.035]], [0.024, 0.03, 0.045])));
+  add((_geo.skirt ??= G.lathe([[0, 0.37], [0.115, 0.37], [0.1, 0.46], [0.085, 0.56], [0.075, 0.63], [0, 0.63]], 14)), 0, 0, 0, 1, 1, 0.8);
+  add((_geo.torso ??= G.lathe([[0, 0.6], [0.075, 0.6], [0.08, 0.68], [0.072, 0.76], [0.088, 0.83], [0.06, 0.875], [0, 0.885]], 14)), 0, 0, 0, 1, 1, 0.7);
+  add((_geo.neck ??= G.lathe([[0, 0.87], [0.024, 0.87], [0.021, 0.935], [0, 0.935]], 8)));
+  add(head, 0.005, 0.975, 0); add(sph, -0.035, 0.99, 0, 0.032, 0.03, 0.03); // hair knot
+  add((_geo.armR ??= limb([[0, 0.845, 0.06], [-0.015, 0.95, 0.1], [-0.06, 1.0, 0.065]], [0.022, 0.019, 0.015])));  // right arm raised to the quiver
+  add((_geo.quiver ??= G.loft([[-0.085, 0.72, 0.0], [-0.1, 1.02, 0.055]], [0.024, 0.026], 8)));
+  add((_geo.armL ??= limb([[0, 0.845, -0.06], [0.03, 0.7, -0.105], [0.06, 0.56, -0.13]], [0.022, 0.019, 0.016]))); // left arm down to the hind
+  add((_geo.hind ??= G.loft([[-0.07, 0.3, -0.1], [0.02, 0.31, -0.1], [0.09, 0.33, -0.1]], [[0.04, 0.035], [0.05, 0.04], [0.04, 0.035]], 8)));
+  add((_geo.hindN ??= G.loft([[0.09, 0.33, -0.1], [0.09, 0.45, -0.11], [0.065, 0.54, -0.125]], [0.025, 0.02, 0.022], 6)));
+  for (const [lx, lz] of [[-0.05, -0.085], [-0.05, -0.115], [0.07, -0.085], [0.07, -0.115]]) add((_geo['hl' + lx + lz] ??= limb([[lx, 0.3, lz], [lx + 0.01, 0.0, lz]], [0.009, 0.007])));
+  const socle = (_geo.socle ??= G.lathe([[0, 0], [0.17, 0], [0.17, 0.02], [0.15, 0.03], [0.14, 0.09], [0.16, 0.1], [0, 0.1]], 16));
   add(socle, 0, -0.1, 0).material = mats.marble;
   g.children.forEach((m) => { m.position.multiplyScalar(k); m.scale.multiplyScalar(k); });
   g.position.set(x, y + 0.1 * k, z); g.rotation.y = rotY;

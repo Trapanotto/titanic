@@ -6,7 +6,7 @@ import {
   kitMats, pipe, showerBath, bench, coolingCouch, servingCounter, shelves, locker, gauge, valve, def,
   basinSmall, desk, chairDining as chair, mirrorWall, clockWall, pottedPalm, deckHalfWidth, wardrobe, coatHooks, towels,
 } from '../interior/kit.js';
-import { Instancer, moorishCeiling, teakLattice, ceilingPipes, poster, iznikMat, tileBorderMat, depthMat } from './f-util.js';
+import { Instancer, moorishCeiling, teakLattice, ceilingPipes, pipeHangers, poster, iznikMat, tileBorderMat, depthMat } from './f-util.js';
 
 const TAU = Math.PI * 2;
 function rngOf(seed) { let s = (seed * 2654435761) >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
@@ -273,7 +273,7 @@ export function swimmingBath(ctx) {
   b.box(tile, X0, Y, Z0 + R, X0 + R, Y + H, Z1 - R, 'xX'); b.box(tile, X1 - R, Y, Z0 + R, X1, Y + H, Z1 - R, 'xX');
   b.box(mats.marble, X0 - 0.04, Y + H, Z0 - 0.04, X1 + 0.04, Y + H + 0.05, Z0 + R, 'xXyYzZ');
   b.box(mats.marble, X0 - 0.04, Y + H, Z1 - R, X1 + 0.04, Y + H + 0.05, Z1 + 0.04, 'xXyYzZ');
-  b.box(mats.marble, X0 - 0.04, Y + H, Z0 + R, X0 + R, Y + H + 0.05, Z1 - R, 'xyY'); b.box(mats.marble, X1 - R, Y + H, Z0 + R, X1 + 0.04, Y + H + 0.05, Z1 - R, 'XyY');
+  b.box(mats.marble, X0 - 0.04, Y + H, Z0 + R, X0 + R, Y + H + 0.05, Z1 - R, 'xXyY'); b.box(mats.marble, X1 - R, Y + H, Z0 + R, X1 + 0.04, Y + H + 0.05, Z1 - R, 'xXyY');
   b.wallX(blue, Z0 + R + 0.002, X0 + R, X1 - R, Y, Y + H - 0.22, 1); b.wallX(blue, Z1 - R - 0.002, X0 + R, X1 - R, Y, Y + H - 0.22, -1);
   b.wallZ(blue, X0 + R + 0.002, Z0 + R, Z1 - R, Y, Y + H - 0.22, 1); b.wallZ(blue, X1 - R - 0.002, Z0 + R, Z1 - R, Y, Y + H - 0.22, -1);
   // scum channel: a recessed white-tiled trough with a rounded lip just above the water line
@@ -454,7 +454,7 @@ export function coolingRoom(ctx) {
   // bronze lanterns
   for (const x of [s.x0 + 2.4, (s.x0 + s.x1) / 2, s.x1 - 3.2]) for (const z of [5.0, 8.4, 11.6]) {
     if (z > hull(deck, x) - 0.6) continue;
-    plan.prop(lantern(), x, z, 0, { y: fc - 0.17 });
+    plan.prop(lantern(), x, z, 0, { y: fc });   // chain hangs from the false ceiling (between the gilt beams)
     world.addLamp({ x, y: fc - 0.8, z, color: 0xffb060, intensity: 0.8 });
   }
 }
@@ -575,6 +575,7 @@ export function machineLobby(ctx) {
   const { plan } = ctx, r = ctx.room, s = r.safe, y = ctx.y + ctx.h - 0.3;
   pipe(plan.zone((s.x0 + s.x1) / 2), 'steelDark', [[s.x0 + 0.15, y, s.z0 + 0.15], [s.x1 - 0.15, y, s.z0 + 0.15]], 0.08);
   pipe(plan.zone((s.x0 + s.x1) / 2), 'copper', [[s.x0 + 0.15, y - 0.2, s.z1 - 0.15], [s.x1 - 0.15, y - 0.2, s.z1 - 0.15]], 0.05);
+  pipeHangers(ctx.world, ctx.deck, s.x0, s.x1, y, s.z0 + 0.15, 0.08, ctx.y + ctx.h); pipeHangers(ctx.world, ctx.deck, s.x0, s.x1, y - 0.2, s.z1 - 0.15, 0.05, ctx.y + ctx.h);
 }
 
 export { Instancer };

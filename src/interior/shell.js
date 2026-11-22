@@ -107,7 +107,7 @@ export function buildDeckShell(world, deck, opts = {}) {
           const h = halfTop(x);
           if (h < 0.3) continue;
           for (const r of rectMinus({ x0: x - 0.05, x1: x + 0.05, z0: -h, z1: h }, holesC.map((q) => ({ ...q, x0: q.x0 - 0.1, x1: q.x1 + 0.1 })))) {
-            if (r.x1 - r.x0 > 0.09) b.box(beamMat, r.x0, yc - 0.14, r.z0, r.x1, yc, r.z1, 'xXy');
+            if (r.x1 - r.x0 > 0.09) b.box(beamMat, r.x0, yc - 0.14, r.z0, r.x1, yc, r.z1, 'xXyzZ'); // ends closed (beams cut at stair wells)
           }
         }
       }

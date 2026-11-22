@@ -31,7 +31,7 @@ function cowlGeos() {
   const lip = gridGeo(7, N + 1, (i, j) => {
     const a = (i / 6) * Math.PI, rr = RE * (0.985 + 0.015 * Math.cos(a)) + 0.035 * Math.sin(a), al = (j / N) * TAU, dx = 0.035 * Math.sin(a) - 0.01;
     return [Rb + BELL + dx, Rb - Math.cos(al) * rr, Math.sin(al) * rr];
-  }, true);
+  });
   // dark throat closing the bore where the bell starts
   const mouth = new THREE.CircleGeometry(rad(K) * 0.97, N).rotateY(Math.PI / 2).translate(Rb + 0.03, Rb, 0);
   COWL = { outer: merge([outer, lip]), inner, mouth };
@@ -223,7 +223,7 @@ function rugGeo(KNEE, FOOT) {
     const y = cy - (cy - yEnd) * f, z = cz + ra + 0.025 * Math.sin(Math.PI * f * 0.9);
     path.push([z, y, 1, 0, f === 1 ? 0 : 0.022, 0.3 + 0.025 * f, 0.5]);
   }
-  const J = 12;
+  const J = 10;
   return gridGeo(path.length, J + 1, (i, j) => {
     const [z, y, nz, ny, th, W, droop] = path[i];
     const th2 = (j / J) * TAU, x = W * Math.cos(th2), s = Math.sin(th2);
@@ -233,7 +233,7 @@ function rugGeo(KNEE, FOOT) {
     // hem: a soft wave along the lower edge
     const wave = i === path.length - 1 || i === path.length - 2 ? 0.012 * Math.sin(x * 19) : 0;
     return [x, y + ny * n + wave, z + nz * n];
-  });
+  }, true);
 }
 
 // ---------- life ring with "S.S. TITANIC" and its holder ----------

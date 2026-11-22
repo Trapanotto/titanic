@@ -4,7 +4,7 @@ import { box } from '../core/geo.js';
 import { DECK_Y, SHIP, hullHalfWidth } from '../core/constants.js';
 import { cyl, vcyl, ball, mk, lathe, Wires, edge, edgeSlope } from './fit-util.js';
 import { merge, cylG, latheGeo } from './inst.js';
-import { cowl, mushroom, bench, ceilingLamp } from './fit-gear.js';
+import { cowl, mushroom, bench, ceilingLamp, gableGeo } from './fit-gear.js';
 
 // Forecastle, well decks, open B deck aft and poop: anchor gear, mooring gear, hatches, cranes, docking bridge.
 
@@ -202,8 +202,9 @@ function winch(world, g, x, y, z) {
     g.add(box(mats.steelDark, 0.16, 0.36, 0.2, x - 0.75, y + 0.65, z + s * 0.3));
     g.add(cyl(mats.iron, x - 0.55, y + 0.9, z + s * 0.3, x - 0.4, y + 0.98, z + s * 0.3, 0.025, 5));
   }
-  g.add(cyl(mats.steelDark, x - 0.75, y + 0.9, z, x - 0.75, y + 1.3, z, 0.04, 6));                          // steam pipe
-  g.add(cyl(mats.brass, x + 0.5, y + 0.3, z + 0.3, x + 0.62, y + 1.05, z + 0.3, 0.02, 5));
+  g.add(cyl(mats.steelDark, x - 0.75, y + 0.75, z - 0.3, x - 0.75, y + 0.75, z + 0.3, 0.04, 6));            // manifold between the valve chests
+  g.add(cyl(mats.steelDark, x - 0.75, y + 0.75, z, x - 0.75, y + 1.3, z, 0.04, 6));                          // steam pipe
+  g.add(cyl(mats.brass, x + 0.5, y + 0.12, z + 0.3, x + 0.62, y + 1.05, z + 0.3, 0.02, 5));                // lever pivoted on the bed
   g.add(ball(mats.woodDark, x + 0.62, y + 1.07, z + 0.3, 0.035, 6, 4));
   world.addCollider(x - 0.75, y, z - 0.95, x + 0.75, y + 1.0, z + 0.95);
 }
@@ -419,6 +420,7 @@ export function buildDeckMachinery(world, parent) {
   root.add(box(mats.paintWhite, 1.6, 0.5, 1.8, -124.9, B + 0.25, 0));
   for (const s of [-1, 1]) { const p = box(mats.windowLit, 1.5, 0.03, 0.95, -124.9, B + 0.63, s * 0.44); p.rotation.x = s * 0.3; root.add(p); }
   root.add(box(mats.paintWhite, 1.66, 0.06, 0.08, -124.9, B + 0.78, 0));
+  for (const [x, ry] of [[-125.68, Math.PI], [-124.12, 0]]) { const gm = mk(gableGeo(0.9, 0.28), mats.paintWhite, x, B + 0.5, 0); gm.rotation.y = ry; root.add(gm); } // gable ends
   world.addCollider(-125.7, B, -0.9, -124.1, B + 0.8, 0.9);
 
   // --- docking bridge: raised athwartship walkway with telegraphs, wheel and binnacle ---
@@ -455,7 +457,7 @@ export function buildDeckMachinery(world, parent) {
     world.addRamp({ x0, x1: xf, z0: -sw, z1: sw, y0: B, y1: yb, axis: 'x' });
     for (let i = 0; i < N; i++) {
       const x = x0 + ((xf - x0) * (i + 0.5)) / N, y = B + (rise * (i + 1)) / N;
-      root.add(box(mats.woodDark, 0.27, 0.04, 2 * sw - 0.06, x, y - 0.02, 0));
+      root.add(box(mats.woodDark, 0.27, 0.04, 2 * sw, x, y - 0.02, 0)); // treads reach the stringers
     }
     for (const s of [-1, 1]) {
       const z = s * (sw + 0.02);
@@ -493,7 +495,7 @@ export function buildDeckMachinery(world, parent) {
     // wheel
     {
       const z = 1.7, wx = xm - 0.3, wy = yb + 1.05;
-      root.add(vcyl(mats.mahogany, wx - 0.12, yb, z, 1.0, 0.11, 8, 0.08));
+      root.add(vcyl(mats.mahogany, wx - 0.12, yb, z, 1.09, 0.11, 8, 0.08)); // pedestal carries the wheel axle
       root.add(box(mats.mahogany, 0.5, 0.06, 0.4, wx - 0.12, yb + 0.03, z));
       root.add(cyl(mats.brass, wx - 0.12, wy, z, wx + 0.14, wy, z, 0.035, 6));
       const rim = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.03, 6, 20), mats.mahogany); rim.rotation.y = Math.PI / 2; rim.position.set(wx + 0.1, wy, z); root.add(rim);

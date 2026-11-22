@@ -455,6 +455,10 @@ export class Batch {
     this.poly(mat, [A, B, C, D], [0, -1, 0], undefined, zx);
     this.poly(mat, [A, B, up(B), up(A)], [sx, 0, sz], undefined, zx);
     this.poly(mat, [D, C, up(C), up(D)], [-sx, 0, -sz], undefined, zx);
+    // end caps (free ends of handrails, strings and cappings would otherwise be open boxes)
+    const ax = dx / l, az = dz / l;
+    this.poly(mat, [A, D, up(D), up(A)], [-ax, 0, -az], undefined, zx);
+    this.poly(mat, [B, C, up(C), up(B)], [ax, 0, az], undefined, zx);
   }
   /** Vertical square post. */
   post(mat, x, z, y0, y1, s = 0.05) { this.box(mat, x - s / 2, y0, z - s / 2, x + s / 2, y1, z + s / 2, 'xXzZY'); }
@@ -497,7 +501,8 @@ export class Batch {
       if (!on) continue;
       for (let i = 0; i < prof.length - 1; i++) {
         const [o0, u0] = prof[i], [o1, u1] = prof[i + 1];
-        if (Math.abs(u1 - u0) < 1e-6 || (o0 < 1e-5 && o1 < 1e-5)) continue;
+        // (closed rail sections reach o < 0: only segments lying in the wall plane o = 0 need no cap)
+        if (Math.abs(u1 - u0) < 1e-6 || (Math.abs(o0) < 1e-5 && Math.abs(o1) < 1e-5)) continue;
         this.poly(mat, [Q(k, 0, u0), Q(k, o0, u0), Q(k, o1, u1), Q(k, 0, u1)], [A[0] * sg, A[1] * sg, A[2] * sg], undefined, zx);
       }
     }

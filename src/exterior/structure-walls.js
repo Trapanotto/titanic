@@ -325,7 +325,10 @@ function roofSlab(world, batch, x0, x1, hw, y, holes = []) {
     batch.box(mats.paintWhite, h.x0 - c, cb, h.z1, h.x1 + c, ct, h.z1 + c);
     batch.box(mats.paintWhite, h.x0 - c, cb, h.z0, h.x0, ct, h.z1);
     batch.box(mats.paintWhite, h.x1, cb, h.z0, h.x1 + c, ct, h.z1);
-    batch.box(mats.woodDark, h.x0 - c - 0.02, ct, h.z0 - c - 0.02, h.x1 + c + 0.02, ct + 0.05, h.z1 + c + 0.02, { skip: 'ny' });
+    // teak capping: a frame on the coaming (was a solid lid closing the opening under the dome)
+    const e = c + 0.02, cap = (xa, za, xb, zb) => batch.box(mats.woodDark, xa, ct, za, xb, ct + 0.05, zb);
+    cap(h.x0 - e, h.z0 - e, h.x1 + e, h.z0 + 0.04); cap(h.x0 - e, h.z1 - 0.04, h.x1 + e, h.z1 + e);
+    cap(h.x0 - e, h.z0 + 0.04, h.x0 + 0.04, h.z1 - 0.04); cap(h.x1 - 0.04, h.z0 + 0.04, h.x1 + e, h.z1 - 0.04);
   }
   batch.cast = false;
 }
@@ -343,6 +346,22 @@ function dome(batch, cx, cz, rx, rz, h, y) {
     const main = i % 4 === 0;
     batch.cyl(mats.iron, P(i, k, 1.005), P(i, k + 1, 1.005), main ? 0.03 : 0.016, main ? 6 : 4);
     if (k > 0) batch.cyl(mats.iron, P(i, k, 1.005), P(i + 1, k, 1.005), k % 2 ? 0.014 : 0.02, 4);
+  }
+  // deck plating between the elliptical curb and the rectangular coaming opening (rx, rz = half sizes of the opening)
+  for (let i = 0; i < seg; i++) {
+    const R = (k) => { const t = (k / seg) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t), f = Math.min(1 / Math.max(1e-6, Math.abs(c)), 1 / Math.max(1e-6, Math.abs(s))); return [cx + c * f * rx, y + 0.002, cz + s * f * rz]; };
+    const a = P(i, 0), b = P(i + 1, 0), ra = R(i), rb = R(i + 1);
+    a[1] = b[1] = y + 0.002;
+    batch.oquad(mats.woodDark, a, b, rb, ra, [0, 1, 0]);
+    batch.oquad(mats.paintWhite, [a[0], y - 0.01, a[2]], [b[0], y - 0.01, b[2]], [rb[0], y - 0.01, rb[2]], [ra[0], y - 0.01, ra[2]], [0, -1, 0]);
+    const t0 = (i / seg) * Math.PI * 2, t1 = ((i + 1) / seg) * Math.PI * 2;
+    for (const [sx, sz] of [[1, 1], [-1, 1], [-1, -1], [1, -1]]) {
+      let tc = Math.atan2(sz * rz, sx * rx); if (tc < 0) tc += Math.PI * 2;
+      if (tc <= t0 || tc >= t1) continue;
+      const cc = [cx + sx * rx, y + 0.002, cz + sz * rz];
+      batch.otri(mats.woodDark, ra, cc, rb, [0, 1, 0]);
+      batch.otri(mats.paintWhite, [ra[0], y - 0.01, ra[2]], [cc[0], y - 0.01, cc[2]], [rb[0], y - 0.01, rb[2]], [0, -1, 0]);
+    }
   }
   // curb ring + ornamental cresting
   for (let i = 0; i < seg; i++) {

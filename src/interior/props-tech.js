@@ -10,7 +10,7 @@ const GAUGE = (r) => [[0, 0], [r, 0], [r * 1.05, 0.01], [r, 0.03], [r * 0.92, 0.
 /** dial instrument facing +x at (x, y, z): brass case, dial face, glass */
 function dial(p, x, y, z, r = 0.09, face = K.gaugeFace) {
   p.latheX(M.brass, GAUGE(r), x, y, z, 20);
-  p.cx(face, r * 0.88, 0.004, x + 0.036, y, z, 20);
+  p.dial(face, r * 0.88, x + 0.037, y, z, 'x', 20); // upright texture (a cylinder cap would turn it sideways)
   p.latheX(M.glass, [[0, 0], [r * 0.9, 0], [r * 0.6, 0.008], [0, 0.01]], x + 0.036, y, z, 16);
 }
 
@@ -35,7 +35,7 @@ function ridingMachine(p, camel) {
   p.bb(M.paintGreen, 1.1, 0.1, 0.5, 0, 0, 0, 0.015);
   p.bb(M.paintGreen, 0.5, 0.4, 0.4, -0.2, 0.1, 0, 0.02);
   p.fp(M.paintGreen, 0.3, 0.26, -0.2, 0.3, 0.2, 0.006, 0.03).rotation.y = -Math.PI / 2;
-  p.latheX(K.gaugeFace, [[0, 0], [0.06, 0], [0.06, 0.012], [0, 0.012]], 0.05, 0.32, 0, 16);
+  p.latheX(M.brass, [[0, 0], [0.06, 0], [0.06, 0.012], [0, 0.012]], 0.05, 0.32, 0, 16); p.dial(K.gaugeFace, 0.055, 0.0625, 0.32, 0, 'x', 16);
   p.lathe(M.chrome, [[0, 0], [0.06, 0], [0.05, 0.05], [0.04, 0.4], [0.06, 0.45], [0, 0.46]], 0.05, 0.1, 0, 12);
   p.bb(M.leather, 0.7, 0.18, 0.34, 0.05, 0.56, 0, 0.06);
   const saddle = p.pil(M.leather, 0.5, 0.14, 0.34, 0.0, 0.72, 0, 0.6, 0.5, 4, 14, -0.04); void saddle;
@@ -96,7 +96,7 @@ export const marconiSet = def('marconiSet', [1.8, 0.75, 1.55], (p) => {
   p.tube(M.chrome, [[0.12, 0.8, 0.54], [0.12, 0.88, 0.62], [0.12, 0.8, 0.7]], 0.004, 8, 3);
   papers(p, 0.15, 0.76, -0.15, 0.1, 2); p.cz(M.oak, 0.004, 0.15, 0.15, 0.768, 0.05, 6); // pencil lying on the papers
   // clock above (in front of the slate panel, not half inside it)
-  p.cx(K.clockFace, 0.11, 0.01, -0.31, 1.48, 0.55, 20); p.t(M.woodDark, 0.115, 0.012, -0.305, 1.48, 0.55, 'x', 20, 4);
+  p.cx(M.woodDark, 0.11, 0.01, -0.31, 1.48, 0.55, 20); p.dial(K.clockFace, 0.105, -0.3045, 1.48, 0.55, 'x', 20); p.t(M.woodDark, 0.115, 0.012, -0.305, 1.48, 0.55, 'x', 20, 4);
   p.b(M.glass, 0.12, 0.2, 0.12, 0.0, 0.76, -0.25); p.c(M.chrome, 0.01, 0.16, 0.0, 0.78, -0.25, 6); // spark gap
 });
 export const telegraph = def('telegraph', [0.5, 0.45, 1.3], (p) => {
@@ -104,7 +104,7 @@ export const telegraph = def('telegraph', [0.5, 0.45, 1.3], (p) => {
   p.rev(M.brass, [{ o: 0.06, y: 0.25, m: 0.004 }, { o: 0.056, y: 0.75, m: 0.004 }], { seg: 32, k: 16 }, 0, 0, 0);
   p.cz(M.brass, 0.21, 0.18, 0, 1.1, 0, 28);
   for (const s of [-1, 1]) {
-    p.cz(K.gaugeFace, 0.18, 0.004, 0, 1.1, s * 0.091, 28); p.t(M.brass, 0.19, 0.012, 0, 1.1, s * 0.09, 'z', 28, 4);
+    p.dial(K.gaugeFace, 0.18, 0, 1.1, s * 0.0915, s > 0 ? 'z' : '-z', 28); p.t(M.brass, 0.19, 0.012, 0, 1.1, s * 0.09, 'z', 28, 4);
     p.latheZ(M.glass, [[0, 0], [0.18, 0], [0.1, 0.02], [0, 0.025]], 0, 1.1, s * 0.093, 20, s);
     const h = p.b(M.brass, 0.03, 0.4, 0.02, 0.08, 0.95, s * 0.115); h.rotation.z = -0.45;
     p.lathe(K.ebony, [[0, 0], [0.025, 0], [0.03, 0.04], [0.02, 0.09], [0, 0.1]], 0.18, 1.3, s * 0.115, 10).rotation.z = -0.45;

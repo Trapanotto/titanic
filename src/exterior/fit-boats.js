@@ -168,11 +168,15 @@ function boatGeos(type, covered) {
       // rowlock sockets on the gunwale
       for (const t of [-0.45, -0.1, 0.25]) { const p = sect(T, t, 1); parts.brass.push(cylG([p[0], p[4] + 0.04, sg * p[3]], [p[0], p[4] + 0.1, sg * p[3]], 0.025, 5)); }
     }
-    parts.pine.push(cylG([-T.L * 0.3, T.D * 0.78, 0], [T.L * 0.3, T.D * 0.8, 0], 0.055, 6));
-    parts.canvas.push(cylG([-T.L * 0.26, T.D * 0.88, 0.04], [T.L * 0.2, T.D * 0.9, 0.04], 0.1, 7, 0.08));
-    for (let k = 0; k < 5; k++) { const x = -T.L * 0.22 + k * T.L * 0.1; parts.rope.push(cylG([x, T.D * 0.88, 0.04], [x + 0.02, T.D * 0.88, 0.04], 0.106, 6)); }
-    parts.pine.push(boxG(0.4, 0.3, 0.3, T.L * 0.36, T.D * 0.36, 0));
-    parts.oak.push(new THREE.LatheGeometry([[0.12, 0], [0.15, 0.08], [0.16, 0.2], [0.15, 0.32], [0.12, 0.4]].map(([r, y]) => new THREE.Vector2(r, y)), 8).rotateZ(Math.PI / 2).translate(T.L * 0.3 + 0.2, T.D * 0.42, 0.3));
+    // mast with the furled sail, lying on the thwarts
+    const my = T.D * 0.68 + 0.0225 + 0.055;
+    parts.pine.push(cylG([-T.L * 0.3, my, 0], [T.L * 0.3, my, 0], 0.055, 6));
+    parts.canvas.push(cylG([-T.L * 0.26, my + 0.1, 0.04], [T.L * 0.2, my + 0.1, 0.04], 0.1, 7, 0.08));
+    for (let k = 0; k < 5; k++) { const x = -T.L * 0.22 + k * T.L * 0.1; parts.rope.push(cylG([x, my + 0.1, 0.04], [x + 0.02, my + 0.1, 0.04], 0.106, 6)); }
+    // provision locker and water breaker standing on the bottom boards
+    const fl = T.D * 0.2 + 0.0125;
+    parts.pine.push(boxG(0.4, 0.3, 0.3, T.L * 0.27, fl + 0.15, 0));
+    parts.oak.push(new THREE.LatheGeometry([[0.001, 0], [0.12, 0], [0.15, 0.08], [0.16, 0.2], [0.15, 0.32], [0.12, 0.4], [0.001, 0.4]].map(([r, y]) => new THREE.Vector2(r, y)), 8).rotateZ(Math.PI / 2).translate(T.L * 0.2 + 0.2, fl + 0.16, 0.3));
   } else {
     // ridge spar under the cover + lashings over it to the gunwale cleats
     const w = new Wires(mats.rope, false);
@@ -257,7 +261,7 @@ function davitGeos(out) {
   Br.push(cylG([0.3, 0.58, 0.05], [0.3, 0.58, -0.08], 0.025, 6));
   // cleat for the hauling part + fall reel on the base
   I.push(boxG(0.06, 0.06, 0.4, 0.22, 0.42, 0.62)); I.push(boxG(0.05, 0.12, 0.05, 0.22, 0.36, 0.55)); I.push(boxG(0.05, 0.12, 0.05, 0.22, 0.36, 0.7));
-  for (let k = 0; k < 3; k++) R.push(new THREE.TorusGeometry(0.21 - k * 0.02, 0.035, 5, 12).rotateX(Math.PI / 2).translate(0, 0.08 + k * 0.06, out ? -0.25 : 0.25));
+  for (let k = 0; k < 3; k++) R.push(new THREE.TorusGeometry(0.21 - k * 0.02, 0.035, 5, 12).rotateX(Math.PI / 2).translate(0, (out ? 0.035 : 0.08) + k * 0.06, out ? -0.25 : 0.25)); // coil on the plate / on deck
   // upper (double) block with hook at the arm head
   const by = head[1] - 0.42;
   for (const s of [-1, 1]) W.push(boxG(0.025, 0.3, 0.17, s * 0.06, by, head[2]));
@@ -282,7 +286,7 @@ function lowerBlock() {
   if (lowerBlockGeo) return lowerBlockGeo;
   lowerBlockGeo = {
     oak: merge([boxG(0.025, 0.26, 0.15, -0.045, 0, 0), boxG(0.025, 0.26, 0.15, 0.045, 0, 0)]),
-    iron: merge([cylG([-0.035, 0.02, 0], [0.035, 0.02, 0], 0.07, 10), cylG([0, -0.13, 0], [0, -0.28, 0], 0.018, 5), new THREE.TorusGeometry(0.06, 0.016, 4, 10, Math.PI * 1.4).translate(0, -0.34, 0)]),
+    iron: merge([cylG([-0.035, 0.02, 0], [0.035, 0.02, 0], 0.07, 10), boxG(0.09, 0.03, 0.08, 0, -0.12, 0), cylG([0, -0.13, 0], [0, -0.28, 0], 0.018, 5), new THREE.TorusGeometry(0.06, 0.016, 4, 10, Math.PI * 1.4).translate(0, -0.34, 0)]), // box = strap between the cheeks carrying the hook
   };
   return lowerBlockGeo;
 }
@@ -318,7 +322,8 @@ export function buildBoats(world, parent) {
       const [hx, hy, hz, uby] = addDavit(g, s * xd, out);
       // falls: double upper block, lower block with hook in the boat's lifting eye, four parts of rope
       for (const [k, m] of [['oak', mats.oak], ['iron', mats.iron]]) g.add(mk(LB[k], m, s * xh, yh + 0.42, bz));
-      g.add(mk(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 6), mats.iron, s * xh, yh + 0.0, bz));
+      if (covered) g.add(mk(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 6), mats.iron, s * xh, yh + 0.0, bz));
+      else { const y0 = by + T.D * 0.2 * Math.pow(xh / (T.L / 2), 5) + 0.03; g.add(mk(new THREE.CylinderGeometry(0.03, 0.03, yh + 0.15 - y0, 6), mats.iron, s * xh, (yh + 0.15 + y0) / 2, bz)); } // lifting rod down to the keel
       for (const o of [-0.075, -0.025, 0.025, 0.075]) R(hx + o * 0.5, uby - 0.12, hz + o, s * xh + o * 0.5, yh + 0.55, bz + o * 0.6);
       R(hx, hy - 0.15, hz, hx, uby + 0.15, hz);
       // hauling part down the arm to the cleat on the davit base
@@ -347,9 +352,15 @@ export function buildBoats(world, parent) {
       }
     } else {
       // gripes holding the swung-out cutter against the ship's side, boom spars
+      // spar resting on the third railing bar and bearing against the bilge; gripe from the top rail over the gunwale
+      const ys = 0.78 + 0.012 + 0.06, zr = 1.8;
+      let lo = 0, hi = 1; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (by + sect(T, 0.6, m)[1] < ys) lo = m; else hi = m; }
+      const zh = bz - sect(T, 0.6, lo)[2] + 0.02, gw = sect(T, 0.6, 1);
       for (const s of [-1, 1]) {
-        R(s * T.L * 0.3, 1.1, 1.72, s * T.L * 0.3, by + T.D, bz - T.B / 2 + 0.05, 0.014);
-        g.add(mk(new THREE.CylinderGeometry(0.06, 0.06, 1.4, 6).rotateX(Math.PI / 2), mats.woodDark, s * T.L * 0.3, by + T.D * 0.6, bz - T.B / 2 - 0.55));
+        const x = s * T.L * 0.3;
+        g.add(mk(new THREE.CylinderGeometry(0.06, 0.06, zh - zr + 0.06, 6).rotateX(Math.PI / 2), mats.woodDark, x, ys, (zh + zr - 0.06) / 2));
+        R(x, 1.075, zr, x, by + gw[4] + 0.03, bz - gw[3] - 0.045, 0.014);
+        R(x, by + gw[4] + 0.03, bz - gw[3] - 0.045, x, by + gw[4] + 0.05, bz - gw[3] + 0.1, 0.014);
       }
     }
     if (collapsible) {
@@ -403,6 +414,16 @@ function SLIP() { return (_slip ||= merge([boxG(0.12, 0.03, 0.2, 0, 0, 0), cylG(
 function CHOCK() {
   if (_chock) return _chock;
   const p = [boxG(0.24, 0.6, 0.5, 0, 0.3, 0), boxG(0.24, 0.12, 2.1, 0, 0.06, 0)];
-  for (const zs of [-1, 1]) { const w = boxG(0.24, 0.42, 0.3, 0, 0, 0); w.rotateX(-zs * 0.55); w.translate(0, 0.5, zs * 0.78); p.push(w); }
+  // side wedges standing on the base plank, their sloping tops bearing against the bilge of the boat
+  // (profile matches the standard boat's section at the chock station t = ±0.54, keel resting at y = 0.6)
+  for (const zs of [-1, 1]) {
+    const sh = new THREE.Shape();
+    const pts = [[0.24, 0.12], [0.86, 0.12], [0.86, 0.952], [0.5, 0.688], [0.24, 0.6]];
+    sh.moveTo(pts[0][0], pts[0][1]); for (let k = 1; k < pts.length; k++) sh.lineTo(pts[k][0], pts[k][1]); sh.closePath();
+    const w = new THREE.ExtrudeGeometry(sh, { depth: 0.24, bevelEnabled: false });
+    w.rotateY(-Math.PI / 2).translate(0.12, 0, 0);       // shape x -> local z, extruded across x (-0.12..0.12)
+    if (zs < 0) { w.scale(1, 1, -1); const ix = w.index; if (ix) { for (let i = 0; i < ix.count; i += 3) { const a = ix.getX(i + 1); ix.setX(i + 1, ix.getX(i + 2)); ix.setX(i + 2, a); } } else { const P = w.attributes.position; for (let i = 0; i < P.count; i += 3) for (const at of [P, w.attributes.normal, w.attributes.uv]) { if (!at) continue; for (let c = 0; c < at.itemSize; c++) { const t = at.array[(i + 1) * at.itemSize + c]; at.array[(i + 1) * at.itemSize + c] = at.array[(i + 2) * at.itemSize + c]; at.array[(i + 2) * at.itemSize + c] = t; } } } w.computeVertexNormals(); }
+    p.push(w);
+  }
   return (_chock = merge(p));
 }

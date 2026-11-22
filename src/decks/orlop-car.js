@@ -192,7 +192,8 @@ export function renaultHold(lanes) {
       b.box(mats.oak, cx - 0.1, Y, cz - 0.08, cx + 0.1, Y + 0.1, cz + 0.08);
     }
     for (const dx of [1.9, -1.9]) for (const s of [-1, 1]) {
-      const p0 = [x + dx, Y + 0.45, z + s * 0.45], p1 = [x + dx * 1.25, Y + 0.02, z + s * 1.35];
+      const ca = Math.cos(0.08), sa = Math.sin(0.08), R = (lx, lz) => [x + lx * ca + lz * sa, z - lx * sa + lz * ca]; // car is turned by 0.08 rad
+      const [ax, az] = R(dx, s * 0.43), [bx, bz] = R(dx * 1.25, s * 1.35), p0 = [ax, Y + 0.48, az], p1 = [bx, Y + 0.02, bz];
       b.prism(mats.rope, p0, p1, 0.012, 4);
       b.box(mats.iron, p1[0] - 0.05, Y, p1[2] - 0.05, p1[0] + 0.05, Y + 0.03, p1[2] + 0.05);
     }

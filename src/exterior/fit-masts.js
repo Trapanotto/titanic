@@ -109,13 +109,13 @@ export function buildMasts(world, parent) {
     root.add(cyl(mats.iron, P(M, y0 + 1.6), y0 + 1.6, 0, P(M, y0 + 1.85), y0 + 1.85, 0, 0.33, 10));
     root.add(ball(mats.gold, P(M, yTop), yTop + 0.06, 0, 0.11, 8, 6, 0.6)); // truck
   };
-  const rungs = (M, y0, y1, side) => { // iron rungs up the mast
+  const rungs = (M, y0, y1, side, r0, r1, yTop) => { // iron rungs up the mast; legs reach into the mast surface
     for (let y = y0; y < y1; y += 0.38) {
-      const r = 0.48 - 0.006 * (y - M.baseY);
+      const r = r0 + ((r1 - r0) * (y - M.baseY)) / (yTop - M.baseY);
       const x = P(M, y) + side * (r + 0.07);
       root.add(box(mats.iron, 0.025, 0.025, 0.36, x, y, 0));
-      root.add(box(mats.iron, 0.09, 0.02, 0.02, x - side * 0.04, y, -0.17));
-      root.add(box(mats.iron, 0.09, 0.02, 0.02, x - side * 0.04, y, 0.17));
+      const xi = Math.sqrt(r * r - 0.17 * 0.17) * Math.cos(Math.PI / 16) - 0.01, L = r + 0.0825 - xi; // inside the 16-gon
+      for (const z of [-0.17, 0.17]) root.add(box(mats.iron, L, 0.02, 0.02, P(M, y) + side * (xi + L / 2), y, z));
     }
   };
   const fit = new Inst();
@@ -138,7 +138,7 @@ export function buildMasts(world, parent) {
   const fTop1 = 52.5;
   lowerMast(FM, fTop1, 0.48, 0.3);
   topMast(FM, fTop1 - 2.2, FM.topY);
-  rungs(FM, FM.baseY + 0.6, FM.baseY + 14.6, -1);
+  rungs(FM, FM.baseY + 0.6, FM.baseY + 14.6, -1, 0.48, 0.3, fTop1);
 
   // crow's nest ~15 m above the forecastle deck, on the forward face
   const yN = FM.baseY + 15, xN = P(FM, yN) + 0.42;
@@ -161,6 +161,8 @@ export function buildMasts(world, parent) {
     // canvas weather apron laced round the top of the nest on short iron stanchions
     const ap = cyl(mats.canvas, xN, yN + H + 0.02, 0, xN, yN + H + 0.48, 0, R + 0.03, 20, R + 0.05, false, true); ap.material = mats.canvas; root.add(ap);
     const api = new THREE.Mesh(innerCylGeo(16), mats.canvas); api.scale.set(R + 0.02, 0.46, R + 0.02); api.position.set(xN, yN + H + 0.25, 0); root.add(api);
+    // canvas top edge (closes the gap between the outer and the inner face of the apron)
+    root.add(new THREE.Mesh(new THREE.RingGeometry(R + 0.012, R + 0.058, 20).rotateX(-Math.PI / 2).translate(xN, yN + H + 0.48, 0), mats.canvas));
     for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; root.add(vcyl(mats.iron, xN + Math.cos(a) * (R + 0.06), yN + H, Math.sin(a) * (R + 0.06), 0.5, 0.012, 4)); }
     root.add(new THREE.Mesh(new THREE.TorusGeometry(R + 0.06, 0.012, 4, 20).rotateX(Math.PI / 2).translate(xN, yN + H + 0.5, 0), mats.iron));
     // opening in the after side of the mast (access from the internal ladder)
@@ -187,7 +189,7 @@ export function buildMasts(world, parent) {
     block(P(M, yTL) + dir * 0.3, yTL - 0.4, 0);                                   // topping lift block at the mast
     rope.seg(tx, ty - 0.5, 0, tx, ty - 3.2, 0, 0.014);
     root.add(ball(mats.iron, tx, ty - 3.3, 0, 0.09, 8, 6));                      // hook weight (ball)
-    root.add(new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.018, 4, 10, Math.PI * 1.4).rotateZ(Math.PI * 1.1), mats.iron)).children.at(-1).position.set(tx, ty - 3.5, 0);
+    root.add(new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.018, 4, 10, Math.PI * 1.4).rotateZ(Math.PI * 1.1), mats.iron)).children.at(-1).position.set(tx, ty - 3.46, 0); // hook hangs from the ball
     // heel fitting: gooseneck pin + band on the mast, steel derrick table
     root.add(cyl(mats.iron, M.x + dir * 0.45, gy - 0.25, 0, M.x + dir * 0.45, gy + 0.25, 0, 0.05, 8));
     root.add(cyl(steel, P(M, gy - 0.3), gy - 0.3, 0, P(M, gy - 0.18), gy - 0.18, 0, 0.56, 16));
@@ -237,7 +239,7 @@ export function buildMasts(world, parent) {
   const mTop1 = 49.5;
   lowerMast(MM, mTop1, 0.46, 0.29);
   topMast(MM, mTop1 - 2.2, MM.topY);
-  rungs(MM, MM.baseY + 0.6, MM.baseY + 12, 1);
+  rungs(MM, MM.baseY + 0.6, MM.baseY + 12, 1, 0.46, 0.29, mTop1);
   boom(MM, -1, 9.5, 0.55, 6.5);
   const yMS = 47.4;
   for (const s of [-1, 1]) {

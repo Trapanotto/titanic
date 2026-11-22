@@ -387,6 +387,20 @@ export function extrude(outline, depth, bevel = 0, curveSeg = 6) {
   return metreUV(g);
 }
 
+/**
+ * Flat dial / clock face disc of radius r with 0..1 texture UVs, facing `face` ('x' | '-x' | 'z' | '-z' | 'y'). Seen from
+ * in front of the face the texture is upright (+v = world +y; for 'y': +v = −x) and unmirrored (+u = viewer's right).
+ * (Cylinder caps and lathes map their UVs along z / around the axis: dials drawn with them come out sideways or mirrored.)
+ */
+export function dialDisc(r, seg = 24, face = 'x') {
+  const g = new THREE.CircleGeometry(r, seg); // faces +z, u → +x, v → +y
+  if (face === 'x') g.rotateY(Math.PI / 2);
+  else if (face === '-x') g.rotateY(-Math.PI / 2);
+  else if (face === '-z') g.rotateY(Math.PI);
+  else if (face === 'y') { g.rotateZ(Math.PI / 2); g.rotateX(-Math.PI / 2); }
+  return g;
+}
+
 /** RoundedBoxGeometry (centred) with metre UVs. */
 export function roundBox(sx, sy, sz, r = 0.02, seg = 1) { return metreUV(new RoundedBoxGeometry(sx, sy, sz, seg, r)); }
 

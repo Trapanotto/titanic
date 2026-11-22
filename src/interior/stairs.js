@@ -180,7 +180,7 @@ function railX(world, deck, b, S, xa, ya, xe, ye, zz, cut = null) {
   const zone = world.zone(deck, (xa + xe) / 2), dx = xe - xa, dy = ye - ya, L = Math.abs(dx), level = Math.abs(dy) < 1e-6;
   const xc = cut ?? xe;
   if (S.infill === 'pipe') {
-    for (const hh of [RAIL_H, 0.48]) b.prism(S.rail, [xa, ya + hh, zz], [xe, ye + hh, zz], hh === RAIL_H ? 0.022 : 0.017, 6);
+    for (const hh of [RAIL_H, 0.48]) b.prism(S.rail, [xa, ya + hh, zz], [xe, ye + hh, zz], hh === RAIL_H ? 0.022 : 0.017, 6, true); // capped pipe ends
     const n = Math.max(1, Math.round(L / 1.2));
     for (let i = 0; i <= n; i++) { const t = i / n, x = xa + dx * t, y = ya + dy * t; b.prism(S.rail, [x, y, zz], [x, y + RAIL_H, zz], 0.018, 6); if (i > 0 && i < n) place(zone, knuckle(), x, y + RAIL_H - 0.03, zz, 0); }
     return;
@@ -208,7 +208,7 @@ function railX(world, deck, b, S, xa, ya, xe, ye, zz, cut = null) {
 }function railZ(world, deck, b, S, xx, za, ze, yf) {
   const zone = world.zone(deck, xx), L = Math.abs(ze - za);
   if (S.infill === 'pipe') {
-    for (const hh of [RAIL_H, 0.48]) b.prism(S.rail, [xx, yf + hh, za], [xx, yf + hh, ze], hh === RAIL_H ? 0.022 : 0.017, 6);
+    for (const hh of [RAIL_H, 0.48]) b.prism(S.rail, [xx, yf + hh, za], [xx, yf + hh, ze], hh === RAIL_H ? 0.022 : 0.017, 6, true);
     return;
   }
   b.sweep(S.rail, RAIL[S.newel === 'grand' ? 'grand' : 'oak'], [xx, yf + RAIL_H, za], [0, 0, Math.sign(ze - za)], [-Math.sign(ze - za), 0, 0], [0, 1, 0], L, [true, true]);
@@ -408,7 +408,7 @@ function reliefFigure(p, s, fz, y0, hold, K = 0.55) {
   } else {
     parts.push(p.loft(W, [P(0.0, 0.83, 0.078), P(0.02, 0.72, 0.11), P(0.06, 0.62, 0.12), P(0.08, 0.58, 0.115)], [0.028, 0.024, 0.021, 0.018], 10));
     parts.push(p.loft(W, [P(0.08, 0.62, 0.115), P(0.09, 0.45, 0.15), P(0.1, 0.25, 0.18), P(0.1, 0.1, 0.2)], 0.009, 6));
-    for (let i = 0; i < 9; i++) { const t = i / 8, yy = y0 + 0.5 - t * 0.36; for (const d of [-1, 1]) { const lf = p.extX(W, [[0, 0], [0.012, 0.005], [0.07, 0.02], [0.012, 0.012]], 0.008, xc + 0.1, yy, fz + s * (0.15 + t * 0.045)); lf.rotation.x = d * 0.6 + Math.PI; parts.push(lf); } }
+    for (let i = 0; i < 9; i++) { const t = i / 8, yy = y0 + 0.5 - t * 0.36; for (const d of [-1, 1]) { const lf = p.extX(W, [[0, 0], [0.012, 0.005], [0.07, 0.02], [0.012, 0.012]], 0.008, (xc + 0.1) * K, yy, fz + s * (0.15 + t * 0.045)); lf.rotation.x = d * 0.6 + Math.PI; parts.push(lf); } } // palm leaflets on the flattened stem
   }
   // large feathered wings rising from the shoulders, spreading away from the clock (flight feathers + coverts)
   const WING = [[0, 0], [0.02, 0.14], [0.05, 0.28], [0.09, 0.42], [0.14, 0.53], [0.19, 0.58], [0.225, 0.55], [0.235, 0.51], [0.26, 0.49], [0.265, 0.45], [0.29, 0.42], [0.29, 0.38], [0.305, 0.34], [0.3, 0.3], [0.31, 0.26],
@@ -443,7 +443,7 @@ const honourGlory = def('honourGlory2', (o) => [o.w ?? 1.6, 0.3, (o.h ?? 1.5) + 
   const cy = h * (o.figures === false ? 0.55 : 0.52), R = 0.2;
   p.latheX(W, [[0, 0], [R + 0.08, 0], [R + 0.09, 0.03], [R + 0.06, 0.08], [R + 0.03, 0.09], [0, 0.09]], 0.03, cy, 0, 28);
   p.latheX(Gd, [[R - 0.01, 0], [R + 0.025, 0.01], [R + 0.015, 0.025], [R - 0.02, 0.02], [R - 0.01, 0]], 0.12, cy, 0, 28); // closed bezel ring
-  p.cx(kitMats.clockFace, R, 0.006, 0.123, cy, 0, 28);
+  p.cx(Dk, R, 0.006, 0.123, cy, 0, 28); p.dial(kitMats.clockFace, R - 0.003, 0.1265, cy, 0, 'x', 28);
   const hand = (len, a, t) => { const m = p.b(Dk, 0.005, len, t, 0.13, 0, 0); m.position.set(0.13, cy + (Math.cos(a) * len) / 2, (-Math.sin(a) * len) / 2); m.rotation.x = -a; };
   hand(0.12, -0.9, 0.014); hand(0.16, 0.75, 0.009);
   // laurel wreath crowning the clock, garland swag below

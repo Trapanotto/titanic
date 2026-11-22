@@ -37,7 +37,7 @@ export function scotlandRoadDetails(world, plan, { x0, x1, z0, z1, stations, ben
     for (const p of runs) pipe(zone, p.mat, [[xa, yP, p.z], [xb, yP, p.z]], p.r);
     // ladder-type cable tray along the outboard wall with three lead-covered cables and a bell wire
     for (const zz of [zout + 0.1, zout + 0.38]) b.box(iron, xa, yP - 0.04, zz - 0.01, xb, yP + 0.02, zz + 0.01, 'xXyYzZ');
-    for (let x = xa + 0.15; x < xb; x += 0.3) b.box(iron, x - 0.012, yP - 0.035, zout + 0.1, x + 0.012, yP - 0.02, zout + 0.38, 'yY');
+    for (let x = xa + 0.15; x < xb; x += 0.3) b.box(iron, x - 0.012, yP - 0.035, zout + 0.1, x + 0.012, yP - 0.02, zout + 0.38, 'xXyY');
     b.bar(matOf('steelDark'), [xa, yP - 0.02, zout + 0.17], [xb, yP - 0.02, zout + 0.17], 0.04, 0.04);
     b.bar(matOf('rubber'), [xa, yP - 0.02, zout + 0.24], [xb, yP - 0.02, zout + 0.24], 0.035, 0.035);
     b.bar(matOf('steelDark'), [xa, yP - 0.02, zout + 0.31], [xb, yP - 0.02, zout + 0.31], 0.03, 0.03);

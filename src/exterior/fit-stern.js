@@ -35,7 +35,7 @@ function propGeo(R, n, rh, hand) {
       const a = hand * (c * cj * Math.sin(beta) + th * Math.cos(beta)) - 0.06 * f * R; // slight rake aft
       const d = t / rr;
       return [a, rr * Math.cos(d), rr * Math.sin(d)];
-    }, (face > 0) !== (hand > 0));
+    }, (face > 0) === (hand > 0)); // both blade faces outward (was inside-out)
     geos.push(g);
   }
   const blade = mergeGeometries(geos);

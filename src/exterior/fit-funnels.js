@@ -160,11 +160,13 @@ export function buildFunnels(world, parent) {
       pipe(Math.PI + 0.22, null, L + 0.2, 0.09);
       // --- whistle platform with triple-chime whistle ---
       const px = a + 0.62;
-      g.add(box(mats.steelFloor, 0.95, 0.05, 2.0, px, LW, 0));
-      for (const z of [-0.95, 0.95]) g.add(cyl(mats.iron, a + 0.05, LW - 0.75, z * 0.8, px + 0.4, LW - 0.03, z, 0.03, 5));
+      const xs = (z) => a * Math.sqrt(Math.max(0, 1 - (z / b) ** 2)) * Math.cos(Math.PI / SEG) - 0.02; // shell surface (inside the polygon)
+      const pin = xs(1.0); // platform reaches back into the elliptical shell so it bears against it everywhere
+      g.add(box(mats.steelFloor, px + 0.475 - pin, 0.05, 2.0, (px + 0.475 + pin) / 2, LW, 0));
+      for (const z of [-0.95, 0.95]) g.add(cyl(mats.iron, xs(z * 0.8), LW - 0.75, z * 0.8, px + 0.4, LW - 0.03, z, 0.03, 5));
       for (const z of [-0.98, -0.33, 0.33, 0.98]) g.add(cyl(mats.iron, px + 0.45, LW, z, px + 0.45, LW + 1.0, z, 0.02, 5));
       for (const h of [0.5, 1.0]) g.add(cyl(mats.iron, px + 0.45, LW + h, -0.98, px + 0.45, LW + h, 0.98, 0.018, 5));
-      for (const z of [-0.98, 0.98]) for (const h of [0.5, 1.0]) g.add(cyl(mats.iron, px + 0.45, LW + h, z, a + 0.1, LW + h, z, 0.018, 5));
+      for (const z of [-0.98, 0.98]) for (const h of [0.5, 1.0]) g.add(cyl(mats.iron, px + 0.45, LW + h, z, xs(z), LW + h, z, 0.018, 5));
       // manifold + three bells (large centre, two small)
       g.add(cyl(mats.brass, wx, LW + 0.45, wz, px + 0.05, LW + 0.45, 0.2, 0.05, 6));
       g.add(cyl(mats.brass, px + 0.05, LW + 0.45, -0.42, px + 0.05, LW + 0.45, 0.42, 0.06, 6));

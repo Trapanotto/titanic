@@ -78,6 +78,11 @@ export class PB {
   /** extruded outline in the xz plane (a = x, b = −z), thickness along y, bottom at y */
   extY(mat, outline, depth, x = 0, y = 0, z = 0, bevel = 0) { const m = this._add(G.extrude(outline, depth, bevel), mat, x, y + depth / 2, z); m.rotation.x = -Math.PI / 2; return m; }
   rev(mat, rows, o, x = 0, y = 0, z = 0) { if (!o.wave && !o.perim) o = { ...o, seg: S(o.seg ?? 24, Math.max(8, MINSEG(Math.max(...rows.map((q) => q.o))))) }; return this._add(G.revolve(rows, o), mat, x, y, z); }
+  /** dial / clock face disc (centre x,y,z) facing 'x' | '-x' | 'z' | '-z', texture upright and unmirrored from the front */
+  dial(mat, r, x = 0, y = 0, z = 0, face = 'x', seg = 24) {
+    seg = S(seg, MINSEG(r));
+    return this._add(cached(`dial${r3(r)}_${seg}_${face}`, () => G.dialDisc(r, seg, face)), mat, x, y, z);
+  }
   /** atlas-coloured box (bottom at y) */
   ab(cell, sx, sy, sz, x = 0, y = 0, z = 0, band = false) {
     return this._add(cached(`ab${r3(sx)}_${r3(sy)}_${r3(sz)}_${cell}_${band}`, () => (band ? G.atlasBox(sx, sy, sz, cell) : G.atlasCell(new THREE.BoxGeometry(sx, sy, sz), cell))), K.atlas, x, y + sy / 2, z);

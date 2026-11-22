@@ -374,7 +374,7 @@ export function steeringGear(plan, R) {
   w.addCollider(cx + Rq, Y, -1.8, cx + Rq + 0.32, Y + 1.0, 1.8);
   // telemotor receiver, hydraulic tank, switchboard, workbench, spare tiller on brackets, spare gear
   plan.prop(bcTelemotor(), R.x1 - 0.45, -1.4, NX, { collide: true });
-  pipe(plan.zone(R.x1), 'copper', [[R.x1 - 0.3, Y + 1.3, -1.3], [R.x1 - 0.3, Y + h - 0.1, -1.3]], 0.025);
+  pipe(plan.zone(R.x1), 'copper', [[R.x1 - 0.65, Y + 1.28, -1.3], [R.x1 - 0.65, Y + h, -1.3]], 0.025); // from the receiver's pipe up into the deck head
   plan.prop(switchboard({ w: 1.6 }), R.x1 - 0.25, -4.6, NX, { collide: true });
   plan.prop(workbench({ w: 1.6 }), R.x1 - 0.45, 5.1, NX, { collide: true });
   plan.prop(tankH({ r: 0.4, l: 1.6 }), cx + 0.6, -4.0, NZ, { collide: true });
@@ -397,8 +397,9 @@ export function windlassRoom(plan, R) {
     b.box(mats.iron, ex + 0.95, Y, s * 2.0 - 0.3, ex + 1.55, Y + 0.55, s * 2.0 + 0.3);
     plan.prop(column({ h, r: 0.24, mat: 'steelDark' }), R.x0 + 6.2, s * 1.35, 0, { collide: true });
     b.box(mats.rust, R.x0 + 5.85, Y, s * 1.35 - 0.35, R.x0 + 6.55, Y + 0.08, s * 1.35 + 0.35);
-    pipe(plan.zone(ex), 'copper', [[R.x0 + 0.15, Y + h - 0.2, s * 2.9], [ex, Y + h - 0.2, s * 2.9], [ex, Y + 1.45, s * 2.9]], 0.05);
-    pipe(plan.zone(ex), 'steelDark', [[ex - 0.3, Y + 0.3, s * 3.1], [R.x0 + 0.15, Y + 0.3, s * 3.1]], 0.07);
+    pipe(plan.zone(ex), 'copper', [[R.x0 + 0.03, Y + h - 0.2, s * 2.9], [ex, Y + h - 0.2, s * 2.9], [ex, Y + 1.45, s * 2.9]], 0.05);
+    for (const x of [R.x0 + 0.8, (R.x0 + ex) / 2 + 0.4]) plan.batch.box(mats.iron, x - 0.02, Y + h - 0.2, s * 2.9 - 0.02, x + 0.02, Y + h, s * 2.9 + 0.02, 'xXzZ'); // pipe hangers
+    pipe(plan.zone(ex), 'steelDark', [[ex - 0.3, Y + 0.3, s * 3.1], [R.x0 + 0.03, Y + 0.3, s * 3.1]], 0.07);
     plan.prop(gauge(), R.x0 + 0.06, s * 1.4, PX, { y: Y + 1.65 });
   }
   w.addCollider(ex + 0.95, Y, -2.3, ex + 1.55, Y + 0.55, -1.7); w.addCollider(ex + 0.95, Y, 1.7, ex + 1.55, Y + 0.55, 2.3);

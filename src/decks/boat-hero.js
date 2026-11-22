@@ -255,6 +255,7 @@ export function furnishBridge(ctx) {
   // teak bulwark capping, brass hand rail; window frames with wind screens above the front bulwark
   d.box('woodDark', 72.62, -FW + 0.05, 72.85, FW - 0.05, 0.95, 1.0);
   d.box('brass', 72.55, -FW + 0.1, 72.6, FW - 0.1, 0.9, 0.94);
+  for (let z = -FW + 0.4; z < FW - 0.3; z += 1.6) d.box('brass', 72.57, z - 0.012, 72.64, z + 0.012, 0.92, 0.95); // rail brackets under the capping
   const n = 16;
   for (let i = 0; i <= n; i++) { const z = -FW + 0.1 + ((2 * FW - 0.2) * i) / n; d.box('woodDark', 72.7, z - 0.035, 72.8, z + 0.035, 1.0, 2.2); }
   d.box('woodDark', 72.68, -FW + 0.05, 72.82, FW - 0.05, 2.2, 2.3);
@@ -509,14 +510,17 @@ export function furnishFanRoom(ctx) {
   ctx.fit(machineBlock({ w: 1.6, d: 1.2, h: 1.5, kind: 'pump', mat: 'paintGrey' }), ['far:lo', 'far:hi']);
   ctx.fit(machineBlock({ w: 1.6, d: 1.2, h: 1.5, kind: 'pump', mat: 'paintGrey' }), ['far:hi', 'right:hi']);
   ctx.fit(switchboard({ w: 1.2 }), ['left:hi', 'right:lo'], { gap: 0 });
-  for (const x of [11.0, 14.6]) d.box('steelDark', x - 0.45, 3.3, x + 0.45, 4.2, 1.9, d.H - 0.02);
+  for (const x of [11.0, 14.6]) { d.box('steelDark', x - 0.45, 3.3, x + 0.45, 4.2, 1.9, d.H); d.box('steelDark', x - 0.5, 3.25, x + 0.5, 4.25, 1.86, 1.9); } // trunks from the deck head, flanged
 }
 
 export function furnishLiftMachinery(ctx) {
   const d = detailer(ctx);
   ctx.fit(machineBlock({ w: 1.3, d: 1.0, h: 1.3, kind: 'dynamo', mat: 'paintGreen' }), ['far:mid', 'left:hi']);
   ctx.fit(switchboard({ w: 1.0 }), ['right:hi', 'left:lo'], { gap: 0 });
-  d.b.ring(mats.iron, [-39.2, d.Y + 1.9, -3.4], [1, 0, 0], 0.25, 0.32, 12);
+  // rope sheave hung from the deck head: grooved wheel on an axle between two hanger plates
+  d.b.prism(mats.iron, [-39.23, d.Y + 1.9, -3.4], [-39.17, d.Y + 1.9, -3.4], 0.32, 12, true);
+  d.b.prism(mats.steelDark, [-39.3, d.Y + 1.9, -3.4], [-39.1, d.Y + 1.9, -3.4], 0.03, 8, true);
+  for (const x of [-39.3, -39.12]) d.box('iron', x, -3.46, x + 0.02, -3.34, 1.84, d.H);
 }
 
 // ============================================================================================== aft house (2nd class)

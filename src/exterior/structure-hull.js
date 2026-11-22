@@ -173,19 +173,21 @@ const HINGE_G = () => (_hinge ||= new THREE.CylinderGeometry(0.035, 0.035, 1, 8,
 
 /** Gangway / shell door: frame with rivets, leaves with flush plates and hinges, brass handle. */
 function shellDoor(batch, inst, xc, y0, w, h, s, leaves = 2) {
-  const base = LAP + 0.004, S = hullS(s, base), N = hullN(s), m = mats.hullBlack;
+  // sit on the strake the door is cut into (inner strakes are LAP lower); all side faces reach down to the
+  // innermost plating surface so nothing stands off the shell where a door crosses a lap
+  const base = shellOff(y0 + h / 2) + 0.004, S = hullS(s, base), N = hullN(s), m = mats.hullBlack, d0 = -base;
   const x0 = xc - w / 2, x1 = xc + w / 2, y1 = y0 + h, f = 0.09;
   // frame (raised doubling around the opening)
-  batch.plate(m, S, N, x0 - f, x1 + f, y1, y1 + f, 0, 0.03);
-  batch.plate(m, S, N, x0 - f, x1 + f, y0 - f, y0, 0, 0.03);
-  batch.plate(m, S, N, x0 - f, x0, y0, y1, 0, 0.03);
-  batch.plate(m, S, N, x1, x1 + f, y0, y1, 0, 0.03);
+  batch.plate(m, S, N, x0 - f, x1 + f, y1, y1 + f, d0, 0.03);
+  batch.plate(m, S, N, x0 - f, x1 + f, y0 - f, y0, d0, 0.03);
+  batch.plate(m, S, N, x0 - f, x0, y0, y1, d0, 0.03);
+  batch.plate(m, S, N, x1, x1 + f, y0, y1, d0, 0.03);
   // dark joint around the leaves
   batch.plate(mats.iron, S, N, x0, x1, y0, y1, 0, 0.004, false);
   const lw = leaves === 2 ? w / 2 : w;
   for (let l = 0; l < leaves; l++) {
     const a = x0 + l * lw + 0.012, b = x0 + (l + 1) * lw - 0.012;
-    batch.plate(m, S, N, a, b, y0 + 0.012, y1 - 0.012, 0, 0.012);
+    batch.plate(m, S, N, a, b, y0 + 0.012, y1 - 0.012, d0, 0.012);
     // horizontal stiffener lines on the leaf
     for (const t of [0.33, 0.66]) batch.plate(m, S, N, a + 0.05, b - 0.05, y0 + h * t - 0.015, y0 + h * t + 0.015, 0.012, 0.022);
     // hinges on the outer edge
@@ -211,7 +213,8 @@ function portholeGeos() {
   if (PH) return PH;
   PH = {
     // brass rim: flange on the plating, raised lip, bore going in towards the glass
-    rim: latheGeo('portRim', [[0.312, 0.0], [0.3, 0.018], [0.265, 0.046], [0.225, 0.054], [0.2, 0.035], [0.2, -0.005]], 12),
+    // (flange starts 3 cm inside the plating so no gap opens where the faceted shell lies below the true surface)
+    rim: latheGeo('portRim', [[0.316, -0.03], [0.3, 0.018], [0.265, 0.046], [0.225, 0.054], [0.2, 0.035], [0.2, -0.005]], 12),
     glass: new THREE.CircleGeometry(0.2, 12).rotateX(-Math.PI / 2).translate(0, 0.004, 0),
     // eyebrow (rigol) above the porthole: arc in the local x/z plane, local z = up
     rigol: (() => {
@@ -220,7 +223,7 @@ function portholeGeos() {
       for (let i = 0; i < seg; i++) {
         const t0 = 0.35 + (i / seg) * (Math.PI - 0.7), t1 = 0.35 + ((i + 1) / seg) * (Math.PI - 0.7);
         const a = P(t0, R0, 0), b = P(t1, R0, 0), c = P(t1, (R0 + R1) / 2, H), d = P(t0, (R0 + R1) / 2, H), e = P(t1, R1, 0), f = P(t0, R1, 0);
-        pos.push(...a, ...c, ...b, ...a, ...d, ...c, ...d, ...e, ...c, ...d, ...f, ...e);
+        pos.push(...a, ...b, ...c, ...a, ...c, ...d, ...d, ...c, ...e, ...d, ...e, ...f); // faces out of the plate
       }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
       g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
