@@ -17,7 +17,7 @@ const HELP = [
   ['J', 'Minikarte ein/aus'],
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
-  ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Telegraf, Steuerrad, Glocke, Pfeife, Morsetaste)'],
+  ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Aufzüge, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Morsetaste)'],
   ['T', 'Ton an/aus'],
   ['Klick / Antippen', 'Info-Marke direkt öffnen'],
   ['1 – 9', 'Schnellreise zu Höhepunkten'],
@@ -191,7 +191,7 @@ export class UI {
       case 'plan': if (this.modal === 'plan') this.closeModal(); else { this._open('plan'); this.plan.open(); } break;
       case 'info':
         if (this.modal === 'info') this.closeModal();
-        else if (!this.modal && p.mode === 'walk' && this.interact?.nearest >= 0) this.interact.run();
+        else if (!this.modal && p.mode === 'walk' && this.interact && this.interact.nearest !== -1 && (this.interact.nearest !== 'door' || this.info.nearest < 0)) this.interact.run();
         else if (!this.modal && p.mode === 'walk' && this.info.nearest >= 0) this.openInfo(this.info.nearest);
         break;
       case 'night': if (this.modal !== 'plan') { this.world.setNight(!this.world.state.night); this.toast(this.world.state.night ? 'Nacht' : 'Tag', 1.5); } break;
@@ -308,12 +308,14 @@ export class UI {
     const head = a <= 45 ? 'Blick zum Bug' : a >= 135 ? 'Blick zum Heck' : deg > 0 ? 'Blick nach Backbord' : 'Blick nach Steuerbord';
     if (head !== L.head) { L.head = head; this.headEl.textContent = head; }
 
-    const use = this.modal ? -1 : (this.interact?.nearest ?? -1);
-    const info = this.modal || use >= 0 ? -1 : this.info.nearest;
-    const near = use >= 0 ? this.interact.label(use) : info; // things to operate come before the info of the same spot
+    const use = this.modal ? -1 : (this.interact?.nearest ?? -1), has = use !== -1;
+    // a door steps back behind an info point; everything else that can be operated comes first
+    const info = this.modal || (has && use !== 'door') ? -1 : this.info.nearest;
+    const act = has && info < 0;
+    const near = act ? this.interact.label(use) : info; // things to operate come before the info of the same spot
     if (near !== L.prompt) {
       L.prompt = near;
-      if (use >= 0) { this.promptText.textContent = near; this.promptEl.classList.add('show'); }
+      if (act) { this.promptText.textContent = near; this.promptEl.classList.add('show'); }
       else if (info >= 0) { this.promptText.textContent = 'Info: ' + this.info.items[info].info.title; this.promptEl.classList.add('show'); }
       else this.promptEl.classList.remove('show');
     }

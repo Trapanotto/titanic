@@ -3,6 +3,7 @@ import { DECK_Y, DECK_ORDER, ZONE_LEN, deckAboveY, isInterior, deckAtY, ceilingY
 
 const CELL = 4;
 const key = (cx, cz) => cx * 4096 + cz;
+const key2 = key; // (addDoor has a parameter called key)
 
 // ---- visibility / chunking parameters ----
 // 1 m grid over the whole ship (plan view): room clusters for the bake, visible area mask for the culling
@@ -44,6 +45,7 @@ export class World {
     this._bakeGroups = [];
     this._grid = new Map();
     this._colliders = [];
+    this.doors = new Map();   // key -> operable door (addDoor)
     this._stamp = 0;
     this.colliderCount = 0;
     this.colliderTag = null;      // set by the app to the id of the module being built
@@ -385,6 +387,30 @@ export class World {
     this._colliders.push(b);
     this.colliderCount++;
     return b;
+  }
+
+  /**
+   * Hinged door that can be operated (interior kit). Registered once per key; later builds get the same record back,
+   * so a door stays the way the visitor left it. The collider of a door is not an ordinary one: it exists only
+   * while the door is closed and never counts as a wall for the visibility test.
+   * init: { deck, x, y, z (centre of the opening), box: [x0, y0, z0, x1, y1, z1], open, leaves: [...] }
+   */
+  addDoor(key, init) {
+    let d = this.doors.get(key);
+    if (d) return d;
+    d = { key, ...init, t: init.open ? 1 : 0 };
+    const [x0, y0, z0, x1, y1, z1] = init.box;
+    const b = (d.col = { x0, x1, y0, y1: init.open ? -1e9 : y1, z0, z1, s: 0, tag: 'door', top: y1 });
+    for (let cx = Math.floor(b.x0 / CELL); cx <= Math.floor(b.x1 / CELL); cx++) {
+      for (let cz = Math.floor(b.z0 / CELL); cz <= Math.floor(b.z1 / CELL); cz++) {
+        const k = key2(cx, cz);
+        let a = this._grid.get(k);
+        if (!a) this._grid.set(k, (a = []));
+        a.push(b);
+      }
+    }
+    this.doors.set(key, d);
+    return d;
   }
 
   /** Collider from the world-space bounding box of an object (call after it is positioned and added). */

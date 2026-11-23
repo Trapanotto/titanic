@@ -301,6 +301,25 @@ export class Sound {
     return n * dot;
   }
 
+  /** door: latch click, soft creak, and the thud when it closes */
+  door(opening) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, 0.03, 0.2, 'bandpass', 1800, 4);
+    this._tone(this.fx, opening ? 310 : 260, t + 0.05, 0.4, 0.012, { type: 'sawtooth', cutoff: 900, attack: 0.1, sustain: true, release: 0.1, vibrato: true });
+    if (!opening) { this._burst(this.fx, t + 0.5, 0.12, 0.6, 'lowpass', 160, 0.7, this.brown); this._burst(this.fx, t + 0.5, 0.03, 0.15, 'bandpass', 1500, 3); }
+  }
+
+  /** electric lift: gate rattle, motor hum, gate again */
+  lift(seconds) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < 5; i++) { this._burst(this.fx, t + i * 0.05, 0.03, 0.14, 'bandpass', 2400, 4); this._burst(this.fx, t + seconds - 0.25 + i * 0.05, 0.03, 0.14, 'bandpass', 2400, 4); }
+    this._tone(this.fx, 96, t + 0.3, seconds - 0.7, 0.12, { type: 'sawtooth', cutoff: 420, attack: 0.3, sustain: true, release: 0.4 });
+    this._tone(this.fx, 193, t + 0.3, seconds - 0.7, 0.04, { type: 'triangle', attack: 0.3, sustain: true, release: 0.4 });
+    this._tone(this.fx, 1320, t + seconds, 0.8, 0.06);
+  }
+
   /** ratchet of the steering gear while the wheel turns */
   wheelClicks(n = 10) {
     if (!this.ready) return;

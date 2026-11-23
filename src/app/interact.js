@@ -5,6 +5,12 @@ import * as THREE from 'three';
 import { DECK_Y } from '../core/constants.js';
 import { mats } from '../core/materials.js';
 import { ENGINE, ORDERS, stepEngine } from '../core/engine.js';
+import { leafMatrix } from '../core/doors.js';
+
+const LIFT_DECKS = ['E', 'D', 'C', 'B', 'A'];
+const LIFT_NAMES = { A: 'A-Deck', B: 'B-Deck', C: 'C-Deck', D: 'D-Deck', E: 'E-Deck' };
+const DOOR_CELL = 4;
+const _m = new THREE.Matrix4();
 
 const YB = DECK_Y.boat;
 const TELE = { x: 72.25, z: 1.5, y: YB + 0.045, yc: 1.1, R: 0.21 };   // boat-hero.js: main telegraphs at z = ±1.5
@@ -28,6 +34,11 @@ export class Interact {
     this._rudder = 0;
     this._wheelAng = 0;
     this._pull = 0;
+    this._swing = new Set();   // doors in motion
+    this._doorGrid = null;
+    this.door = null;          // door in reach
+    this._liftDir = 1;
+    this._ride = null;
     this.root = new THREE.Group();
     this.root.name = 'bridgeLive';
     this.root.userData.noMerge = true;
@@ -108,24 +119,139 @@ export class Interact {
     });
     add(PULL.x - 0.5, YB, PULL.z, 1.4, () => 'Dampfpfeife ziehen', () => { this._pull = 1; this.sound.whistle(); });
     add(66.6, YB, 6.4, 1.6, () => 'Glocke läuten', () => this.sound.bell(2));
+    // the same order from the manoeuvring platform between the engines
+    add(-31.5, DECK_Y.tank, 1.0, 1.6, () => 'Maschinentelegraf: ' + next().name, () => this.items[0].act());
+    // telephones on the wheelhouse wall
+    for (const z of [-3.4, 3.4]) add(66.6, YB, z, 1.1, () => 'Telefon zum Krähennest abnehmen', () => {
+      this.sound.bell(3);
+      this.toast('„Eisberg direkt voraus!“ – Meldung des Ausgucks Frederick Fleet an die Brücke, 14. April 1912, 23:40 Uhr', 7);
+    });
+    // first-class lifts: gates on the aft side of the three shafts, E to A deck
+    for (const deck of LIFT_DECKS) for (const z of [-1.6, 0, 1.6]) {
+      add(44.9, DECK_Y[deck], z, 0.85, () => 'Aufzug zum ' + LIFT_NAMES[this._liftTarget(deck)], () => this._rideLift(deck, z, this._player));
+    }
     add(52.6, YB, 0.75, 1.6, () => 'Morsetaste: CQD senden', () => {
       this.sound.morse('CQD CQD DE MGY');
       this.toast('– · – ·   – – · –   – · ·   „CQD CQD DE MGY“: Notruf der Titanic (Rufzeichen MGY)', 6);
     });
   }
 
-  label(i) { return this.items[i]?.label() || ''; }
+  // ------------------------------------------------------------------ doors
+
+  /** door in reach: close by, and looked at unless the visitor stands right in front of it */
+  _findDoor(p) {
+    const doors = this.world.doors;
+    if (!doors?.size) return null;
+    if (!this._doorGrid || this._doorGrid.n !== doors.size) {
+      const g = (this._doorGrid = new Map());
+      g.n = doors.size;
+      for (const d of doors.values()) { const k = Math.floor(d.x / DOOR_CELL) * 4096 + Math.floor(d.z / DOOR_CELL); let a = g.get(k); if (!a) g.set(k, (a = [])); a.push(d); }
+    }
+    const fx = Math.cos(p.yaw), fz = -Math.sin(p.yaw), x = p.pos.x, z = p.pos.z, y = p.pos.y;
+    let best = null, bd = 1.7 * 1.7;
+    for (let cx = Math.floor((x - 1.7) / DOOR_CELL); cx <= Math.floor((x + 1.7) / DOOR_CELL); cx++) for (let cz = Math.floor((z - 1.7) / DOOR_CELL); cz <= Math.floor((z + 1.7) / DOOR_CELL); cz++) {
+      const a = this._doorGrid.get(cx * 4096 + cz);
+      if (!a) continue;
+      for (const d of a) {
+        if (Math.abs(d.y - y) > 1) continue;
+        const dx = d.x - x, dz = d.z - z, d2 = dx * dx + dz * dz;
+        if (d2 >= bd) continue;
+        const dist = Math.sqrt(d2);
+        if (dist > 0.75 && (dx * fx + dz * fz) / dist < 0.72) continue;
+        bd = d2; best = d;
+      }
+    }
+    return best;
+  }
+
+  _inDoorway(d, pos) {
+    const b = d.col, r = 0.34;
+    return pos.x > b.x0 - r && pos.x < b.x1 + r && pos.z > b.z0 - r && pos.z < b.z1 + r && Math.abs(pos.y - d.y) < 1;
+  }
+
+  toggleDoor(d, pos) {
+    if (d.open && this._inDoorway(d, pos)) { this.toast('Du stehst in der Tür', 1.5); return; }
+    d.open = !d.open;
+    if (d.open) d.col.y1 = -1e9; // passable as soon as it starts to swing
+    // the leaves are instances in the meshes of their zone
+    d._ims = d.leaves.map((L, li) => {
+      const zg = this.world.zone(d.deck, L.X ? L.e : L.c), tag = d.key + '#' + li, out = [];
+      for (const c of zg.children) { const i = c.userData.leafOf ? c.userData.leafOf.indexOf(tag) : -1; if (i >= 0) out.push([c, i]); }
+      return out;
+    });
+    this._swing.add(d);
+    this.sound.door(d.open);
+  }
+
+  _swingDoors(dt, pos) {
+    for (const d of this._swing) {
+      const to = d.open ? 1 : 0, step = dt / 0.55;
+      d.t = to > d.t ? Math.min(1, d.t + step) : Math.max(0, d.t - step);
+      const e = d.t * d.t * (3 - 2 * d.t);
+      d.leaves.forEach((L, li) => {
+        leafMatrix(L, d.y, e, _m);
+        for (const [im, i] of d._ims[li]) { im.setMatrixAt(i, _m); im.instanceMatrix.needsUpdate = true; }
+      });
+      if (d.t !== to) continue;
+      if (!d.open) {
+        if (this._inDoorway(d, pos)) { d.open = true; continue; } // somebody stepped in: swing open again
+        d.col.y1 = d.col.top;
+      }
+      d._ims = null;
+      this._swing.delete(d);
+    }
+  }
+
+  // ------------------------------------------------------------------ lifts (1st class, E to A deck)
+
+  _liftTarget(deck) {
+    const i = LIFT_DECKS.indexOf(deck);
+    if (i + this._liftDir < 0 || i + this._liftDir >= LIFT_DECKS.length) this._liftDir = -this._liftDir;
+    return LIFT_DECKS[i + this._liftDir];
+  }
+
+  _rideLift(from, z, player) {
+    if (this._ride) return;
+    const to = this._liftTarget(from);
+    let veil = this._veil;
+    if (!veil) {
+      veil = this._veil = document.createElement('div');
+      veil.className = 'lift-veil';
+      (document.getElementById('ui') || document.body).append(veil);
+    }
+    veil.textContent = `Aufzug · ${LIFT_NAMES[from]} → ${LIFT_NAMES[to]}`;
+    veil.classList.add('show');
+    this.sound.lift(2.4);
+    this._ride = { t: 0, to, z, player, moved: false };
+  }
+
+  _stepRide(dt) {
+    const r = this._ride;
+    if (!r) return;
+    r.t += dt;
+    if (!r.moved && r.t > 1.3) {
+      r.moved = true;
+      r.player.teleport({ deck: r.to, x: 44.7, y: DECK_Y[r.to], z: r.z, yaw: Math.PI });
+    }
+    if (r.t > 2.6) { this._veil.classList.remove('show'); this._ride = null; this.toast(LIFT_NAMES[r.to], 2); }
+  }
+
+  label(i) { return i === 'door' ? (this.door?.open ? 'Tür schließen' : 'Tür öffnen') : this.items[i]?.label() || ''; }
 
   run(i = this.nearest) {
+    if (i === 'door') { if (this.door) this.toggleDoor(this.door, this._pos); return true; }
     const it = this.items[i];
     if (!it) return false;
     it.act();
     return true;
   }
 
-  /** @param feet player's feet position */
-  update(dt, feet, mode) {
+  update(dt, player) {
+    const feet = player.pos, mode = player.mode;
+    this._pos = feet; this._player = player;
     stepEngine(dt);
+    if (this._swing.size) this._swingDoors(dt, feet);
+    this._stepRide(dt);
     // moving parts (only near the bridge)
     const nearBridge = Math.abs(feet.x - 70) < 60 && feet.y > DECK_Y.A - 2;
     this.root.visible = nearBridge;
@@ -147,7 +273,7 @@ export class Interact {
     // which thing is in reach
     this._timer -= dt;
     if (this._timer > 0) return;
-    this._timer = 0.2;
+    this._timer = 0.15;
     let best = -1, bd = Infinity;
     if (mode === 'walk') for (let i = 0; i < this.items.length; i++) {
       const it = this.items[i];
@@ -155,6 +281,7 @@ export class Interact {
       const dx = it.x - feet.x, dz = it.z - feet.z, d = dx * dx + dz * dz;
       if (d < it.r * it.r && d < bd) { bd = d; best = i; }
     }
-    this.nearest = best;
+    this.door = best < 0 && mode === 'walk' && !this._ride ? this._findDoor(player) : null;
+    this.nearest = best >= 0 ? best : this.door ? 'door' : -1;
   }
 }

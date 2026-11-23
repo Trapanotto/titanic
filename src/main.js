@@ -155,7 +155,7 @@ function step(dt) {
   } catch (e) {
     if (loopErrors++ < 5) console.error('[app] Fehler in einem update()', e);
   }
-  interact?.update(dt, player.pos, player.mode);
+  interact?.update(dt, player);
   sound.update(dt);
   ui.update(dt, time);
   if (!contextLost) { mirrorView?.update(camera); if (post) post.render(dt); else renderer.render(scene, camera); }

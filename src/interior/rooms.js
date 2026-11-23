@@ -1,4 +1,5 @@
 // Interior kit – data-driven room / wall / door builder. See docs/KIT.md.
+import { leafMatrix } from '../core/doors.js';
 import { mats } from '../core/materials.js';
 import { DECK_Y, ceilingY } from '../core/constants.js';
 import {
@@ -166,9 +167,7 @@ function doorLeaf(w, h, style, variant = '') {
     t = P._bakeTemplate(p.g);
     leafCache.set(key, t);
   }
-  const g = new THREE.Group();
-  for (const part of t) g.add(new THREE.Mesh(part.geo, part.mat));
-  return g;
+  return { key, parts: t };
 }
 const PUBLIC_TYPES = new Set(['lobby', 'public', 'saloon', 'restaurant', 'cafe', 'promenade', 'suite', 'gym', 'sport']);
 
@@ -307,6 +306,27 @@ class DeckPlan {
       const p = w.tick?.();
       if (p) await p;
     }
+  }
+
+  /** Door leaves: one InstancedMesh per leaf template part and zone (a leaf swings by rewriting its instance matrix). */
+  _leafInstances() {
+    const m = new THREE.Matrix4();
+    for (const zg of this._leafZones || []) {
+      const jobs = zg.userData.leafJobs || [], by = new Map();
+      zg.userData.leafJobs = null;
+      for (const j of jobs) { let a = by.get(j.tpl.key); if (!a) by.set(j.tpl.key, (a = [])); a.push(j); }
+      for (const list of by.values()) {
+        const leafOf = list.map((j) => j.door.key + '#' + j.li);
+        for (const part of list[0].tpl.parts) {
+          const im = new THREE.InstancedMesh(part.geo, part.mat, list.length);
+          list.forEach((j, i) => im.setMatrixAt(i, leafMatrix(j.door.leaves[j.li], j.door.y, j.door.t, m)));
+          im.userData.leafOf = leafOf;
+          im.name = 'doorLeaves';
+          zg.add(im);
+        }
+      }
+    }
+    this._leafZones = null;
   }
 
   /** The work of finish() as a generator: yields after every wall line, room and block of wall faces. */
@@ -465,6 +485,7 @@ class DeckPlan {
     this._phase = 'curtains';
     this._portCurtains();
     yield;
+    this._leafInstances();
     this._phase = 'flush';
     yield* b.flushSteps(); // one zone/material bucket per step (large decks: tens of ms in one go otherwise)
     return { rooms: this.rooms, walls: nWalls, doors: nDoors, problems: this.problems };
@@ -782,15 +803,21 @@ class DeckPlan {
       // an open leaf stands clear of the jamb: its hinge edge used to sit half inside the architrave (flickering edge)
       const hi = closed ? 0.01 : 0.036;
       const leaves = double ? [[da + hi, 1, (d.w - 0.03) / 2], [db - hi, -1, (d.w - 0.03) / 2]] : [[hingeLo ? da + hi : db - hi, hingeLo ? 1 : -1, d.w - 0.02]];
-      for (const [ha, dirA, lw] of leaves) {
-        const off = closed ? 0 : sgn * (T2 + 0.02);
-        const al = Math.cos(ang) * dirA, pr = Math.sin(ang) * sgn; // along-wall / perpendicular components
-        const dx = X ? al : pr, dz = X ? pr : al, hx = X ? ha : l.c + off, hz = X ? l.c + off : ha;
-        const leaf = doorLeaf(lw, d.h - 0.02, dstyle, variant);
-        leaf.position.set(hx, Y, hz); leaf.rotation.y = Math.atan2(-dz, dx); leaf.userData.leaf = true;
-        this.zone(hx).add(leaf);
-      }
-      if (closed) { if (X) this.world.addCollider(da, Y, l.c - T2, db, yh, l.c + T2); else this.world.addCollider(l.c - T2, Y, da, l.c + T2, yh, db); }
+      // the door is registered once (it can be operated: app/interact.js) and its leaves are drawn as instances,
+      // placed for the state the visitor left it in
+      void hi;
+      const mid = (da + db) / 2, dkey = `${this.deck}|${l.axis}|${Math.round(l.c * 100)}|${Math.round(mid * 100)}`;
+      const door = this.world.addDoor(dkey, {
+        deck: this.deck, x: X ? mid : l.c, y: Y, z: X ? l.c : mid, w: d.w, open: !closed,
+        box: X ? [da, Y, l.c - T2, db, yh, l.c + T2] : [l.c - T2, Y, da, l.c + T2, yh, db],
+        leaves: leaves.map(([, dirA]) => ({ X, e: dirA > 0 ? da : db, dir: dirA, c: l.c, T2, sgn, ang: closed ? (95 * Math.PI) / 180 : ang })),
+      });
+      leaves.forEach(([, , lw], li) => {
+        const L = door.leaves[li], tpl = doorLeaf(lw, d.h - 0.02, dstyle, variant);
+        const zg = this.zone(X ? L.e : L.c);
+        (zg.userData.leafJobs ??= []).push({ tpl, door, li });
+        (this._leafZones ??= new Set()).add(zg);
+      });
     }
     // brass number plate above the door, on the side opposite to the declaring room
     if (d.label && top - yh > 0.26) {
