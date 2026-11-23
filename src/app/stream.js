@@ -194,15 +194,14 @@ export class DeckStreamer {
     }
     // stairwells / hatches next to the camera: the zones of every deck they connect, near the well
     if (this.cfg.wells) {
-      // weak tiers ('near'): only the deck directly above and below, only the zones the well itself is in – enough
-      // to close the view through the stair opening (otherwise one looks through the empty ship down to the sea)
+      // weak tiers ('near'): of every deck the well passes through only the zones the well itself is in – enough to
+      // close the view down a stairwell or machinery hatch (otherwise one looks through the empty ship)
       const near = this.cfg.wells === 'near', m = near ? 9 : 8, zm = near ? 1 : 12;
       for (const o of this._openingList()) {
         if (p.x < o.x0 - m || p.x > o.x1 + m || p.z < o.z0 - m || p.z > o.z1 + m) continue;
         const lo = DECK_Y[o.decks[0]] - 0.5, hi = deckAboveY(o.decks[o.decks.length - 1]) + 2;
         if (p.y < lo || p.y > hi) continue;
         for (const d of o.decks) {
-          if (near && Math.abs(DECK_ORDER.indexOf(d) - i) > 1) continue;
           for (const g of this.zonesByDeck[d] || []) if (g.userData.x1 > o.x0 - zm && g.userData.x0 < o.x1 + zm) out.add(g);
         }
       }

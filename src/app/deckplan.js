@@ -139,6 +139,9 @@ export class DeckPlan {
     const n = this.world.teleports.filter((t) => t.deck === deck).length;
     this.deckTitle.textContent = `${DECK_NAMES[deck]} · ${n} ${n === 1 ? 'Ort' : 'Orte'}`;
     this._hoverTp = null;
+    // phones: the list shows the chosen deck only (see style.css), so it starts at the top again
+    for (const sec of this.items.children) sec.classList.toggle('other', sec.dataset.deck !== deck);
+    this.items.scrollTop = 0;
     this.draw();
   }
 
@@ -168,6 +171,7 @@ export class DeckPlan {
       const onDeck = tps.filter((t) => t.deck === d);
       if (!onDeck.length) continue;
       const sec = el('section', 'plan-sec');
+      sec.dataset.deck = d;
       const h = el('h4', '', DECK_NAMES[d]);
       h.addEventListener('click', () => this.select(d));
       sec.append(h);
@@ -191,6 +195,7 @@ export class DeckPlan {
 
   _filter() {
     const q = this.search.value.trim().toLowerCase();
+    this.items.classList.toggle('searching', !!q);
     let any = false;
     for (const sec of this.items.children) {
       let secAny = false;

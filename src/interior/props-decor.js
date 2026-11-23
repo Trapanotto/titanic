@@ -342,11 +342,22 @@ export const fireHose = def('fireHose', [0.6, 0.18, 0.7], (p) => {
 
 /** wall-mounted chemical fire extinguisher on a bracket – origin = mounting point, faces +x */
 export const extinguisher = def('extinguisher', [0.25, 0.2, 0.7], (p) => {
-  p.bb(M.iron, 0.02, 0.1, 0.14, 0.01, -0.06, 0, 0.004);
-  p.lathe(K.fireRed, [[0, 0], [0.085, 0], [0.09, 0.03], [0.09, 0.5], [0.07, 0.56], [0, 0.57]], 0.11, -0.6, 0, 12);
-  p.lathe(M.brass, [[0, 0], [0.05, 0], [0.04, 0.04], [0.02, 0.07], [0, 0.07]], 0.11, -0.03, 0, 10);
-  p.loft(M.rubber, [[0.11, 0.0, 0.03], [0.17, -0.06, 0.06], [0.2, -0.25, 0.05]], 0.012, 6);
-  p.t(M.iron, 0.095, 0.008, 0.11, -0.25, 0, 'y', 12, 3);
+  // 1912 soda-acid extinguisher: conical riveted copper body painted red, brass cap with plunger knob, carrying
+  // handle, short nozzle near the top, hung in an iron wall bracket with a strap and a cup under the base
+  const f = FINE(), cx = 0.1, y0 = -0.62;
+  p.bb(M.iron, 0.012, 0.6, 0.05, 0.006, y0 + 0.02, 0, 0.003);            // back bar of the bracket
+  p.b(M.iron, cx + 0.03, 0.012, 0.05, (cx + 0.03) / 2, y0 - 0.012, 0);   // foot plate under the base
+  p.t(M.iron, 0.079, 0.006, cx, y0 + 0.36, 0, 'y', 14, 4);              // strap round the body
+  // body: foot ring, slightly tapering shell, shoulder, neck
+  p.lathe(K.fireRed, [[0, 0], [0.084, 0], [0.088, 0.012], [0.084, 0.03], [0.08, 0.05], [0.072, 0.4], [0.062, 0.45], [0.04, 0.5], [0.034, 0.52], [0, 0.52]], cx, y0, 0, 14);
+  if (f >= 1) { p.t(M.brass, 0.081, 0.004, cx, y0 + 0.055, 0, 'y', 14, 4); p.t(M.brass, 0.07, 0.004, cx, y0 + 0.41, 0, 'y', 14, 4); } // seam bands
+  // brass cap with knurled rim and plunger knob
+  p.lathe(M.brass, [[0, 0], [0.04, 0], [0.044, 0.008], [0.044, 0.026], [0.03, 0.036], [0.012, 0.04], [0.012, 0.062], [0.022, 0.066], [0.022, 0.078], [0, 0.082]], cx, y0 + 0.52, 0, 12);
+  // nozzle on the shoulder, pointing forward and slightly down
+  const nz = p.c(M.brass, 0.009, 0.05, 0, 0, 0, 6, 0.006); nz.position.set(cx + 0.075, y0 + 0.455, 0); nz.rotation.z = -Math.PI / 2 - 0.3;
+  // carrying handle: flat brass loop at the side
+  p.t(M.brass, 0.032, 0.005, cx, y0 + 0.3, 0.085, 'z', 10, 4);
+  if (f >= 2) p.b(M.paper, 0.004, 0.11, 0.075, cx + 0.074, y0 + 0.17, 0); // instruction label on the front
 });
 
 /** brass porthole (inner face): rim, glass, hinged-up deadlight, dogs – origin = centre on the lining, faces +x */

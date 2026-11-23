@@ -779,7 +779,9 @@ class DeckPlan {
       const closed = d.closed || d.open === 0, ang = ((closed ? 0 : d.open ?? 95) * Math.PI) / 180;
       const rt = d.room?.type, variant = steelDoor ? '' : (d.glazed || (d.glazed !== false && PUBLIC_TYPES.has(rt) && (dstyle === 'oak' || dstyle === 'mahogany' || dstyle === 'white')) ? 'glazed' : rt === 'cabin' ? 'louvre' : '');
       const double = d.w >= 1.25 && !steelDoor && d.double !== false;
-      const leaves = double ? [[da + 0.01, 1, (d.w - 0.03) / 2], [db - 0.01, -1, (d.w - 0.03) / 2]] : [[hingeLo ? da + 0.01 : db - 0.01, hingeLo ? 1 : -1, d.w - 0.02]];
+      // an open leaf stands clear of the jamb: its hinge edge used to sit half inside the architrave (flickering edge)
+      const hi = closed ? 0.01 : 0.036;
+      const leaves = double ? [[da + hi, 1, (d.w - 0.03) / 2], [db - hi, -1, (d.w - 0.03) / 2]] : [[hingeLo ? da + hi : db - hi, hingeLo ? 1 : -1, d.w - 0.02]];
       for (const [ha, dirA, lw] of leaves) {
         const off = closed ? 0 : sgn * (T2 + 0.02);
         const al = Math.cos(ang) * dirA, pr = Math.sin(ang) * sgn; // along-wall / perpendicular components

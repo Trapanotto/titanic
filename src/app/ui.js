@@ -376,7 +376,7 @@ export class UI {
     tbtn('▲', 'Springen / Steigen', () => { if (this.player.mode === 'fly') this.controls.touchVertical(1); else this.controls.touchJump(); }, () => this.controls.touchVertical(0));
     tbtn('▼', 'Sinken', () => { if (this.player.mode === 'fly') this.controls.touchVertical(-1); }, () => this.controls.touchVertical(0));
     tbtn('Flug', 'Flugmodus', () => this.action('fly'));
-    tbtn('Plan', 'Deckplan', () => this.action('plan'));
+    tbtn('Karte', 'Karte', () => this.action('plan'));
     tbtn('☾', 'Tag / Nacht', () => this.action('night'));
     tbtn('?', 'Hilfe', () => this.action('help'));
     touch.append(this.stickEl, btns);
