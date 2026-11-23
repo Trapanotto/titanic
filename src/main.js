@@ -9,6 +9,7 @@ import { UI } from './app/ui.js';
 import { PostPipeline, QUALITY_LEVELS } from './app/post.js';
 import { TIER, TIERS, setTier, detectTier, probeCaps, applyDebugCaps, lowerTier, crashGuard } from './core/tier.js';
 import { DeckStreamer } from './app/stream.js';
+import { MirrorView } from './app/mirrors.js';
 
 const params = new URLSearchParams(location.search);
 const flag = (name) => { const v = params.get(name); return v !== null && v !== '0' && v !== 'false'; };
@@ -133,6 +134,8 @@ window.addEventListener('resize', resize);
 const updates = [];
 let time = 0, last = 0, raf = 0, running = false, contextLost = false, loopErrors = 0;
 let streamer = null;
+let mirrorView = null;
+try { if (renderer) mirrorView = debug.mirrors = new MirrorView(world, scene, TIER); } catch (e) { console.warn('[app] Spiegel', e); }
 
 function step(dt) {
   time += dt;
@@ -147,7 +150,7 @@ function step(dt) {
     if (loopErrors++ < 5) console.error('[app] Fehler in einem update()', e);
   }
   ui.update(dt, time);
-  if (!contextLost) { if (post) post.render(dt); else renderer.render(scene, camera); }
+  if (!contextLost) { mirrorView?.update(camera); if (post) post.render(dt); else renderer.render(scene, camera); }
 }
 
 // Automatic quality fallback: if the frame time stays above ~25 ms for a few seconds, step the preset down (toast);
@@ -265,7 +268,7 @@ function nextPaint() {
   });
 }
 
-const STREAMABLE = (m) => !['environment', 'exterior', 'fittings'].includes(m.id);
+const STREAMABLE = (m) => !['environment', 'exterior', 'fittings', 'people'].includes(m.id);
 
 async function buildModules() {
   const only = params.get('only')?.split(',').map((s) => s.trim()).filter(Boolean);

@@ -189,11 +189,11 @@ function chairGeos() {
     parts.push(beamZY(0.06, 0.028, s * 0.285, ARM0, ARM1, 0.08));        // arm rest from back stile to front leg
   }
   for (const [z, y] of [TOP, [0.14, 0.06], [0.9, 0.06], [1.5, 0.08], FOOT]) parts.push(boxG(0.575, 0.035, 0.035, 0, y, z)); // cross bars
-  // fine 0/1: one board per section instead of the slats
+  // fine 0/1: half the slats (a single board per section looked like a plank bed)
   const lo = TIER.fine <= 1;
   const slats = (a, b, n, lift) => {
-    if (lo) n = 1;
-    const ang = Math.atan2(-(b[1] - a[1]), b[0] - a[0]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), w = (L / n) * (lo ? 0.94 : 0.72);
+    if (lo) n = Math.ceil(n / 2);
+    const ang = Math.atan2(-(b[1] - a[1]), b[0] - a[0]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), w = (L / n) * (lo ? 0.8 : 0.72);
     for (let k = 0; k < n; k++) { const q = lerp(a, b, (k + 0.5) / n); sling.push(boxG(0.505, 0.014, w, 0, 0, 0, ang).translate(0, q[1] + lift, q[0])); }
   };
   slats(HIP, TOP, 8, 0.0); slats(HIP, KNEE, 6, 0.028); slats(KNEE, FOOT, 7, 0.028);

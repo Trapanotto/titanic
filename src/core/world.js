@@ -720,7 +720,19 @@ function bakeGroup(world, root, isZone, users = null) {
 }
 
 /** bakeGroup as a generator: yields between source meshes and output batches (time slicing in bakeZones). */
+/** Record the world box of a flat, upright mirror pane (thin along x or z) on its zone. */
+const _mb = new THREE.Box3();
+function noteMirror(root, o) {
+  if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+  _mb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+  const sx = _mb.max.x - _mb.min.x, sy = _mb.max.y - _mb.min.y, sz = _mb.max.z - _mb.min.z;
+  const ax = sx < sz ? 0 : 2, t = Math.min(sx, sz), w = Math.max(sx, sz);
+  if (t > 0.03 || w < 0.15 || w > 3 || sy < 0.15 || sy > 3) return;
+  (root.userData.mirrors ||= []).push({ cx: (_mb.min.x + _mb.max.x) / 2, cy: (_mb.min.y + _mb.max.y) / 2, cz: (_mb.min.z + _mb.max.z) / 2, ax, t, w, h: sy });
+}
+
 function* bakeGroupSteps(world, root, isZone, users = null) {
+  if (isZone) root.userData.mirrors = null;
   root.updateWorldMatrix(true, true);
   const rootM = root.matrixWorld, identity = isIdentity(rootM);
   const inv = new THREE.Matrix4().copy(rootM).invert();
@@ -739,6 +751,7 @@ function* bakeGroupSteps(world, root, isZone, users = null) {
   for (let si = 0; si < originals.length; si++) {
     const o = originals[si];
     yield 'mesh';
+    if (isZone && o.material.userData.isMirror) noteMirror(root, o); // working mirrors (app/mirrors.js)
     let g = o.geometry;
     if (!g.attributes.normal) { g = g.clone(); g.computeVertexNormals(); }
     const P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, I = g.index;
