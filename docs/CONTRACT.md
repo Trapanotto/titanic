@@ -104,3 +104,17 @@ A background rebuild gets only a few milliseconds per frame. Deck modules theref
 their top-level statements and finish with `await plan.finishAsync()` (not `plan.finish()`): both hand the frame back
 when the slice is used up and are no-ops otherwise. Keep a single synchronous step below ~10 ms; long helpers need
 their own `await world.tick()` (make them async) or must be split.
+
+## Detail levels (fine modelling, surfaces, clutter)
+`import { TIER } from '<..>/core/tier.js'` – `TIER.fine` is 0 (phones), 1 (weak laptops / integrated GPUs), 2 (ordinary
+PCs), 3 (strong GPUs). Read it at build time (inside functions, never at module top level – the tier is set at startup).
+- Fine geometry (moulding profiles, carving, turned parts, fluting, rivets, hardware, small clutter) is added only from
+  the level that can afford it: `if (TIER.fine >= 2) ...`. Level 0 and 1 are devices that crashed before: there, prefer
+  better proportions/silhouettes at the same triangle count and at most a few cheap additions.
+- Triangle budget relative to the state before the detail pass, per module: level 0 ≤ +5 %, level 1 ≤ +10 %,
+  level 2 ≤ +25 %, level 3 ≤ +50 %. Measure with `node tools/smoke.mjs <modules> --tier=mobile|low|mid|high`.
+- Round parts already scale with `DETAIL.q` (interior kit, `S(n, min)`); use the kit builders so new parts scale too.
+- Anything repeated many times: one cached geometry / prop template (`def`, `cached`) or `THREE.InstancedMesh`,
+  shared `mats.*` / kit materials only. No new material per object, no new textures outside `src/core/tex-lib.js`.
+- Small clutter must be visually grounded (stands on a surface, no floating, no intersections with walls or doors) and
+  must not block door openings or walking routes; clutter gets no colliders.

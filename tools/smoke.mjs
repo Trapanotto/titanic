@@ -1,5 +1,5 @@
 // Headless smoke test for scene modules (no browser needed).
-// usage: node tools/smoke.mjs src/exterior/index.js [src/decks/a.js ...] [--bake] [--all]
+// usage: node tools/smoke.mjs src/exterior/index.js [src/decks/a.js ...] [--bake] [--all] [--tier=mobile|low|mid|high]
 // Builds the given modules into a fresh World and prints statistics + sanity checks.
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
@@ -33,6 +33,12 @@ globalThis.addEventListener ??= () => {};
 globalThis.requestAnimationFrame ??= (f) => setTimeout(() => f(performance.now()), 16);
 
 const THREE = await import('three');
+// device tier (default: high) – must be set before any module reads TIER
+const tierArg = process.argv.find((a) => a.startsWith('--tier='));
+const { TIER, setTier } = await import('../src/core/tier.js');
+if (tierArg) setTier(tierArg.slice(7), 'smoke');
+const detailArg = process.argv.find((a) => a.startsWith('--detail='));
+(await import('../src/interior/props-core.js')).DETAIL.q = detailArg ? +detailArg.slice(9) : TIER.detail;
 const { World } = await import('../src/core/world.js');
 const C = await import('../src/core/constants.js');
 
@@ -49,6 +55,10 @@ const scene = new THREE.Scene();
 const world = new World(scene);
 world.camera = new THREE.PerspectiveCamera(70, 1.6, 0.1, 5000);
 world.renderer = null; // modules must tolerate a missing renderer in this test
+world.tier = TIER;
+world.dropRadius = TIER.dropRadius;
+world.dropTinyInstances = !TIER.tinyInstances;
+console.log(`[smoke] tier ${TIER.name}, detail ${TIER.detail}, fine ${TIER.fine}`);
 
 function stats(root) {
   let meshes = 0, tris = 0, inst = 0, lights = 0;

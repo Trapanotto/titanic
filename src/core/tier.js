@@ -6,6 +6,8 @@
 //   high   – only GPUs known to be strong: today's full quality
 // A session that ended without the page being closed (bluescreen, driver reset, tab crash) lowers the tier for good
 // (crashGuard); ?tier=... overrides and resets that.
+// `fine` (0–3) is the level of fine modelling detail (profiles, carving, clutter, rivets): modules add geometry only
+// from the level they can afford – see docs/CONTRACT.md "Detail levels".
 // URL override: ?tier=mobile|low|mid|high. Debug: ?nohalf=1 (no float render targets), ?maxtex=2048.
 
 export const TIERS = ['mobile', 'low', 'mid', 'high'];
@@ -13,25 +15,25 @@ export const TIERS = ['mobile', 'low', 'mid', 'high'];
 const SETTINGS = {
   mobile: {
     quality: 'mobil', qualities: ['mobil', 'niedrig'], antialias: false, maxPixelRatio: 1, minPixelRatio: 0.6,
-    power: 'default', texMax: 256, detail: 0.25, dropRadius: 0.1, physical: false, lamps: 4, lampShadows: 0, sunShadow: 0,
+    power: 'default', texMax: 256, detail: 0.25, fine: 0, dropRadius: 0.1, physical: false, lamps: 4, lampShadows: 0, sunShadow: 0,
     particles: false, lampVolume: false, envMaps: 'min', oceanSeg: 0.3, tinyInstances: false,
     stream: { neighbours: 0, wells: false, budgetMB: 60 },
   },
   low: {
     quality: 'niedrig', qualities: ['niedrig', 'mittel'], antialias: true, maxPixelRatio: 1, minPixelRatio: 0.7,
-    power: 'default', texMax: 512, detail: 0.35, dropRadius: 0.05, physical: false, lamps: 6, lampShadows: 0, sunShadow: 1024,
+    power: 'default', texMax: 512, detail: 0.35, fine: 1, dropRadius: 0.05, physical: false, lamps: 6, lampShadows: 0, sunShadow: 1024,
     particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 0.6, tinyInstances: true,
     stream: { neighbours: 1, wells: false, budgetMB: 110 },
   },
   mid: {
     quality: 'mittel', qualities: ['niedrig', 'mittel', 'hoch'], antialias: true, maxPixelRatio: 2, minPixelRatio: 1,
-    power: 'high-performance', texMax: 512, detail: 0.5, dropRadius: 0, physical: true, lamps: 14, lampShadows: 2, sunShadow: 2048,
+    power: 'high-performance', texMax: 512, detail: 0.6, fine: 2, dropRadius: 0, physical: true, lamps: 14, lampShadows: 2, sunShadow: 2048,
     particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 1, tinyInstances: true,
     stream: { neighbours: 1, wells: true, budgetMB: 160 },
   },
   high: {
     quality: 'hoch', qualities: ['niedrig', 'mittel', 'hoch'], antialias: true, maxPixelRatio: 2, minPixelRatio: 1,
-    power: 'high-performance', texMax: 1024, detail: 0.5, dropRadius: 0, physical: true, lamps: 14, lampShadows: 2, sunShadow: 4096,
+    power: 'high-performance', texMax: 1024, detail: 1, fine: 3, dropRadius: 0, physical: true, lamps: 14, lampShadows: 2, sunShadow: 4096,
     particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 1, tinyInstances: true,
     stream: { neighbours: 1, wells: true, budgetMB: 200 },
   },
