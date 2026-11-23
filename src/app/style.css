@@ -101,6 +101,9 @@ kbd {
   max-width: calc(100% - 300px);
 }
 .keybar .key { pointer-events: auto; cursor: pointer; white-space: nowrap; }
+.keybar { align-items: center; }
+.keybar .key-main { font-size: 16px; color: var(--cream); }
+.keybar .key-main kbd { font-size: 15px; padding: 3px 9px; }
 .keybar .key:hover { color: var(--cream); }
 .keybar .key:hover kbd { border-color: var(--brass-hi); }
 .touch .keybar { display: none; }

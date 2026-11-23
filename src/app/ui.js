@@ -349,8 +349,9 @@ export class UI {
     this.toastEl = el('div', 'toast');
 
     const bar = el('div', 'keybar');
-    for (const [k, label, act] of [['H', 'Hilfe', 'help'], ['M', 'Deckplan', 'plan'], ['J', 'Minikarte', 'minimap'], ['F', 'Flugmodus', 'fly'], ['N', 'Tag/Nacht', 'night'], ['E', 'Info', 'info']]) {
-      const item = el('span', 'key');
+    // only the map and the help stay on screen; every other key is listed in the help (H)
+    for (const [k, label, act] of [['M', 'Karte', 'plan'], ['H', 'Hilfe', 'help']]) {
+      const item = el('span', 'key' + (act === 'plan' ? ' key-main' : ''));
       item.title = label + ' (' + k + ')';
       item.append(el('kbd', '', k), el('span', 'key-label', ' ' + label));
       item.addEventListener('click', (e) => { e.stopPropagation(); if (act === 'minimap') this.minimap?.toggle(); else this.action(act); });
@@ -374,7 +375,6 @@ export class UI {
     tbtn('▼', 'Sinken', () => { if (this.player.mode === 'fly') this.controls.touchVertical(-1); }, () => this.controls.touchVertical(0));
     tbtn('Flug', 'Flugmodus', () => this.action('fly'));
     tbtn('Plan', 'Deckplan', () => this.action('plan'));
-    tbtn('Info', 'Info lesen', () => this.action('info'));
     tbtn('☾', 'Tag / Nacht', () => this.action('night'));
     tbtn('?', 'Hilfe', () => this.action('help'));
     touch.append(this.stickEl, btns);

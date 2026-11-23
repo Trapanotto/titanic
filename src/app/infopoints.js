@@ -109,7 +109,7 @@ export class InfoPoints {
         colorDirty = true;
       }
       n++;
-      const r = it.info.radius;
+      const r = Math.min(it.info.radius, 3.5); // the E bar only right next to the marker
       if (mode === 'walk' && d2 < r * r && Math.abs(dy) < 2.4 && d2 < bestD) { bestD = d2; best = i; }
     }
     vis.length = n;
