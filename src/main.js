@@ -12,6 +12,7 @@ import { DeckStreamer } from './app/stream.js';
 import { MirrorView } from './app/mirrors.js';
 import { Sound } from './app/audio.js';
 import { Interact } from './app/interact.js';
+import { ENGINE } from './core/engine.js';
 
 const params = new URLSearchParams(location.search);
 const flag = (name) => { const v = params.get(name); return v !== null && v !== '0' && v !== 'false'; };
@@ -67,6 +68,7 @@ ui.controls = controls;
 const debug = (window.__titanic = { world, scene, camera, renderer: null, player, ui, controls, errors: [], ready: false, frame: null, params, tier: TIER });
 world.tier = TIER;
 world.dropRadius = TIER.dropRadius;
+world.insideExtFar = TIER.insideExtFar || 0;
 world.dropTinyInstances = !TIER.tinyInstances;
 ui.tier = TIER;
 
@@ -139,12 +141,14 @@ let streamer = null;
 let mirrorView = null;
 try { if (renderer) mirrorView = debug.mirrors = new MirrorView(world, scene, TIER); } catch (e) { console.warn('[app] Spiegel', e); }
 
+debug.engine = ENGINE;
 const sound = (ui.sound = debug.sound = new Sound(world, player));
 let interact = null;
 try { interact = ui.interact = debug.interact = new Interact(world, scene, sound, (t, s) => ui.toast(t, s)); } catch (e) { console.warn('[app] Bedienpunkte', e); }
 
 function step(dt) {
   time += dt;
+  debug.time = time;
   controls.apply();
   player.update(dt);
   world.updateVisibility(camera.position);
@@ -448,6 +452,7 @@ async function main() {
   }
   debug.ready = true;
   ui.ready();
+  if (params.has('selftest')) import('./app/selftest.js').then((m) => m.run(debug)).catch((e) => console.error('[selftest]', e));
   if (guard.crashed) ui.toast?.('Der letzte Besuch wurde unerwartet beendet – die Grafik läuft jetzt eine Stufe einfacher.', 7);
   start();
 }

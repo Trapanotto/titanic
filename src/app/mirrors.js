@@ -14,7 +14,7 @@ export class MirrorView {
   constructor(world, scene, tier) {
     this.world = world;
     this.range = tier.fine === 0 ? 16 : 25;
-    const size = tier.fine <= 1 ? 512 : tier.fine === 2 ? 768 : 1024;
+    const size = tier.fine === 0 ? 384 : tier.fine === 1 ? 512 : tier.fine === 2 ? 768 : 1024;
     this.quad = new Reflector(new THREE.PlaneGeometry(1, 1), { textureWidth: size, textureHeight: size, clipBias: 0.002, color: 0xc4cacc, multisample: 0 });
     this.quad.name = 'mirrorView';
     this.quad.visible = false;
@@ -23,6 +23,12 @@ export class MirrorView {
     scene.add(this.quad);
     this._tick = 0;
     this._cur = null;
+    if (tier.fine <= 1) { // the scene is drawn a second time for the mirror: only every second frame on weak devices
+      const q = this.quad, draw = q.onBeforeRender;
+      let n = 0;
+      q.userData.fresh = false;
+      q.onBeforeRender = function (...a) { if ((n++ & 1) && q.userData.fresh) return; q.userData.fresh = true; draw.apply(this, a); };
+    }
   }
 
   /** Pick the nearest mirror in front of the camera (every few frames) and place the reflecting quad on it. */
@@ -45,6 +51,7 @@ export class MirrorView {
     this.quad.visible = true;
     if (key === this._cur) return;
     this._cur = key;
+    this.quad.userData.fresh = false; // another mirror: draw it at once
     _n.set(nx, 0, nz); _r.crossVectors(_u, _n);
     _c.set(best.cx + nx * (best.t / 2 + 0.004), best.cy, best.cz + nz * (best.t / 2 + 0.004));
     _m.makeBasis(_r, _u, _n).setPosition(_c);

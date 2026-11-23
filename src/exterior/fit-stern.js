@@ -97,7 +97,10 @@ export function buildStern(world, parent) {
   root.add(box(red, 0.6, RUDDER_TOP, 0.5, sx + 0.1, RUDDER_TOP / 2, 0));                              // propeller post
   addProp(CENTRE.x, CENTRE.y, 0, CENTRE.R, CENTRE.blades, 0.52, 1, 1.5);
 
-  // ---------- rudder ----------
+  // ---------- rudder (turns with the wheel on the bridge: separate from the baked stern gear) ----------
+  const rudG = new THREE.Group(); rudG.name = 'rudder'; rudG.position.set(xr, 0, 0); rudG.userData.noMerge = true;
+  root.add(rudG);
+  const rud = { add(m) { m.position.x -= xr; m.userData.noMerge = true; rudG.add(m); } };
   {
     const H = RUDDER_TOP - 0.15, c = 4.3;
     const sh = new THREE.Shape();
@@ -110,16 +113,16 @@ export function buildStern(world, parent) {
     sh.closePath();
     const rg = new THREE.ExtrudeGeometry(sh, { depth: 0.34, bevelEnabled: true, bevelSize: 0.1, bevelThickness: 0.1, bevelSegments: 1, curveSegments: 6 });
     rg.translate(0, 0, -0.17);
-    root.add(mk(rg, red, xr - 0.12, 0, 0));
+    rud.add(mk(rg, red, xr - 0.12, 0, 0));
     // plating seams (butt straps) on both faces of the rudder
-    for (let k = 1; k <= 3; k++) root.add(box(red, 0.08, H * (0.86 - 0.05 * k), 0.6, xr - 0.12 - c * k * 0.24, H * 0.5, 0));
-    root.add(box(red, c * 0.9, 0.08, 0.6, xr - 0.12 - c * 0.45, H * 0.5, 0));
+    for (let k = 1; k <= 3; k++) rud.add(box(red, 0.08, H * (0.86 - 0.05 * k), 0.6, xr - 0.12 - c * k * 0.24, H * 0.5, 0));
+    rud.add(box(red, c * 0.9, 0.08, 0.6, xr - 0.12 - c * 0.45, H * 0.5, 0));
     // rudder stock head, arms and pintles / gudgeons
     for (let k = 0; k < 6; k++) {
       const y = 0.9 + (k * (H - 1.6)) / 5;
-      root.add(box(mats.iron, 0.75, 0.24, 0.66, xr + 0.05, y, 0));
-      root.add(cyl(mats.iron, xr - 0.06, y - 0.3, 0, xr - 0.06, y + 0.3, 0, 0.13, 8));
-      root.add(box(red, c * (0.82 - 0.05 * k), 0.16, 0.6, xr - 0.15 - (c * (0.82 - 0.05 * k)) / 2, y, 0)); // horizontal arms
+      rud.add(box(mats.iron, 0.75, 0.24, 0.66, xr + 0.05, y, 0));
+      rud.add(cyl(mats.iron, xr - 0.06, y - 0.3, 0, xr - 0.06, y + 0.3, 0, 0.13, 8));
+      rud.add(box(red, c * (0.82 - 0.05 * k), 0.16, 0.6, xr - 0.15 - (c * (0.82 - 0.05 * k)) / 2, y, 0)); // horizontal arms
     }
   }
 
@@ -130,6 +133,6 @@ export function buildStern(world, parent) {
   });
 
   return {
-    update(dt) { for (const p of props) p.m.rotation.x += dt * p.speed * ENGINE.speed; },
+    update(dt) { for (const p of props) p.m.rotation.x += dt * p.speed * ENGINE.speed; rudG.rotation.y = ENGINE.rudder * 0.61; },
   };
 }

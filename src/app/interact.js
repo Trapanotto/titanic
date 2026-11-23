@@ -119,6 +119,7 @@ export class Interact {
     });
     add(WHEEL.x - 0.5, YB, WHEEL.z, 1.3, () => 'Steuerrad: ' + RUDDER[(this._rudder + 1) % 4], () => {
       this._rudder = (this._rudder + 1) % 4;
+      ENGINE.helm = [0, 1, 0, -1][this._rudder];
       this.sound.wheelClicks(12);
       this.toast('Ruder ' + RUDDER[this._rudder], 2.5);
     });
@@ -236,20 +237,25 @@ export class Interact {
 
   // ------------------------------------------------------------------ watertight doors (sliding plates)
 
-  /** one instanced plate per watertight door; an open door's plate is hidden (its raised plate is part of the deck) */
+  /** one instanced plate per watertight door: raised above the opening while open, lowered into it when closed */
   _plates() {
-    if (this._plateMesh) return;
     const list = [...this.world.doors.values()].filter((d) => d.kind === 'wt');
+    if (this._plateMesh && this._plateMesh.count === list.length) return;
+    if (this._plateMesh) { this.scene.remove(this._plateMesh); this._plateMesh.dispose(); }
     const im = (this._plateMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.steelDark, Math.max(1, list.length)));
+    im.count = list.length;
     im.name = 'wtPlates'; im.frustumCulled = false; im.userData.noMerge = true;
     list.forEach((d, i) => { d._pi = i; this._plate(d, d.t); });
     this.scene.add(im);
   }
 
   _plate(d, e) {
-    const im = this._plateMesh, c = 1 - e, H = d.h + 0.1;
-    if (c <= 0) _m.makeScale(0, 0, 0);
-    else _m.makeScale(0.05, H, d.w + 0.1).setPosition(d.x + d.e + 0.028, d.y + (1 - c) * (d.h + 0.15) + H / 2, d.z);
+    const im = this._plateMesh;
+    if (!im || d._pi === undefined) return;
+    // bottom edge travels from the sill to its raised position; the top is cut off at the deck head
+    const yb = d.y + e * (d.h + 0.15), yt = Math.min(yb + d.h + 0.1, Math.max(d.top, d.y + d.h + 0.1)), H = yt - yb;
+    if (H < 0.05 || (e >= 1 && !d.raise)) _m.makeScale(0, 0, 0);
+    else _m.makeScale(0.05, H, d.w + 0.1).setPosition(d.x + d.e + 0.026, yb + H / 2, d.z);
     im.setMatrixAt(d._pi, _m);
     im.instanceMatrix.needsUpdate = true;
   }
@@ -340,6 +346,7 @@ export class Interact {
     this._stepRide(dt);
     this._stepZoom(dt, player);
     if (this.world.uses.size !== this._usesN) this._syncUses();
+    if (this.world.doors.size !== this._doorsN) { this._doorsN = this.world.doors.size; this._plates(); }
     // moving parts (only near the bridge)
     const nearBridge = Math.abs(feet.x - 70) < 60 && feet.y > DECK_Y.A - 2;
     this.root.visible = nearBridge;

@@ -247,14 +247,15 @@ export function bulkhead(world, deck, x, opts = {}) {
     if (wt) {
       const e = t + 0.04;
       // can be lowered (app/interact.js): by hand at the door, the ones on the tank top also from the bridge
-      world.addDoor(`wt|${deck}|${Math.round(x * 100)}|${Math.round(d.z * 100)}`, { kind: 'wt', deck, x, y: y0, z: d.z, w: d.w, h: d.h, e, open: true, box: [x - t, y0, za, x + t, yt, zb], leaves: [] });
-      b.box(F, x - e, y0, za - 0.09, x + e, yt + 0.09, za);
+            b.box(F, x - e, y0, za - 0.09, x + e, yt + 0.09, za);
       b.box(F, x - e, y0, zb, x + e, yt + 0.09, zb + 0.09);
       b.box(F, x - e, yt, za, x + e, yt + 0.09, zb);
       b.box(F, x - e, y0, za, x + e, y0 + 0.12, zb, 'xXY');
       const top = Math.min(y1 - 0.05, yt + 0.15 + d.h);
+      // can be lowered (app/interact.js): by hand at the door, the ones on the tank top also from the bridge.
+      // The plate is drawn by the app (raised or lowered); here only its guides and the brass plate.
+      world.addDoor(`wt|${deck}|${Math.round(x * 100)}|${Math.round(d.z * 100)}`, { kind: 'wt', deck, x, y: y0, z: d.z, w: d.w, h: d.h, e, top, raise: top - yt > 0.6, open: true, box: [x - t, y0, za, x + t, yt, zb], leaves: [] });
       if (top - yt > 0.6) { // vertically sliding watertight door, shown raised
-        b.box(F, x + e, yt + 0.15, za - 0.05, x + e + 0.05, top, zb + 0.05);
         for (const z of [za - 0.12, zb + 0.06]) b.box(mats.iron, x + e, y0, z, x + e + 0.07, top, z + 0.06);
         b.box(mats.brass, x + e + 0.05, yt + 0.5, d.z - 0.05, x + e + 0.09, yt + 0.6, d.z + 0.05);
       }

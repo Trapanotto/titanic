@@ -9,6 +9,7 @@ import { stairKeepouts, stairHoles, stairSolids } from './stairs.js';
 import * as P from './props.js';
 import { PRESETS } from './presets.js';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { tiledBoxGeometry } from '../core/geo.js';
 
 export const SIDES = ['fwd', 'aft', 'port', 'stbd'];
@@ -165,6 +166,13 @@ function doorLeaf(w, h, style, variant = '') {
       for (let y = 0.12; y < h - 0.08; y += 0.24) for (const a of [0.035, w - 0.035]) p.b(mats.iron, 0.018, 0.018, 0.008, a, y, s * 0.0265);
     }
     t = P._bakeTemplate(p.g);
+    if (fine === 0 && t.length > 1) { // phones: knob and hinges take the colour of the leaf, one draw call less per type
+      const solid = t.filter((q) => !q.mat.transparent), rest = t.filter((q) => q.mat.transparent);
+      const main = solid.reduce((a, q) => (q.geo.attributes.position.count > a.geo.attributes.position.count ? q : a), solid[0]);
+      let g = null;
+      try { g = solid.length > 1 ? mergeGeometries(solid.map((q) => q.geo), false) : null; } catch { g = null; }
+      if (g) t = [{ geo: g, mat: main.mat }, ...rest];
+    }
     leafCache.set(key, t);
   }
   return { key, parts: t };

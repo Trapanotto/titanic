@@ -62,6 +62,8 @@ export class World {
     this.culling = true;
     this.chunks = [];             // interior chunks (baked meshes + static instanced meshes with a world box)
     this.extChunks = [];          // exterior chunks (LOD / far detail)
+    this.extAll = [];             // every exterior cluster (inside cut on weak devices: insideExtFar)
+    this.insideExtFar = 0;        // > 0: inside the ship, exterior clusters farther away than this are not drawn
     this.stats = { zones: 0, chunks: 0, chunksTotal: 0, rays: 0, maskMs: 0, evicted: 0 };
     this._own = null;
     this._clusterGrids = new Map();
@@ -163,6 +165,16 @@ export class World {
       const c = this.extChunks[i];
       if (c.lod) showCluster(c, true, p, now, lodOn);
       else if (c.far) c.mesh.visible = !(lodOn && distXYZ(c, p) > c.far);
+    }
+    // weak devices: from inside the ship the outside is only seen through windows and doors – skip its far parts
+    const cut = inside && lodOn && ext ? this.insideExtFar : 0;
+    if (cut || this._extCut) {
+      const A = this.extAll;
+      for (let i = 0; i < A.length; i++) {
+        const c = A[i];
+        if (cut && distXYZ(c, p) > cut) c.on = false; else if (!c.lod) c.on = true;
+      }
+      this._extCut = cut > 0;
     }
     const S = this.stats;
     S.zones = nz; S.chunks = nc; S.chunksTotal = this.chunks.length; S.exterior = ext; S.openings = open.length;
@@ -831,7 +843,7 @@ function* bakeGroupSteps(world, root, isZone, users = null) {
       if (!identity) { _v.set(cx, (tp[a * 3 + 1] + tp[b * 3 + 1] + tp[c * 3 + 1]) / 3, cz).applyMatrix4(rootM); cx = _v.x; cz = _v.z; }
       let cid;
       if (grid) cid = grid[clampI(Math.floor(cz - GZ0) | 0, 0, GH - 1) * GW + clampI(Math.floor(cx - GX0) | 0, 0, GW - 1)];
-      else cid = 0; // exterior: one chunk per group and material (slicing costs more draw calls than it saves)
+      else cid = clampI(Math.floor((cx + 140) / 40), 0, 7); // exterior: 40 m slices along the ship (clusters of one multi-draw batch: culled by the frustum and, on weak devices, cut off by distance while the visitor is inside)
       let B;
       if (cid === lastC) B = lastB;
       else {
@@ -1194,7 +1206,7 @@ function makeExtBatch(world, parts) {
   mesh.castShadow = first.cast; mesh.receiveShadow = first.receive; mesh.renderOrder = first.order;
   mesh.name = 'baked';
   const batch = { clusters, bpe: ia.BYTES_PER_ELEMENT, type: ia instanceof Uint16Array ? 0x1403 : 0x1405, counts: new Int32Array(clusters.length), offs: new Int32Array(clusters.length), m: 0, extraTris: 0 };
-  for (const c of clusters) { c.mesh = mesh; c.batch = batch; if (c.lod) world.extChunks.push(c); }
+  for (const c of clusters) { c.mesh = mesh; c.batch = batch; world.extAll.push(c); if (c.lod) world.extChunks.push(c); }
   mesh.userData.batch = batch;
   mesh.onBeforeRender = batchBeforeRender;
   mesh.onAfterRender = batchAfterRender;
