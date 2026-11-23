@@ -177,6 +177,7 @@ export function furnishReception(ctx) {
 
   // Steinway grand piano at the port side, palms in jardinières
   w.put(piano({ grand: true, mat: 'woodDark' }), 33.6, -12.0, 'stbd');
+  world.addUse('piano', 33.6, Y, -10.7);
   w.put(stool(), 33.6, -10.6, 'port', { collide: false });
   for (const [x, z] of [[31.1, -13.0], [31.1, 13.0], [46.8, -5.5], [46.8, 5.5], [37.95, -3.7], [37.95, 3.7]]) {
     if (w.put(jardiniere(), x, z, 'fwd', { collide: true })) { const pl = pottedPalm(); place(plan.zone(x), pl, x, Y + 0.2, z, D() * TAU); }

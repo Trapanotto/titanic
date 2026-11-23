@@ -46,6 +46,7 @@ export class World {
     this._grid = new Map();
     this._colliders = [];
     this.doors = new Map();   // key -> operable door (addDoor)
+    this.uses = new Map();    // key -> thing that can be used (addUse)
     this._stamp = 0;
     this.colliderCount = 0;
     this.colliderTag = null;      // set by the app to the id of the module being built
@@ -387,6 +388,12 @@ export class World {
     this._colliders.push(b);
     this.colliderCount++;
     return b;
+  }
+
+  /** Something the visitor can use with E (kind: 'piano'); registered once per place. */
+  addUse(kind, x, y, z) {
+    const k = `${kind}|${Math.round(x * 10)}|${Math.round(y * 10)}|${Math.round(z * 10)}`;
+    if (!this.uses.has(k)) this.uses.set(k, { kind, x, y, z });
   }
 
   /**

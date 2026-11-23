@@ -320,6 +320,37 @@ export class Sound {
     this._tone(this.fx, 1320, t + seconds, 0.8, 0.06);
   }
 
+  /** a few bars on a piano */
+  piano() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    if (t < (this._pianoUntil || 0)) return;
+    const start = 4 * Math.floor(Math.random() * 4);
+    this._pianoUntil = t + 12 * BEAT;
+    for (let i = 0; i < 4; i++) {
+      const [ch, mel] = WALTZ[start + i], k = CH[ch], at = t + 0.05 + i * 3 * BEAT;
+      this._tone(this.fx, hz(k.b), at, 1.1, 0.16, { type: 'triangle' });
+      for (const b of [1, 2]) for (const n of k.c) this._tone(this.fx, hz(n), at + b * BEAT, 0.5, 0.045, { type: 'triangle' });
+      let u = at;
+      for (const [n, beats] of mel) { this._tone(this.fx, hz(n), u, 1.2, 0.12, { type: 'triangle' }); this._tone(this.fx, hz(n) * 2, u, 0.5, 0.02); u += beats * BEAT; }
+    }
+  }
+
+  /** watertight door: gear rattling while the plate runs, thud at the end */
+  wtDoor() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < 14; i++) this._burst(this.fx, t + i * 0.12, 0.04, 0.14, 'bandpass', 1300, 5);
+    this._burst(this.fx, t + 1.75, 0.25, 0.7, 'lowpass', 120, 0.7, this.brown);
+  }
+
+  /** alarm bells before the watertight doors close */
+  alarm() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < 16; i++) for (const [f, v] of [[2100, 0.07], [3150, 0.03]]) this._tone(this.fx, f, t + i * 0.11, 0.25, v);
+  }
+
   /** ratchet of the steering gear while the wheel turns */
   wheelClicks(n = 10) {
     if (!this.ready) return;

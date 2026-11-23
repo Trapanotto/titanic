@@ -249,6 +249,7 @@ export function restaurant(ctx, R) {
   d.collider(bx0, bz0, bx1, bz1, 1.0);
   const yp = ph;
   plan.prop(piano(), bx0 + 0.36, -2.85, PX, { y: Y + yp });
+  plan.world.addUse('piano', bx0 + 1.0, Y + yp, -2.85);
   plan.prop(stool({ mat: 'bc_walnut' }), bx0 + 0.95, -2.75, PX, { y: Y + yp });
   for (const z of [-1.55, -0.35]) { plan.prop(bcChairLXVI({}), bx0 + 0.55, z, PX, { y: Y + yp }); plan.prop(bcMusicStand(), bx0 + 1.15, z + 0.05, NX, { y: Y + yp }); }
   plan.prop(bcCello(), bx0 + 0.28, 0.45, PX, { y: Y + yp });

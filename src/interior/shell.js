@@ -246,6 +246,8 @@ export function bulkhead(world, deck, x, opts = {}) {
     b.poly(M, [[x - t, yt, za], [x + t, yt, za], [x + t, yt, zb], [x - t, yt, zb]], [0, -1, 0], undefined, x);
     if (wt) {
       const e = t + 0.04;
+      // can be lowered (app/interact.js): by hand at the door, the ones on the tank top also from the bridge
+      world.addDoor(`wt|${deck}|${Math.round(x * 100)}|${Math.round(d.z * 100)}`, { kind: 'wt', deck, x, y: y0, z: d.z, w: d.w, h: d.h, e, open: true, box: [x - t, y0, za, x + t, yt, zb], leaves: [] });
       b.box(F, x - e, y0, za - 0.09, x + e, yt + 0.09, za);
       b.box(F, x - e, y0, zb, x + e, yt + 0.09, zb + 0.09);
       b.box(F, x - e, yt, za, x + e, yt + 0.09, zb);

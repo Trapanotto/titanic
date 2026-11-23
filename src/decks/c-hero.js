@@ -372,6 +372,7 @@ export function thirdSaloon(ctx, R, s, zi, smoking, doorX, hatch) {
   for (const z of [zi + 1.2, zi + 3.1]) if (z + 1.1 < hw(fwdX - 0.6)) plan.prop(bcSlatBench({ w: 1.8, back: true }), fwdX - 0.3, s * (z + 0.3), NX, { collide: true });
   if (!smoking) {
     plan.prop(piano(), R.x0 + 0.38, s * (zi + 0.95), PX, { collide: true });
+    plan.world.addUse('piano', R.x0 + 1.0, plan.y, s * (zi + 0.95));
     plan.prop(stool({ mat: 'oak' }), R.x0 + 1.05, s * (zi + 0.95), 0, { collide: false });
     poster(plan, R.x0 + 0.06, s * (zi + 2.6), 1, 0, 0.55, 0.75, 1.65, 0);
     poster(plan, fwdX - 0.02, s * (zi + 2.15), -1, 0, 0.5, 0.7, 1.75, 2);

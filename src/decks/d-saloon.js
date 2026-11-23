@@ -314,6 +314,7 @@ export function furnishDining1(ctx) {
   const side = (x, z, dir, wd = 2.4) => w.put(sideboard({ w: wd, v: v++ }), x, z, dir);
   side(x1 - 0.32, 0, 'aft'); side(x1 - 0.32, -11.9, 'aft', 2.2); side(x1 - 0.32, 11.9, 'aft', 2.2);
   w.put(piano({ mat: 'oak' }), x0 + 0.38, 0, 'fwd');
+  world.addUse('piano', x0 + 1.0, Y, 0);
   side(x0 + 0.32, -8.0, 'fwd', 2.2); side(x0 + 0.32, 8.0, 'fwd', 2.2);
   for (const c of casing) {
     side(c.x0 - 0.32, 0, 'aft', 2.6); side(c.x1 + 0.32, 0, 'fwd', 2.6);
@@ -434,6 +435,7 @@ export function furnishDining2(ctx) {
 
   // ---------------------------------------------------------------- piano, sideboards, sconces
   w.put(piano({ mat: 'mahogany' }), x1 - 0.4, 0, 'aft');
+  world.addUse('piano', x1 - 1.0, Y, 0);
   for (const z of [-4.6, 4.6]) w.put(sideboard({ w: 2.2, v: 7 }), x1 - 0.32, z, 'aft');
   for (const z of [-11.6, 11.6]) w.put(station({ w: 1.8 }), x0 + 0.3, z, 'fwd');
   for (const z of [-4, 4]) w.mount(sconce({ plain: true }), x0 + 0.06, z, 'fwd', 1.9);

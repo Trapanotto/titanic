@@ -43,6 +43,11 @@ export class Interact {
     this.root.name = 'bridgeLive';
     this.root.userData.noMerge = true;
     scene.add(this.root);
+    this.scene = scene;
+    this._usesN = 0;
+    this._zoom = null;
+    this._msg = 0;
+    this._wtShut = false;
     this._buildBridge();
     this._register();
   }
@@ -130,10 +135,35 @@ export class Interact {
     for (const deck of LIFT_DECKS) for (const z of [-1.6, 0, 1.6]) {
       add(44.9, DECK_Y[deck], z, 0.85, () => 'Aufzug zum ' + LIFT_NAMES[this._liftTarget(deck)], () => this._rideLift(deck, z, this._player));
     }
-    add(52.6, YB, 0.75, 1.6, () => 'Morsetaste: CQD senden', () => {
-      this.sound.morse('CQD CQD DE MGY');
-      this.toast('– · – ·   – – · –   – · ·   „CQD CQD DE MGY“: Notruf der Titanic (Rufzeichen MGY)', 6);
+    add(52.6, YB, 0.75, 1.6, () => 'Morsetaste: ' + (this._msg ? 'SOS' : 'CQD') + ' senden', () => {
+      if (this._msg) { this.sound.morse('SOS SOS DE MGY'); this.toast('· · ·   – – –   · · ·   „SOS SOS DE MGY“: das neue Notzeichen, von der Titanic als eines der ersten Schiffe gesendet', 6); }
+      else { this.sound.morse('CQD CQD DE MGY'); this.toast('– · – ·   – – · –   – · ·   „CQD CQD DE MGY“: Notruf der Titanic (Rufzeichen MGY)', 6); }
+      this._msg = 1 - this._msg;
     });
+    // watertight doors of the tank top, released from the bridge
+    add(66.6, YB, -5.3, 1.1, () => 'Schotttüren im Maschinenbereich ' + (this._wtShut ? 'öffnen' : 'schließen'), () => {
+      this._wtShut = !this._wtShut;
+      let n = 0;
+      for (const d of this.world.doors.values()) if (d.kind === 'wt' && d.deck === 'tank' && d.open === this._wtShut) { this.toggleDoor(d, this._pos, true); n++; }
+      this.sound.alarm();
+      this.toast(this._wtShut ? `${n} wasserdichte Türen auf dem Tank Top fahren herunter` : `${n} wasserdichte Türen werden geöffnet`, 4);
+    });
+    // binoculars on the bridge wings
+    for (const s of [-1, 1]) add(69, YB, s * 9.3, 1.3, () => (this._zoom?.on ? 'Fernglas absetzen' : 'Fernglas: Ausschau halten'), () => {
+      const cam = this.world.camera;
+      if (!cam) return;
+      if (this._zoom) this._zoom.on = !this._zoom.on; else this._zoom = { on: true, base: cam.fov, x: 69, z: s * 9.3 };
+    });
+  }
+
+  /** things registered by the deck modules (pianos) */
+  _syncUses() {
+    const all = [...this.world.uses.values()];
+    for (let i = this._usesN; i < all.length; i++) {
+      const u = all[i];
+      if (u.kind === 'piano') this.items.push({ x: u.x, y: u.y, z: u.z, r: 1.3, label: () => 'Klavier spielen', act: () => this.sound.piano() });
+    }
+    this._usesN = all.length;
   }
 
   // ------------------------------------------------------------------ doors
@@ -169,8 +199,8 @@ export class Interact {
     return pos.x > b.x0 - r && pos.x < b.x1 + r && pos.z > b.z0 - r && pos.z < b.z1 + r && Math.abs(pos.y - d.y) < 1;
   }
 
-  toggleDoor(d, pos) {
-    if (d.open && this._inDoorway(d, pos)) { this.toast('Du stehst in der Tür', 1.5); return; }
+  toggleDoor(d, pos, quiet) {
+    if (d.open && this._inDoorway(d, pos)) { if (!quiet) this.toast('Du stehst in der Tür', 1.5); return; }
     d.open = !d.open;
     if (d.open) d.col.y1 = -1e9; // passable as soon as it starts to swing
     // the leaves are instances in the meshes of their zone
@@ -179,15 +209,17 @@ export class Interact {
       for (const c of zg.children) { const i = c.userData.leafOf ? c.userData.leafOf.indexOf(tag) : -1; if (i >= 0) out.push([c, i]); }
       return out;
     });
+    if (d.kind === 'wt') this._plates();
     this._swing.add(d);
-    this.sound.door(d.open);
+    if (!quiet) { if (d.kind === 'wt') this.sound.wtDoor(); else this.sound.door(d.open); }
   }
 
   _swingDoors(dt, pos) {
     for (const d of this._swing) {
-      const to = d.open ? 1 : 0, step = dt / 0.55;
+      const to = d.open ? 1 : 0, step = dt / (d.kind === 'wt' ? 1.8 : 0.55);
       d.t = to > d.t ? Math.min(1, d.t + step) : Math.max(0, d.t - step);
       const e = d.t * d.t * (3 - 2 * d.t);
+      if (d.kind === 'wt') this._plate(d, e);
       d.leaves.forEach((L, li) => {
         leafMatrix(L, d.y, e, _m);
         for (const [im, i] of d._ims[li]) { im.setMatrixAt(i, _m); im.instanceMatrix.needsUpdate = true; }
@@ -202,6 +234,26 @@ export class Interact {
     }
   }
 
+  // ------------------------------------------------------------------ watertight doors (sliding plates)
+
+  /** one instanced plate per watertight door; an open door's plate is hidden (its raised plate is part of the deck) */
+  _plates() {
+    if (this._plateMesh) return;
+    const list = [...this.world.doors.values()].filter((d) => d.kind === 'wt');
+    const im = (this._plateMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.steelDark, Math.max(1, list.length)));
+    im.name = 'wtPlates'; im.frustumCulled = false; im.userData.noMerge = true;
+    list.forEach((d, i) => { d._pi = i; this._plate(d, d.t); });
+    this.scene.add(im);
+  }
+
+  _plate(d, e) {
+    const im = this._plateMesh, c = 1 - e, H = d.h + 0.1;
+    if (c <= 0) _m.makeScale(0, 0, 0);
+    else _m.makeScale(0.05, H, d.w + 0.1).setPosition(d.x + d.e + 0.028, d.y + (1 - c) * (d.h + 0.15) + H / 2, d.z);
+    im.setMatrixAt(d._pi, _m);
+    im.instanceMatrix.needsUpdate = true;
+  }
+
   // ------------------------------------------------------------------ lifts (1st class, E to A deck)
 
   _liftTarget(deck) {
@@ -210,33 +262,67 @@ export class Interact {
     return LIFT_DECKS[i + this._liftDir];
   }
 
+  /** the travelling cage: panelled walls, lamp, folding gate towards the staircase (aft) */
+  _cageMesh() {
+    if (this.cage) return this.cage;
+    const g = (this.cage = new THREE.Group()), W = 0.64, H = 2.26, wood = mats.mahogany, gold = mats.gold;
+    g.name = 'liftCage'; g.userData.noMerge = true;
+    const box = (m, w, h, d, x, y, z) => this._mesh(new THREE.BoxGeometry(w, h, d), m, g, x, y, z);
+    box(wood, 2 * W, 0.05, 2 * W, 0, 0.025, 0); box(wood, 2 * W, 0.05, 2 * W, 0, H, 0);
+    box(wood, 0.04, H, 2 * W, W, H / 2, 0);
+    for (const s of [-1, 1]) { box(wood, 2 * W, H, 0.04, 0, H / 2, s * W); box(gold, 2 * W - 0.1, 0.02, 0.012, 0, 0.95, s * (W - 0.028)); }
+    box(gold, 0.012, 0.02, 2 * W - 0.1, W - 0.028, 0.95, 0);
+    this._mesh(new THREE.SphereGeometry(0.09, 12, 8), mats.lampGlow, g, 0, H - 0.07, 0);
+    for (let i = 0; i <= 10; i++) box(gold, 0.014, H - 0.1, 0.014, -W, H / 2, -W + 0.04 + (i * (2 * W - 0.08)) / 10);
+    for (const y of [0.12, 1.05, H - 0.1]) box(gold, 0.018, 0.02, 2 * W, -W, y, 0);
+    this.scene.add(g);
+    return g;
+  }
+
   _rideLift(from, z, player) {
     if (this._ride) return;
     const to = this._liftTarget(from);
-    let veil = this._veil;
-    if (!veil) {
-      veil = this._veil = document.createElement('div');
-      veil.className = 'lift-veil';
-      (document.getElementById('ui') || document.body).append(veil);
-    }
-    veil.textContent = `Aufzug · ${LIFT_NAMES[from]} → ${LIFT_NAMES[to]}`;
-    veil.classList.add('show');
-    this.sound.lift(2.4);
-    this._ride = { t: 0, to, z, player, moved: false };
+    this._cageMesh();
+    this._ride = { t: 0, to, z, player, y0: DECK_Y[from], y1: DECK_Y[to], move: 3.6 };
+    player.yaw = Math.PI; player.pitch = 0; // facing the gate
+    this.sound.lift(this._ride.move + 0.9);
+    this.toast(`Aufzug · ${LIFT_NAMES[from]} → ${LIFT_NAMES[to]}`, 3);
   }
 
+  /** the visitor stands in the cage and travels with it; looking around stays free */
   _stepRide(dt) {
     const r = this._ride;
     if (!r) return;
     r.t += dt;
-    if (!r.moved && r.t > 1.3) {
-      r.moved = true;
+    const k = Math.min(1, Math.max(0, (r.t - 0.5) / r.move)), e = k * k * (3 - 2 * k), y = r.y0 + (r.y1 - r.y0) * e;
+    this.cage.visible = true;
+    this.cage.position.set(46.45, y + 0.02, r.z);
+    r.player.setFlyPose(46.5, y + 1.65, r.z);
+    if (r.t > r.move + 1.0) {
+      this.cage.visible = false;
+      this._ride = null;
       r.player.teleport({ deck: r.to, x: 44.7, y: DECK_Y[r.to], z: r.z, yaw: Math.PI });
+      this.toast(LIFT_NAMES[r.to], 2);
     }
-    if (r.t > 2.6) { this._veil.classList.remove('show'); this._ride = null; this.toast(LIFT_NAMES[r.to], 2); }
   }
 
-  label(i) { return i === 'door' ? (this.door?.open ? 'Tür schließen' : 'Tür öffnen') : this.items[i]?.label() || ''; }
+  // ------------------------------------------------------------------ binoculars
+
+  _stepZoom(dt, player) {
+    const z = this._zoom, cam = this.world.camera;
+    if (!z || !cam) return;
+    if (z.on && (player.mode !== 'walk' || Math.hypot(player.pos.x - z.x, player.pos.z - z.z) > 1.8)) z.on = false;
+    const to = z.on ? 15 : z.base;
+    if (Math.abs(cam.fov - to) < 0.05) { if (!z.on) { cam.fov = z.base; cam.updateProjectionMatrix(); this._zoom = null; } return; }
+    cam.fov += (to - cam.fov) * (1 - Math.exp(-dt * 9));
+    cam.updateProjectionMatrix();
+  }
+
+  label(i) {
+    if (i !== 'door') return this.items[i]?.label() || '';
+    const d = this.door, wt = d?.kind === 'wt';
+    return (wt ? 'Schotttür ' : 'Tür ') + (d?.open ? 'schließen' : wt ? 'hochkurbeln' : 'öffnen');
+  }
 
   run(i = this.nearest) {
     if (i === 'door') { if (this.door) this.toggleDoor(this.door, this._pos); return true; }
@@ -252,6 +338,8 @@ export class Interact {
     stepEngine(dt);
     if (this._swing.size) this._swingDoors(dt, feet);
     this._stepRide(dt);
+    this._stepZoom(dt, player);
+    if (this.world.uses.size !== this._usesN) this._syncUses();
     // moving parts (only near the bridge)
     const nearBridge = Math.abs(feet.x - 70) < 60 && feet.y > DECK_Y.A - 2;
     this.root.visible = nearBridge;

@@ -17,7 +17,7 @@ const HELP = [
   ['J', 'Minikarte ein/aus'],
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
-  ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Aufzüge, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Morsetaste)'],
+  ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Schotttüren, Aufzüge, Klaviere, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Fernglas, Morsetaste)'],
   ['T', 'Ton an/aus'],
   ['Klick / Antippen', 'Info-Marke direkt öffnen'],
   ['1 – 9', 'Schnellreise zu Höhepunkten'],
