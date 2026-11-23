@@ -258,8 +258,8 @@ function buildFlight(world, f, bl, bu) {
     bl.wallZ(S.riser, xa, z0, z1, yt - r, yt, -dir);
     if (S.nosing) {
       bl.sweep(S.tread, NOSE, [xa, yt, z0], [0, 0, 1], [-dir, 0, 0], [0, 1, 0], z1 - z0, [true, true]);
-      bl.box(S.nosing, Math.min(xa, xa + dir * 0.045), yt + 0.003, z0 + 0.03, Math.max(xa, xa + dir * 0.045), yt + 0.007, z1 - 0.03, 'xXYzZ');
-      if (f.st.style === 'grand') bl.flat(mats.carpetRed, xa + dir * 0.06, xe - dir * 0.02, z0 + 0.25, z1 - 0.25, yt + 0.004);
+      bl.box(S.nosing, Math.min(xa, xa + dir * 0.045), yt + 0.002, z0 + 0.03, Math.max(xa, xa + dir * 0.045), yt + 0.012, z1 - 0.03, 'xXYzZ');
+      if (f.st.style === 'grand') bl.flat(mats.carpetRed, xa + dir * 0.06, xe - dir * 0.02, z0 + 0.25, z1 - 0.25, yt + 0.009);
     } else {
       bl.box(mats.steelDark, Math.min(xa, xa + dir * 0.05), yt - 0.05, z0, Math.max(xa, xa + dir * 0.05), yt + 0.004, z1, 'xXYzZ');
     }
@@ -552,8 +552,8 @@ function stepRun(b, S, xb, xt, z0, z1, y0, y1) {
     if (i === N - 1) break; // the last riser rises onto the landing / deck
     b.flat(S.tread, xa, xe, z0, z1, yt);
     b.sweep(S.tread, NOSE, [xa, yt, z0], [0, 0, 1], [-dir, 0, 0], [0, 1, 0], z1 - z0, [true, true]);
-    b.box(S.nosing, Math.min(xa, xa + dir * 0.045), yt + 0.003, z0 + 0.03, Math.max(xa, xa + dir * 0.045), yt + 0.007, z1 - 0.03, 'xXYzZ');
-    b.flat(mats.carpetRed, xa + dir * 0.05, xe - dir * 0.01, c0, c1, yt + 0.004);
+    b.box(S.nosing, Math.min(xa, xa + dir * 0.045), yt + 0.002, z0 + 0.03, Math.max(xa, xa + dir * 0.045), yt + 0.012, z1 - 0.03, 'xXYzZ');
+    b.flat(mats.carpetRed, xa + dir * 0.05, xe - dir * 0.01, c0, c1, yt + 0.009);
   }
 }
 
@@ -641,7 +641,7 @@ function buildImperial(world, st, B) {
 
     // ---- half-landing: oak floor with carpet field, plaster soffit with gilt frame, moulded front edge
     bl.flat(S.tread, x0, xl, zc - hwi, zc + hwi, ym);
-    bl.flat(mats.carpetRed, x0 + 0.3, xl - 0.15, zc - hwi + 0.3, zc + hwi - 0.3, ym + 0.004);
+    bl.flat(mats.carpetRed, x0 + 0.3, xl - 0.15, zc - hwi + 0.3, zc + hwi - 0.3, ym + 0.009);
     bl.box(mats.brass, xl - 0.15, ym, zc - hwi + 0.3, xl - 0.12, ym + 0.008, zc + hwi - 0.3, 'XYx');
     bl.flat(mats.plaster, x0, xl, zc - hwi, zc + hwi, ym - LAND_T, true);
     bl.wallZ(S.rail, xl, zc - hwi, zc + hwi, ym - LAND_T, ym, 1);

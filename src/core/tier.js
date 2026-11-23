@@ -14,7 +14,7 @@ export const TIERS = ['mobile', 'low', 'mid', 'high'];
 
 const SETTINGS = {
   mobile: {
-    quality: 'mobil', qualities: ['mobil', 'niedrig'], antialias: false, maxPixelRatio: 1, minPixelRatio: 0.6,
+    quality: 'mobil', qualities: ['mobil', 'niedrig'], antialias: true, maxPixelRatio: 1.5, minPixelRatio: 0.75,
     power: 'default', texMax: 256, detail: 0.25, fine: 0, dropRadius: 0.1, physical: false, lamps: 4, lampShadows: 0, sunShadow: 0,
     particles: false, lampVolume: false, envMaps: 'min', oceanSeg: 0.3, tinyInstances: false,
     stream: { neighbours: 0, nearDecks: 14, wells: 'near', budgetMB: 60 },

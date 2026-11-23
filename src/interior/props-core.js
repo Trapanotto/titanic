@@ -298,7 +298,7 @@ export function slabWithHoles(p, mat, d, t, w, x, y, z, holes, bevel = 0.006) {
 /** mattress (piped, slightly puffed) bottom at y, length along z */
 export function mattress(p, w, l, h, x, y, z, mat = M.linen) { p.pil(mat, w, h, l, x, y, z, 0.22, 0.12, 3, 14, 0.006); }
 /** pillow bottom at y */
-export function pillowAt(p, w, l, h, x, y, z, mat = M.linen) { p.pil(mat, w, h, l, x, y, z, 0.6, 0.45, 3, 10, h * 0.18); } // head dent (no extra triangles)
+export function pillowAt(p, w, l, h, x, y, z, mat = M.linen) { p.pil(mat, w, h, l, x, y - h * 0.3, z, 0.6, 0.45, 3, 10, h * 0.18); } // sunk into the mattress by a third: its rounded underside otherwise leaves a gap all round (looked as if it floated) // head dent (no extra triangles)
 /**
  * Blanket over a mattress (top at y): covers the foot end from zFoot to zFold (z along the bed), hangs over the sides by
  * `drop`, turned-down sheet at the fold.

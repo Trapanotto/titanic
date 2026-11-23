@@ -517,7 +517,8 @@ export function furnishGym(ctx) {
   for (const x of [34.3, 35.2]) d.wmount(pulleyMachine(), pw, x, 0.0, 0.0);
   ctx.occupied.push({ x0: 33.95, x1: 35.55, z0: 3, z1: 3.5 });
   wput(ctx, punchBag(), 36.7, 3.6, 'stbd');
-  d.wmount(wallBars({ w: 0.9 }), wz(37.45, -1), 6.6, 0.0, 0.0); reserve(ctx, 37.2, 6.1, 37.45, 7.1);
+  // wall bars on the inboard wall between the pulley machines and the punching bag (they used to stand across a doorway)
+  d.wmount(wallBars({ w: 0.8 }), pw, 36.0, 0.0, 0.0); reserve(ctx, 35.58, 3.0, 36.42, 3.3);
   wput(ctx, dumbbells(), 36.95, 5.1, 'aft', { collide: true });
   // rowing machines and a bench along the windows
   wput(ctx, rowingMachine(), 29.7, 6.85, 'fwd');

@@ -239,6 +239,7 @@ export class UI {
     if (pm && pm.usedJSHeapSize) L.push(`JS-Speicher ${Math.round(pm.usedJSHeapSize / 1048576)} MB`);
     const q = this.qualityName?.();
     if (q) L.push('Qualität ' + q + (this.tier ? ' · Stufe ' + this.tier.name : ''));
+    try { const gl = this.renderer?.getContext(); if (gl) L.push(`Tiefe ${gl.getParameter(gl.DEPTH_BITS)} Bit · Glättung ${gl.getContextAttributes().antialias ? 'an' : 'aus'} · Pixel ×${this.renderer.getPixelRatio().toFixed(2)}`); } catch { /* context lost */ }
     const sm = window.__titanic?.streamer?.stats;
     if (sm) L.push(`Decks ${sm.decks || '–'} · ${sm.mb} MB Geometrie`);
     this.fpsEl.textContent = L.join('\n');

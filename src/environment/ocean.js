@@ -227,6 +227,7 @@ void main() {
   float side = g.y >= 0.0 ? 1.0 : -1.0;
   float ax = max(abs(x) - BOW_X, 0.0);
   float dHull = length(vec2(ax, max(az - hw, 0.0)));
+  if (ax <= 0.0 && az < hw - 0.35) discard; // no sea inside the hull (it showed on G deck where the shell is hidden or not loaded)
   float sBow = BOW_X - x;
   float bowK = smoothstep(-70.0, 125.0, x);
   float sW = -128.0 - x;

@@ -292,17 +292,79 @@ T.keys = unitTex(256, (ctx, s) => {
   ctx.fillStyle = '#141210';
   for (let o = 0; o < 8; o++) for (const k of [1, 2, 4, 5, 6]) { const x = ((o * 7 + k) * s) / 52 - s / 52 / 3; if (x < s - 4) ctx.fillRect(x, 0, (s / 52) * 0.62, s * 0.62); }
 }, 87);
-T.paintings = unitTex(256, (ctx, s, r) => { // 2 × 2 small oil paintings (seascape, landscape, portrait, still life)
+T.paintings = unitTex(512, (ctx, s, r) => { // 2 × 2 oil paintings (steamer at sea, landscape, portrait, still life)
   const q = s / 2;
-  const sky = (x, y, a, b) => { const g = ctx.createLinearGradient(0, y, 0, y + q); g.addColorStop(0, a); g.addColorStop(1, b); ctx.fillStyle = g; ctx.fillRect(x, y, q, q); };
-  sky(0, 0, '#9fb6c8', '#e8d8b0'); ctx.fillStyle = '#2f4f63'; ctx.fillRect(0, q * 0.62, q, q * 0.38);
-  ctx.fillStyle = '#1b1b1b'; ctx.fillRect(q * 0.3, q * 0.5, q * 0.42, q * 0.1); ctx.fillStyle = '#d9a05b'; for (let i = 0; i < 4; i++) ctx.fillRect(q * (0.38 + i * 0.07), q * 0.36, q * 0.04, q * 0.14);
-  sky(q, 0, '#a9c4d6', '#f0e6c8'); ctx.fillStyle = '#4f6b3a'; ctx.beginPath(); ctx.moveTo(q, q * 0.7); ctx.quadraticCurveTo(q * 1.4, q * 0.45, q * 2, q * 0.65); ctx.lineTo(q * 2, q); ctx.lineTo(q, q); ctx.fill();
-  ctx.fillStyle = '#2d4a26'; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc(q * (1.15 + r() * 0.7), q * (0.62 + r() * 0.1), q * (0.04 + r() * 0.05), 0, 7); ctx.fill(); }
-  ctx.fillStyle = '#3a2a22'; ctx.fillRect(0, q, q, q); ctx.fillStyle = '#c89878'; ctx.beginPath(); ctx.ellipse(q * 0.5, q * 1.38, q * 0.13, q * 0.17, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = '#1a1a22'; ctx.beginPath(); ctx.moveTo(q * 0.2, q * 2); ctx.quadraticCurveTo(q * 0.5, q * 1.45, q * 0.8, q * 2); ctx.fill();
-  ctx.fillStyle = '#2a2018'; ctx.fillRect(q, q, q, q); ctx.fillStyle = '#c9a24a'; ctx.beginPath(); ctx.ellipse(q * 1.5, q * 1.75, q * 0.25, q * 0.08, 0, 0, 7); ctx.fill();
-  for (const [c, x, y] of [['#a8202a', 1.4, 1.6], ['#e0c040', 1.55, 1.58], ['#7a8a3a', 1.48, 1.52]]) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(q * x, q * y, q * 0.07, 0, 7); ctx.fill(); }
+  // each painting is drawn in a unit square (0..1), clipped to its quarter of the atlas
+  const cell = (cx, cy, draw) => { ctx.save(); ctx.beginPath(); ctx.rect(cx * q, cy * q, q, q); ctx.clip(); ctx.translate(cx * q, cy * q); ctx.scale(q, q); draw(); ctx.restore(); };
+  const grad = (y0, y1, stops) => { const g = ctx.createLinearGradient(0, y0, 0, y1); stops.forEach(([t, c]) => g.addColorStop(t, c)); return g; };
+  const blob = (x, y, rx, ry, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, 7); ctx.fill(); };
+  const clouds = (n, y0, y1, c) => { for (let i = 0; i < n; i++) { const x = r(), y = y0 + r() * (y1 - y0), w = 0.06 + r() * 0.12; for (let k = 0; k < 5; k++) blob(x + (r() - 0.5) * w * 1.6, y + (r() - 0.5) * 0.02, w * (0.35 + r() * 0.4), 0.012 + r() * 0.02, c); } };
+  // brush strokes + darkened varnish towards the edges, over the finished picture
+  const finish = () => {
+    for (let i = 0; i < 420; i++) { ctx.strokeStyle = `rgba(${r() < 0.5 ? '255,244,214' : '30,20,10'},${0.025 + r() * 0.05})`; ctx.lineWidth = 0.004 + r() * 0.008; const x = r(), y = r(), a = (r() - 0.5) * 0.8; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * 0.05, y + Math.sin(a) * 0.05); ctx.stroke(); }
+    const g = ctx.createRadialGradient(0.5, 0.5, 0.3, 0.5, 0.5, 0.78); g.addColorStop(0, 'rgba(40,24,8,0)'); g.addColorStop(1, 'rgba(40,24,8,0.5)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 1, 1);
+  };
+  // 1 – liner at sea under an evening sky
+  cell(0, 0, () => {
+    ctx.fillStyle = grad(0, 0.6, [[0, '#5f7f9c'], [0.55, '#c9c2a4'], [1, '#f0d7a0']]); ctx.fillRect(0, 0, 1, 0.6);
+    clouds(7, 0.08, 0.4, 'rgba(250,236,210,0.5)'); clouds(4, 0.3, 0.5, 'rgba(120,110,120,0.35)');
+    ctx.fillStyle = grad(0.58, 1, [[0, '#6f8f93'], [0.3, '#2f5564'], [1, '#162f3d']]); ctx.fillRect(0, 0.58, 1, 0.42);
+    for (let i = 0; i < 90; i++) { const y = 0.6 + r() * 0.4, w = 0.02 + (y - 0.6) * 0.18 * r(); ctx.fillStyle = `rgba(235,240,230,${0.1 + r() * 0.25})`; ctx.fillRect(r(), y, w, 0.004 + (y - 0.6) * 0.012); }
+    for (let i = 0; i < 14; i++) { ctx.fillStyle = `rgba(250,220,150,${0.25 - i * 0.015})`; ctx.fillRect(0.44 + (r() - 0.5) * 0.1, 0.6 + i * 0.022, 0.12, 0.006); } // sun glitter
+    // hull, superstructure, four funnels with smoke, masts
+    ctx.fillStyle = '#17171a'; ctx.beginPath(); ctx.moveTo(0.16, 0.56); ctx.lineTo(0.86, 0.56); ctx.lineTo(0.8, 0.625); ctx.lineTo(0.2, 0.625); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7a2a22'; ctx.fillRect(0.2, 0.615, 0.6, 0.012);
+    ctx.fillStyle = '#ece6d6'; ctx.fillRect(0.27, 0.525, 0.46, 0.036); ctx.fillStyle = '#d8cfba'; ctx.fillRect(0.31, 0.505, 0.38, 0.02);
+    for (let i = 0; i < 4; i++) { const x = 0.36 + i * 0.085; ctx.fillStyle = '#d9a05b'; ctx.beginPath(); ctx.moveTo(x, 0.505); ctx.lineTo(x + 0.008, 0.415); ctx.lineTo(x + 0.036, 0.415); ctx.lineTo(x + 0.03, 0.505); ctx.fill(); ctx.fillStyle = '#141414'; ctx.fillRect(x + 0.007, 0.405, 0.03, 0.022); }
+    for (let i = 0; i < 26; i++) blob(0.4 - i * 0.012 + (r() - 0.5) * 0.03, 0.39 - i * 0.006 + (r() - 0.5) * 0.02, 0.02 + i * 0.002, 0.012 + i * 0.001, `rgba(50,46,48,${0.22 - i * 0.007})`);
+    ctx.strokeStyle = '#2a2420'; ctx.lineWidth = 0.004; for (const x of [0.25, 0.76]) { ctx.beginPath(); ctx.moveTo(x, 0.56); ctx.lineTo(x + 0.008, 0.36); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(245,245,235,0.8)'; ctx.fillRect(0.17, 0.622, 0.05, 0.008); // bow wave
+    finish();
+  });
+  // 2 – English landscape: hills, river, trees, cottage
+  cell(1, 0, () => {
+    ctx.fillStyle = grad(0, 0.55, [[0, '#7fa3c4'], [1, '#e9e2c6']]); ctx.fillRect(0, 0, 1, 0.55);
+    clouds(8, 0.06, 0.36, 'rgba(255,250,238,0.55)');
+    const hill = (y, amp, c, ph) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(0, 1); for (let x = 0; x <= 1.01; x += 0.04) ctx.lineTo(x, y + Math.sin(x * 5 + ph) * amp + Math.sin(x * 13 + ph * 2) * amp * 0.3); ctx.lineTo(1, 1); ctx.fill(); };
+    hill(0.5, 0.04, '#8fa7a0', 0.4); hill(0.57, 0.03, '#6f8f5c', 2.1); hill(0.68, 0.025, '#4f7a3c', 4.0);
+    ctx.fillStyle = '#9fc0cf'; ctx.beginPath(); ctx.moveTo(0.42, 0.68); ctx.bezierCurveTo(0.6, 0.76, 0.3, 0.86, 0.62, 1); ctx.lineTo(0.9, 1); ctx.bezierCurveTo(0.5, 0.86, 0.72, 0.76, 0.47, 0.68); ctx.fill(); // river
+    for (let i = 0; i < 120; i++) blob(r(), 0.7 + r() * 0.3, 0.01 + r() * 0.02, 0.004 + r() * 0.006, `rgba(${r() < 0.5 ? '120,150,70' : '50,90,40'},0.35)`);
+    const tree = (x, y, k) => { ctx.fillStyle = '#3a2a1c'; ctx.fillRect(x - 0.006 * k, y - 0.09 * k, 0.012 * k, 0.1 * k); for (let i = 0; i < 16; i++) blob(x + (r() - 0.5) * 0.11 * k, y - 0.11 * k + (r() - 0.5) * 0.09 * k, 0.03 * k, 0.026 * k, ['#2d4a26', '#3d6230', '#55783a'][i % 3]); };
+    tree(0.17, 0.8, 1.6); tree(0.84, 0.74, 1.2); tree(0.7, 0.66, 0.7); tree(0.3, 0.64, 0.6);
+    ctx.fillStyle = '#e6dcc4'; ctx.fillRect(0.52, 0.6, 0.07, 0.04); ctx.fillStyle = '#8a4a34'; ctx.beginPath(); ctx.moveTo(0.51, 0.6); ctx.lineTo(0.555, 0.57); ctx.lineTo(0.6, 0.6); ctx.fill(); // cottage
+    finish();
+  });
+  // 3 – portrait of a gentleman, dark ground
+  cell(0, 1, () => {
+    const g = ctx.createRadialGradient(0.45, 0.4, 0.05, 0.5, 0.5, 0.75); g.addColorStop(0, '#6a5038'); g.addColorStop(1, '#1c140f'); ctx.fillStyle = g; ctx.fillRect(0, 0, 1, 1);
+    ctx.fillStyle = '#16161c'; ctx.beginPath(); ctx.moveTo(0.12, 1); ctx.bezierCurveTo(0.16, 0.66, 0.36, 0.62, 0.5, 0.62); ctx.bezierCurveTo(0.64, 0.62, 0.84, 0.66, 0.88, 1); ctx.fill(); // coat
+    ctx.fillStyle = '#efe9dc'; ctx.beginPath(); ctx.moveTo(0.43, 0.62); ctx.lineTo(0.5, 0.82); ctx.lineTo(0.57, 0.62); ctx.fill(); // shirt front
+    ctx.fillStyle = '#24242c'; ctx.beginPath(); ctx.moveTo(0.46, 0.66); ctx.lineTo(0.54, 0.66); ctx.lineTo(0.515, 0.76); ctx.lineTo(0.485, 0.76); ctx.fill(); // tie
+    ctx.fillStyle = '#b98868'; ctx.fillRect(0.455, 0.54, 0.09, 0.1); // neck
+    blob(0.5, 0.42, 0.115, 0.15, '#c99a78'); blob(0.47, 0.4, 0.085, 0.12, '#dbb08c'); // head, lit side
+    ctx.fillStyle = 'rgba(70,40,26,0.45)'; ctx.beginPath(); ctx.ellipse(0.56, 0.44, 0.06, 0.13, 0, -1.4, 1.6); ctx.fill(); // shadow side
+    ctx.fillStyle = '#3a2a1e'; ctx.beginPath(); ctx.ellipse(0.5, 0.335, 0.122, 0.095, 0, 3.1, 6.35); ctx.fill(); blob(0.4, 0.37, 0.022, 0.06, '#3a2a1e'); blob(0.6, 0.37, 0.022, 0.06, '#2a1e16'); // hair
+    for (const x of [0.455, 0.54]) { blob(x, 0.41, 0.017, 0.008, '#f3ead8'); blob(x, 0.41, 0.008, 0.008, '#2a1c14'); ctx.fillStyle = '#3a2a1e'; ctx.fillRect(x - 0.022, 0.39, 0.044, 0.007); }
+    ctx.strokeStyle = 'rgba(90,50,34,0.7)'; ctx.lineWidth = 0.007; ctx.beginPath(); ctx.moveTo(0.5, 0.42); ctx.lineTo(0.49, 0.475); ctx.lineTo(0.508, 0.48); ctx.stroke(); // nose
+    ctx.fillStyle = '#4a3020'; ctx.beginPath(); ctx.ellipse(0.5, 0.505, 0.045, 0.014, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#8a4a40'; ctx.fillRect(0.478, 0.518, 0.044, 0.007); // moustache, lips
+    blob(0.445, 0.36, 0.03, 0.02, 'rgba(255,236,206,0.25)');
+    finish();
+  });
+  // 4 – still life: fruit in a brass bowl, bottle, glass, cloth
+  cell(1, 1, () => {
+    ctx.fillStyle = grad(0, 0.62, [[0, '#1f1812'], [1, '#3d2c1e']]); ctx.fillRect(0, 0, 1, 0.62);
+    ctx.fillStyle = grad(0.62, 1, [[0, '#6a4a2c'], [1, '#3a2616']]); ctx.fillRect(0, 0.62, 1, 0.38);
+    ctx.fillStyle = '#d8cfbc'; ctx.beginPath(); ctx.moveTo(0, 0.78); ctx.bezierCurveTo(0.2, 0.7, 0.3, 0.86, 0.5, 0.8); ctx.lineTo(0.42, 1); ctx.lineTo(0, 1); ctx.fill(); // cloth
+    ctx.strokeStyle = 'rgba(120,110,95,0.6)'; ctx.lineWidth = 0.006; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.moveTo(0.04 + i * 0.07, 0.8); ctx.lineTo(0.02 + i * 0.08, 1); ctx.stroke(); }
+    ctx.fillStyle = '#1f3a26'; ctx.fillRect(0.13, 0.3, 0.075, 0.38); ctx.fillRect(0.152, 0.17, 0.03, 0.14); blob(0.167, 0.3, 0.038, 0.03, '#1f3a26'); ctx.fillStyle = 'rgba(210,240,210,0.35)'; ctx.fillRect(0.142, 0.33, 0.012, 0.3); // bottle
+    ctx.fillStyle = '#b08a3a'; ctx.beginPath(); ctx.moveTo(0.36, 0.62); ctx.bezierCurveTo(0.4, 0.78, 0.76, 0.78, 0.8, 0.62); ctx.fill(); ctx.fillRect(0.53, 0.74, 0.1, 0.05); ctx.fillStyle = '#e6c56a'; ctx.fillRect(0.36, 0.612, 0.44, 0.014); blob(0.46, 0.68, 0.03, 0.04, 'rgba(255,240,180,0.35)'); // bowl
+    for (const [c, x, y, rr] of [['#a8202a', 0.46, 0.56, 0.075], ['#d08a2a', 0.6, 0.55, 0.07], ['#7a8a3a', 0.71, 0.575, 0.06], ['#c23a2e', 0.54, 0.5, 0.065], ['#e0c040', 0.655, 0.49, 0.06]]) {
+      blob(x, y, rr, rr * 0.95, c); blob(x + rr * 0.3, y + rr * 0.25, rr * 0.7, rr * 0.6, 'rgba(20,10,5,0.25)'); blob(x - rr * 0.35, y - rr * 0.35, rr * 0.25, rr * 0.2, 'rgba(255,250,235,0.55)');
+    }
+    for (let i = 0; i < 9; i++) blob(0.84 + (i % 3) * 0.035 - Math.floor(i / 3) * 0.008, 0.7 + Math.floor(i / 3) * 0.04, 0.02, 0.02, '#4a2a52'); // grapes
+    ctx.strokeStyle = 'rgba(230,240,240,0.6)'; ctx.lineWidth = 0.005; ctx.beginPath(); ctx.moveTo(0.245, 0.5); ctx.lineTo(0.262, 0.64); ctx.lineTo(0.318, 0.64); ctx.lineTo(0.335, 0.5); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0.29, 0.64); ctx.lineTo(0.29, 0.72); ctx.moveTo(0.26, 0.722); ctx.lineTo(0.32, 0.722); ctx.stroke(); ctx.fillStyle = 'rgba(140,30,40,0.6)'; ctx.fillRect(0.258, 0.57, 0.064, 0.068); // wine glass
+    finish();
+  });
 }, 91);
 T.signs = unitTex(256, (ctx, s) => { // four enamel signs (rows): white letters on blue
   const h = s / 4, txt = ['↑ BOAT DECK', 'DINING SALOON →', '← BATHS', 'EMERGENCY EXIT'];
@@ -357,12 +419,40 @@ export const kitMats = {
 };
 for (const [k, m] of Object.entries(kitMats)) m.name = 'kit_' + k;
 
+// Portholes and cabin windows seen from inside: a view of sky and sea instead of a flat glowing disc. The hull has
+// no real openings there, so the pane paints what lies along the line of sight: sea below the horizon, sky above.
+const portDay = { value: 1 };
+kitMats.portGlass.onBeforeCompile = (sh) => {
+  sh.uniforms.uPortDay = portDay;
+  sh.vertexShader = 'varying vec3 vPortW;\n' + sh.vertexShader.replace('#include <project_vertex>', /* glsl */ `
+    vec4 portW = vec4( transformed, 1.0 );
+    #ifdef USE_INSTANCING
+      portW = instanceMatrix * portW;
+    #endif
+    vPortW = ( modelMatrix * portW ).xyz;
+    #include <project_vertex>`);
+  sh.fragmentShader = 'varying vec3 vPortW;\nuniform float uPortDay;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', /* glsl */ `
+    #include <emissivemap_fragment>
+    {
+      vec3 pd = normalize( vPortW - cameraPosition );
+      vec3 sky = mix( vec3( 0.80, 0.87, 0.93 ), vec3( 0.30, 0.52, 0.82 ), clamp( pd.y * 2.2, 0.0, 1.0 ) );
+      vec3 sea = mix( vec3( 0.42, 0.58, 0.66 ), vec3( 0.04, 0.15, 0.25 ), clamp( -pd.y * 5.0, 0.0, 1.0 ) );
+      sea *= 0.92 + 0.08 * sin( pd.x * 90.0 / max( -pd.y, 0.02 ) ) * sin( pd.z * 70.0 / max( -pd.y, 0.02 ) ); // a hint of swell
+      vec3 dayC = mix( sea, sky, smoothstep( -0.004, 0.004, pd.y ) ) * 1.25;
+      vec3 nightC = mix( vec3( 0.003, 0.006, 0.012 ), vec3( 0.008, 0.013, 0.026 ), clamp( pd.y * 2.0 + 0.3, 0.0, 1.0 ) );
+      totalEmissiveRadiance = mix( nightC, dayC, uPortDay );
+      diffuseColor.rgb = vec3( 0.02 );
+    }`);
+};
+kitMats.portGlass.customProgramCacheKey = () => 'titanicPortView1';
+
 const _night = new WeakSet();
 /** Registers the day/night behaviour of kit materials once per world. */
 export function hookNight(world) {
   if (_night.has(world)) return;
   _night.add(world);
   world.onTimeChange((night) => {
+    portDay.value = night ? 0 : 1;
     kitMats.portGlass.emissiveIntensity = night ? 0.03 : 0.9; kitMats.portGlass.color.setHex(night ? 0x0c1622 : 0x8fb6cf);
     kitMats.cutGlass.emissiveIntensity = night ? 1.6 : 1.0;
   });

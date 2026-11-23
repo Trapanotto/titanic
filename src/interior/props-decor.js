@@ -269,7 +269,7 @@ export const mirrorWall = def('mirrorWall', (o) => [o.w ?? 0.8, 0.05, o.h ?? 1.1
   const w = o.w ?? 0.8, h = o.h ?? 1.1, f = matOf(o.frame, M.gold);
   p.b(M.woodDark, 0.015, h - 0.04, w - 0.04, 0.008, -h / 2 + 0.02, 0);
   p.mf(f, w, h, 0, 0, 0, 0.06, 'frame'); // one moulded frame instead of four bars (fewer triangles)
-  p.b(M.mirror, 0.006, h - 0.12, w - 0.12, 0.016, -h / 2 + 0.06, 0);
+  p.b(M.mirror, 0.006, h - 0.12, w - 0.12, 0.021, -h / 2 + 0.06, 0); // glass clearly in front of the backing board
   for (const sy of [-1, 1]) for (const sz of [-1, 1]) p.t(f, 0.025, 0.007, 0.036, sy * (h / 2 - 0.03), sz * (w / 2 - 0.03), 'x', 10, 4);
   p.extX(f, [[-0.15, 0], [0.15, 0], [0.06, 0.05], [0, 0.09], [-0.06, 0.05]], 0.03, 0.017, h / 2, 0, 0.004);
 });
@@ -487,10 +487,10 @@ function crateAt(p, s, x, y, z, rot = 0, mat = M.pine) {
   const q = p;
   q.b(mat, s - 0.04, s - 0.023, s - 0.04, x, y + 0.02, z); // body up to just under the top rails (crates stack on it)
   for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    const g = new THREE.PlaneGeometry(s - 0.1, s - 0.1); const m = q.add(g, K.stencil, x + sx * (s / 2 - 0.018), y + s / 2, z + sz * (s / 2 - 0.018)); m.rotation.y = sx ? (sx > 0 ? Math.PI / 2 : -Math.PI / 2) : (sz > 0 ? 0 : Math.PI);
+    const g = new THREE.PlaneGeometry(s - 0.1, s - 0.1); const m = q.add(g, K.stencil, x + sx * (s / 2 - 0.011), y + s / 2, z + sz * (s / 2 - 0.011)); m.rotation.y = sx ? (sx > 0 ? Math.PI / 2 : -Math.PI / 2) : (sz > 0 ? 0 : Math.PI);
   }
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) q.b(M.oak, 0.06, s, 0.06, x + sx * (s / 2 - 0.03), y, z + sz * (s / 2 - 0.03));
-  for (const yy of [0, s - 0.06]) { for (const sx of [-1, 1]) q.b(M.oak, 0.05, 0.06, s - 0.06, x + sx * (s / 2 - 0.025), y + yy, z); for (const sz of [-1, 1]) q.b(M.oak, s - 0.06, 0.06, 0.05, x, y + yy, z + sz * (s / 2 - 0.025)); }
+  for (const yy of [0, s - 0.06]) { for (const sx of [-1, 1]) q.b(M.oak, 0.05, 0.06, s - 0.12, x + sx * (s / 2 - 0.027), y + yy, z); for (const sz of [-1, 1]) q.b(M.oak, s - 0.12, 0.06, 0.05, x, y + yy, z + sz * (s / 2 - 0.027)); } // rails fit between the posts, a little behind their faces (no doubled faces)
   void rot;
 }
 export const crate = def('crate', (o) => { const s = o.s ?? 0.8; return [s, s, s]; }, (p, o) => { crateAt(p, o.s ?? 0.8, 0, 0, 0); });
