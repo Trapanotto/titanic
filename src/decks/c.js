@@ -8,8 +8,9 @@ import { DECK_Y } from '../core/constants.js';
 import { buildDeckShell, createDeckPlan, basinSmall, bench, showerBath, locker, bunkCrew, workbench, shelves, tableRect, chairDining, pottedPalm, sofa, armchair, tableRound, desk, safe, bookcase, PRESETS, writingDesk, picture, clockWall, sconce } from '../interior/kit.js';
 import {
   bay, poster, grandLobby, aftLobby, purserOffice, enquiryOffice, suiteSitting, barberShop, library, promenade,
-  thirdSaloon, barPantry, steeringGear, windlassRoom, carpenter, crewMess,
+  thirdSaloon, barPantry, steeringGear, windlassRoom, carpenter, crewMess, crewGalley, surgeryExtras,
 } from './c-hero.js';
+import { fineLv, cgJugBasin, cgBottles, cgLedger, cgFireBuckets, cgBarberPole } from './f-util.js';
 
 const deck = 'C';
 // first-class corridors (wall centre lines, |z|)
@@ -45,12 +46,16 @@ function maidsSaloon(ctx) {
 }
 function surgery(ctx) {
   ctx.fit(bunkCrew({ tiers: 1, cover: 'linen' }), ['far:mid', 'left:hi']);
-  ctx.fit(tableRect({ w: 1.2, d: 0.7, mat: 'paintWhite' }), ['right:hi', 'left:hi']);
+  if (ctx.fit(tableRect({ w: 1.2, d: 0.7, mat: 'paintWhite' }), ['right:hi', 'left:hi']) && fineLv() >= 0) { ctx.attach(cgJugBasin(), 0.05, -0.3, { y: 0.75 }); ctx.attach(cgBottles({ v: 1 }), -0.2, 0.3, { y: 0.75 }); }
   ctx.fit(shelves({ kind: 'bottles', w: 1.2, mat: 'paintWhite' }), ['right:mid', 'left:mid', 'far:hi']);
   ctx.fit(basinSmall(), ['near:hi', 'right:lo'], { collide: false });
+  surgeryExtras(ctx);
 }
 function consulting(ctx) {
-  if (ctx.put(desk({ w: 1.3, mat: 'oak' }), ctx.W / 2, ctx.D - 1.1, 'out')) ctx.put(chairDining({ cls: 'plain' }), ctx.W / 2, ctx.D - 0.45, 'out', { collide: false });
+  if (ctx.put(desk({ w: 1.3, mat: 'oak' }), ctx.W / 2, ctx.D - 1.1, 'out')) {
+    if (fineLv() >= 0) { ctx.attach(cgLedger({ v: 4 }), 0.15, -0.42, { y: 0.773 }); ctx.attach(cgLedger({ open: true, v: 0 }), 0.12, 0.08, { y: 0.785, turn: 0.15 }); }
+    ctx.put(chairDining({ cls: 'plain' }), ctx.W / 2, ctx.D - 0.45, 'out', { collide: false });
+  }
   ctx.put(chairDining({ cls: 'first' }), ctx.W / 2, ctx.D - 1.9, 'in', { collide: false });
   ctx.fit(bookcase({ w: 1.2, mat: 'oak' }), ['right:hi', 'left:hi']);
   ctx.fit(safe(), ['left:mid', 'right:mid']);
@@ -104,12 +109,13 @@ export async function build(world) {
     info: { title: 'Eingang der 3. Klasse unter der Back', x: 95.2, z: -3.2, radius: 4, text: 'Durch die Türen im Schott zum vorderen Brunnendeck gelangten die Passagiere der Dritten Klasse in diese Halle unter der Back. Von hier führte die vordere Treppe der Dritten Klasse hinunter zu den Kabinen der allein reisenden Männer auf den Decks D bis G. Das offene Brunnendeck davor diente ihnen tagsüber als Promenade.' } });
   await world.tick();
   tp('Eingangshalle 3. Klasse (vorn)', '3. Klasse', 95.3, -3.4, 0);
+  if (fineLv() >= 0) plan.prop(cgFireBuckets(), 100.35, -LF.z + 0.055, -Math.PI / 2, { y: Y + 1.25 });
   await world.tick();
   room('zimmermann', 'Werkstatt des Zimmermanns', 94, 100, -99, -LF.z, carpenter, [dS(97.5, { style: 'steel' })], { ...SVC, walls: ['fwd', 'stbd', 'port'] });
   await world.tick();
   room('wasch-crew-v', 'Waschraum und WC der Decksmannschaft', 100, 106, -99, -LF.z, washroom, [dS(103.2)], { ...CREW, floor: 'tile' });
   await world.tick();
-  room('crew-kombuese', 'Mannschaftsküche', 94, 100, LF.z, 99, { preset: 'galley', ranges: 1 }, [dP(97.5, { style: 'steel' })], { ...SVC, floor: 'tile', walls: ['fwd', 'port', 'stbd'],
+  room('crew-kombuese', 'Mannschaftsküche', 94, 100, LF.z, 99, crewGalley, [dP(97.5, { style: 'steel' })], { ...SVC, floor: 'tile', walls: ['fwd', 'port', 'stbd'],
     });
   await world.tick();
   room('lampen', 'Lampenraum und Bootsmannsstore', 100, 106, LF.z, 99, lampRoom, [dP(103.2, { style: 'steel' })], SVC);
@@ -253,6 +259,7 @@ export async function build(world) {
   await world.tick();
   room('deckpantry', 'Deckpantry', 2, 8.5, -CH, 0, 'pantry', [dA(-1.5)], { ...SVC, floor: 'tile', walls: ['aft', 'port', 'stbd'] });
   await world.tick();
+  if (fineLv() >= 0) plan.prop(cgBarberPole(), 1.94, 2.55, Math.PI, { y: Y + 1.95 }); // the barber's sign beside the door, in the staircase hall
   room('friseur', 'Friseursalon 1. Klasse', 2, 8.5, 0, CH, barberShop, [dA(1.5, { style: 'mahogany' })], {
     type: 'public', cls: 'first', wall: 'mahoganyDado', floor: 'tile', walls: ['aft', 'port', 'stbd'], teleport: { name: 'Friseursalon', group: '1. Klasse' },
     info: { title: 'Friseursalon der 1. Klasse', text: 'Beim Friseur der Ersten Klasse konnte man sich rasieren und frisieren lassen und zugleich Andenken kaufen: Von der Decke hingen Wimpel, Puppen, Fähnchen und Mützenbänder mit dem Schiffsnamen, dazu gab es Postkarten, Tabak und Spielzeug. Der Barbier August Weikman überlebte den Untergang.' } });
@@ -371,6 +378,7 @@ export async function build(world) {
   await world.tick();
   room('eingang-3a', 'Eingangshalle 3. Klasse (achtern)', LP.x0, LP.x1, -LP.z, LP.z, (ctx) => {
     poster(plan, LP.x0 + 0.05, -5.2, 1, 0, 0.6, 0.8, 1.6); poster(plan, LP.x0 + 0.05, -1.6, 1, 0, 0.6, 0.8, 1.6);
+    if (fineLv() >= 0) plan.prop(cgFireBuckets(), LP.x0 + 0.055, 3.34, 0, { y: Y + 1.25 });
   }, [], { type: 'lobby', cls: 'third', stairs: true, walls: 'none', wall: 'paintWhite', floor: 'linoRed', lamp: 'bulkhead' });
   await world.tick();
   tp('Eingangshalle 3. Klasse (achtern)', '3. Klasse', -107.0, -3.4, Math.PI);

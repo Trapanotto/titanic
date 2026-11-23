@@ -7,9 +7,14 @@ import {
   addStyle, matOf, PRESETS, pipe, imperialPlan, deckHalfWidth, faceDir,
   armchair, backBar, barberChair, barrel, bench, bookcase, chairDining, chest, clockWall, coatHooks, column, desk, gauge, liftCage,
   machineBlock, mirrorWall, notice, piano, picture, pilaster, pottedPalm, safe, sconce, servingCounter, settee, shelves, sofa, stool,
-  tableRect, tableRound, tankH, valve, washbasinMarble, workbench, writingDesk, fireplace, bookPile, newspaper, carafe, switchboard,
+  tableRect, tableRound, tankH, valve, washbasinMarble, workbench, writingDesk, fireplace, bookPile, newspaper, carafe, switchboard, messTable, locker,
 } from '../interior/kit.js';
-import { BM, Deco, roomFaces } from './bc-util.js';
+import { BM, Deco, roomFaces, PRF } from './bc-util.js';
+import {
+  fineLv, Rivets, cgMug, cgTeapot, cgLedger, cgCounterSet, cgBottles, cgBarberKit, cgCards, cgGlass, cgDraughts, cgMessCentre, cgFireBuckets,
+  cgMenuBoard, cgJugBasin, cgTowelHooks, cgBarberPole, cgMopBucket, hangFree,
+} from './f-util.js';
+import { workTable, utensilRail, instrumentStand } from './d-hero.js';
 import {
   bcBigSafe, bcCurtains, bcKeyBoard, bcPigeon, bcPoster, bcSlatBench, bcSlatTable, bcSpittoon, bcSteerEngine, bcTelemotor, bcVitrine, bcWreath,
 } from './bc-props.js';
@@ -130,26 +135,43 @@ function counterBehind(ctx, xa, xb) {
   ctx.attach(bookPile({ v: 0 }), 0.05, -w * 0.3, { y: 0.93, turn: 0.2 });
   ctx.attach(newspaper(), 0.02, w * 0.25, { y: 0.93, turn: -0.3 });
   ctx.attach(carafe(), -0.12, 0.0, { y: 0.93 });
+  if (fineLv() >= 0 && w > 2) { ctx.attach(cgCounterSet(), 0.0, -0.5, { y: 0.925 }); ctx.attach(cgLedger({ open: true, v: 1 }), -0.04, 1.4, { y: 0.925, turn: 0.1 }); }
   for (const dx of w > 2 ? [-w * 0.25, w * 0.25] : [0]) wput(ctx, stool({ mat: 'oak', seat: 'leather' }), x + dx, zw + 0.85, 'port', { collide: false });
 }
 export function purserOffice(ctx) {
   counterBehind(ctx, 41.0, 42.4);
   ctx.fit(bcBigSafe(), ['far:lo', 'far:hi', 'left:hi']);
   ctx.fit(bcBigSafe(), ['far:hi', 'right:hi', 'left:mid']);
-  if (ctx.fit(desk({ w: 1.3, mat: 'oak' }), ['left:mid', 'right:mid', 'far:mid'])) ctx.attach(chairDining({ cls: 'plain', mat: 'oak' }), 0.6, 0, { turn: Math.PI });
+  if (ctx.fit(desk({ w: 1.3, mat: 'oak' }), ['left:mid', 'right:mid', 'far:mid'])) { ctx.attach(chairDining({ cls: 'plain', mat: 'oak' }), 0.6, 0, { turn: Math.PI }); deskLedgers(ctx); }
   ctx.fit(bcPigeon({ w: 1.2 }), ['right:hi', 'left:hi', 'far:mid']);
   ctx.fit(safe(), ['right:mid', 'left:lo']);
   ctx.mount(bcKeyBoard(), 'left', ctx.D * 0.55, 1.75) || ctx.mount(bcKeyBoard(), 'right', ctx.D * 0.55, 1.75);
   ctx.mount(clockWall(), 'far', ctx.W * 0.5, 2.15);
+  officeDeco(ctx, [41.0, 42.4]);
+}
+/** two ledgers stacked at the corner of the desk placed last (desk top 0.773 m) */
+function deskLedgers(ctx, k = 2) {
+  if (fineLv() < 0) return;
+  ctx.attach(cgLedger({ v: k }), 0.15, -0.42, { y: 0.773 }); ctx.attach(cgLedger({ v: k + 1 }), 0.15, -0.42, { y: 0.818, turn: 0.12 });
+}
+/** offices behind the grille: fielded oak panels on the wainscot, moulded ceiling with beads (and beams from fine 2) */
+function officeDeco(ctx, [xa, xb]) {
+  const f = fineLv(); if (f < 1) return;
+  const d = new Deco(ctx.plan), F = roomFaces(ctx, { port: [{ s: xa - 0.06, e: xb + 0.06, y0: 0, y1: 2.3 }] });
+  for (const side of ['fwd', 'aft', 'port']) { const q = F[side]; if (!q.hull) d.panelRun(q.F, q.a, q.e, q.holes, { wood: mats.oak, rail: mats.oak, upper: false, cornice: false, topRail: false, skirt: false, dado: 0.86, lowPitch: 0.62 }); }
+  if (f >= 2) d.coffers(F.x0, F.x1, F.z0, F.z1, [(F.x0 + F.x1) / 2], [(F.z0 + F.z1) / 2], { w: 0.16, depth: 0.07, mat: 'oak', bead: 'gold' });
+  else d.beadRect(F.x0 + 0.25, F.x1 - 0.25, F.z0 + 0.25, F.z1 - 0.25, 'gold');
+  d.flush();
 }
 export function enquiryOffice(ctx) {
   counterBehind(ctx, 43.0, 46.6);
   ctx.fit(bcPigeon({ w: 1.5 }), ['far:lo', 'far:hi']);
   ctx.fit(shelves({ kind: 'empty', w: 1.2, mat: 'mahogany' }), ['far:hi', 'far:mid']);
-  if (ctx.fit(desk({ w: 1.2, mat: 'oak' }), ['right:mid', 'left:mid'])) ctx.attach(chairDining({ cls: 'plain', mat: 'oak' }), 0.6, 0, { turn: Math.PI });
+  if (ctx.fit(desk({ w: 1.2, mat: 'oak' }), ['right:mid', 'left:mid'])) { ctx.attach(chairDining({ cls: 'plain', mat: 'oak' }), 0.6, 0, { turn: Math.PI }); deskLedgers(ctx, 0); }
   ctx.fit(safe(), ['right:hi', 'left:hi']);
   ctx.mount(bcKeyBoard(), 'left', ctx.D * 0.6, 1.75);
   ctx.mount(notice(), 'far', ctx.W * 0.8, 1.6);
+  officeDeco(ctx, [43.0, 46.6]);
 }
 
 // ---------------------------------------------------------------- suites (Straus / Astor)
@@ -190,12 +212,13 @@ export function barberShop(ctx) {
   const wall = ctx.hull === 'right' ? 'left' : 'right', uw = wall === 'right' ? ctx.W : 0, dir = wall === 'right' ? 'right' : 'left', sg = wall === 'right' ? -1 : 1;
   for (const v of [1.9, 4.1]) {
     if (!ctx.put(washbasinMarble({ mirror: true }), uw + sg * 0.26, v, dir, { force: false })) continue;
+    if (fineLv() >= 0) ctx.attach(cgBarberKit(), 0, 0, { y: 0.001 });
     ctx.put(barberChair(), uw + sg * (0.52 + 0.62), v, dir, { collide: false });
     ctx.mount(sconce({ plain: true }), wall, v - 0.55, 1.9);
   }
   ctx.fit(bcVitrine({ w: 1.3 }), ['far:lo', 'far:hi', 'far:mid']);
   ctx.fit(shelves({ kind: 'bottles', w: 1.0, mat: 'mahogany' }), [wall === 'right' ? 'left:hi' : 'right:hi', 'near:hi']);
-  ctx.fit(bench({ w: 1.4, mat: 'mahogany', iron: false }), [wall === 'right' ? 'left:mid' : 'right:mid', 'near:hi'], { collide: false });
+  if (ctx.fit(bench({ w: 1.4, mat: 'mahogany', iron: false }), [wall === 'right' ? 'left:mid' : 'right:mid', 'near:hi'], { collide: false }) && fineLv() >= 1) ctx.mount(cgTowelHooks({ w: 1.0 }), ctx.last.wall, ctx.last.pos, 1.78);
   ctx.fit(bcVitrine({ w: 1.0, v: 9 }), [wall === 'right' ? 'left:lo' : 'right:lo']);
   // souvenirs hanging from the ceiling: pennants, dolls, small flags, cap ribbons
   const b = ctx.plan.batch, top = ctx.y + ctx.h, r = ctx.drng;
@@ -232,11 +255,17 @@ export function library(ctx, R, WZ, bays) {
     d.b.poly(matOf('mahogany'), [d.P(F, -0.7, 2.18, 0.45), d.P(F, 0.7, 2.18, 0.45), d.P(F, 0, 2.4, 0.45)], d.O(F));
     d.mount(bcWreath(), F, 0, 2.27, 0.46);
   }
-  // fluted sycamore columns
+  // fluted sycamore columns (and from fine level 2 matching pilasters on the end walls under the beam lines)
   const xs = [R.x0 + 3.0, (R.x0 + R.x1) / 2, R.x1 - 3.0];
+  if (fineLv() >= 2) for (const [xw, rot] of [[R.x0 + 0.05, PX], [R.x1 - 0.05, NX]]) for (const z of [-3.4, 3.4]) plan.prop(pilaster({ h: h - 0.18, w: 0.28, mat: 'bc_sycamore', capital: 'paintWhite' }), xw + (rot === PX ? 0.04 : -0.04), z, rot, { collide: false });
   for (const x of xs) for (const s of [-1, 1]) plan.prop(column({ h: h - 0.1, r: 0.14, mat: 'bc_sycamore', capital: 'paintWhite' }), x, s * 3.4, 0, { collide: true });
   // ceiling: beams on the column lines, beaded panels, lamps
-  d.coffers(f.x0, f.x1, f.z0, f.z1, xs, [-3.4, 3.4], { w: 0.26, depth: 0.1, mat: 'plaster', bead: 'paintWhite', cb: (cx, cz, w, dd) => { if (w * dd > 4) plan.lamp(cx, cz, 'bowl'); } });
+  const fl = fineLv();
+  d.coffers(f.x0, f.x1, f.z0, f.z1, xs, [-3.4, 3.4], { w: 0.26, depth: 0.1, mat: 'plaster', bead: 'paintWhite', cb: (cx, cz, w, dd) => { if (w * dd > 4) plan.lamp(cx, cz, 'bowl'); else if (fl >= 1) d.rose(cx, cz, 0.2); } });
+  if (fl >= 2) { // dentil course under the Adam cornice
+    const yc = h - PRF.cornice.at(-1)[1];
+    for (const sd of ['fwd', 'aft', 'port', 'stbd']) for (const [a, e] of d.segs(f[sd].a, f[sd].e, f[sd].holes, yc - 0.06, yc)) for (let q = a + 0.04; q < e - 0.07; q += 0.075) d.box(f[sd].F, 'paintWhite', q, q + 0.04, yc - 0.05, yc, 0.032);
+  }
   // mahogany chairs with tapestry seats (instanced), writing tables in the bays, settees, reading tables
   const ch = chairDining({ cls: 'second', mat: 'mahogany', seat: 'fabricGold' });
   for (const s of [-1, 1]) {
@@ -247,7 +276,10 @@ export function library(ctx, R, WZ, bays) {
     }
     for (let i = 0; i < bays.length - 1; i++) wallLight(plan, (bays[i][1] + bays[i + 1][0]) / 2, s * (WZ - 0.06), s < 0 ? PZ : NZ);
     plan.prop(pottedPalm(), R.x1 - 0.7, s * (WZ - 0.7), 0, { collide: false });
-    for (const x of [R.x0 + 2.6, R.x1 - 2.6]) group(plan, x, s * 6.7, { cover: s < 0 ? 'fabricGreen' : 'fabricRed', r: 0.5, items: true });
+    for (const x of [R.x0 + 2.6, R.x1 - 2.6]) {
+      group(plan, x, s * 6.7, { cover: s < 0 ? 'fabricGreen' : 'fabricRed', r: 0.5, items: true });
+      if (fl >= 1) plan.prop(bookPile({ v: x > R.x0 + 5 ? 2 : 0 }), x - 0.2, s * 6.75 + 0.12, 0.7, { y: Y + 0.75, collide: false });
+    }
     const xm = (R.x0 + R.x1) / 2;
     plan.prop(tableRound({ r: 0.45, mat: 'mahogany', items: true }), xm, s * 6.6, 0, { collide: true });
     plan.prop(settee({ mat: 'fabricGreen' }), xm, s * 5.55, s < 0 ? NZ : PZ, { collide: true });
@@ -287,10 +319,17 @@ export function thirdSaloon(ctx, R, s, zi, smoking, doorX, hatch) {
   const sa = span(R.x0 + 0.2, 0.05); d.panelRun({ axis: 'z', c: R.x0 + 0.05, n: 1 }, sa[0], sa[1], [], po);
   const sf = span(fwdX - 0.3, 0.05); d.panelRun({ axis: 'z', c: fwdX, n: -1 }, sf[0], sf[1], [], { ...po, upper: false });
   // deck beams (steel, painted white) across the room, a longitudinal girder on steel stanchions
+  const fl = fineLv(), rv = fl >= 2 ? new Rivets(plan.world, plan.deck) : null;
   for (let x = R.x0 + 1.2; x < fwdX - 0.3; x += 2.4) {
     const [z0, z1] = span(x);
     b.box(mats.paintWhite, x - 0.045, top - 0.24, z0, x + 0.045, top, z1, 'xXy');
     b.box(mats.paintWhite, x - 0.09, top - 0.26, z0, x + 0.09, top - 0.24, z1, 'xXyY');
+    if (fl >= 1) for (const [ze, dz] of [[z0, 1], [z1, -1]]) { // knee brackets where the beam meets the frames / inner wall
+      const tri = [[top - 0.26, ze], [top - 0.62, ze], [top - 0.26, ze + dz * 0.38]];
+      for (const sx of [-1, 1]) b.poly(mats.paintWhite, tri.map(([y, z]) => [x + sx * 0.006, y, z]), [sx, 0, 0]);
+      b.poly(mats.paintWhite, [[x - 0.006, top - 0.62, ze], [x + 0.006, top - 0.62, ze], [x + 0.006, top - 0.26, ze + dz * 0.38], [x - 0.006, top - 0.26, ze + dz * 0.38]], [0, -1, dz * 0.9]);
+    }
+    if (rv) for (const dx of [-0.06, 0.06]) rv.row(mats.paintWhite, [x + dx, top - 0.262, z0 + 0.1], [x + dx, top - 0.262, z1 - 0.1], 0.16, 'y');
   }
   const zg = s * (zi + 3.9), xsT = [-119.6, -116.7, -113.8, -110.9];
   let gx = R.x0 + 0.05; while (hw(gx) < zi + 4.05) gx += 0.25;
@@ -312,6 +351,22 @@ export function thirdSaloon(ctx, R, s, zi, smoking, doorX, hatch) {
     plan.prop(bcSlatBench({ w: tw }), x + 0.7, zc, NX, { collide: true });
     if (smoking) { plan.prop(bcSpittoon(), x - 1.2, s * (z0 - 0.35), 0, { collide: false }); }
     else if (x !== xsT[1]) plan.prop(newspaper(), x + 0.1, zc - s * 0.3, 0.4, { y: Y + 0.77, collide: false });
+    if (fl >= 0) { // a game of cards / draughts, mugs of tea or beer glasses
+      const k = xsT.indexOf(x);
+      if (smoking && k % 2 === 0) plan.prop(cgCards({ v: k }), x, zc + s * 0.25, 0, { y: Y + 0.76, collide: false });
+      else if (!smoking && k === 1) plan.prop(cgDraughts(), x, zc + s * 0.1, 0.1, { y: Y + 0.76, collide: false });
+      if (fl >= 1) for (const [dx, dz] of [[-0.24, -0.55], [0.22, 0.6], [-0.2, 0.75]]) if (Math.abs(dz) < tw / 2 - 0.1) plan.prop(smoking ? cgGlass() : cgMug(), x + dx, zc + s * dz, 1.3 * dz, { y: Y + 0.76, collide: false });
+    }
+  }
+  if (fl >= 2) { // tongue-and-groove boarding with a capping rail on the lining of the ship's side
+    const wood = smoking ? mats.oak : mats.pine;
+    for (let x = R.x0 + 0.1; x < fwdX - 0.1; x += 1.0) {
+      const xb = Math.min(fwdX - 0.1, x + 1.0), z = s * (Math.min(hw(x), hw(xb)) - 0.015), t = (a, c) => [Math.min(a, c), Math.max(a, c)];
+      const [za, zb] = t(z, z - s * 0.012), [ga, gb] = t(z - s * 0.012, z - s * 0.016), [ra, rb] = t(z, z - s * 0.04);
+      b.box(wood, x, Y, za, xb, Y + 1.05, zb, s > 0 ? 'zY' : 'ZY');
+      for (let k = 1; k < 10; k++) b.box(mats.woodDark, x + k * 0.1 - 0.004, Y + 0.12, ga, x + k * 0.1 + 0.004, Y + 1.0, gb, s > 0 ? 'z' : 'Z');
+      b.box(wood, x, Y + 1.05, ra, xb, Y + 1.1, rb, s > 0 ? 'zyY' : 'ZyY');
+    }
   }
   // benches along the forward (well-deck) bulkhead, under the portholes
   for (const z of [zi + 1.2, zi + 3.1]) if (z + 1.1 < hw(fwdX - 0.6)) plan.prop(bcSlatBench({ w: 1.8, back: true }), fwdX - 0.3, s * (z + 0.3), NX, { collide: true });
@@ -332,6 +387,7 @@ export function thirdSaloon(ctx, R, s, zi, smoking, doorX, hatch) {
     wallLight(plan, R.x0 + 0.06, s * (zi + 1.2), PX, true); wallLight(plan, fwdX - 0.01, s * (zi + 2.15), NX, true);
     plan.prop(clockWall(), R.x0 + 4.0, s * (zi + 0.07), s > 0 ? PZ : NZ, { y: Y + 2.1 });
   }
+  if (rv) { for (const dz of [-0.07, 0.07]) rv.row(mats.paintWhite, [gx + 0.1, top - 0.322, zg + dz], [fwdX - 0.1, top - 0.322, zg + dz], 0.16, 'y'); rv.flush(); }
   d.flush();
 }
 
@@ -405,6 +461,21 @@ export function windlassRoom(plan, R) {
   w.addCollider(ex + 0.95, Y, -2.3, ex + 1.55, Y + 0.55, -1.7); w.addCollider(ex + 0.95, Y, 1.7, ex + 1.55, Y + 0.55, 2.3);
 }
 
+/** crew galley under the forecastle: the kit's galley, a work table with a utensil rail, a bill of fare */
+export function crewGalley(ctx) {
+  ctx.opts = { ranges: 1 };
+  PRESETS.galley(ctx);
+  const fl = fineLv(); if (fl < 0) return;
+  if (ctx.fit(workTable({ w: 1.4, v: 4 }), ['left:mid', 'right:mid', 'near:hi', 'far:hi']) && fl >= 1) ctx.mount(utensilRail({ w: 1.4 }), ctx.last.wall, ctx.last.pos, 1.3);
+  hangFree(ctx, cgMenuBoard(), ['near', 'left', 'right'], 1.55);
+  if (fl >= 1) ctx.fit(cgMopBucket(), ['near:lo', 'left:lo', 'right:lo'], { collide: false });
+}
+
+/** ship's surgeon: treatment table with jug, basin and medicine bottles, instrument stand */
+export function surgeryExtras(ctx) {
+  const fl = fineLv(); if (fl < 0) return;
+  if (fl >= 1) ctx.fit(instrumentStand(), ['far:lo', 'right:lo', 'left:lo'], { collide: false });
+}
 export function carpenter(ctx) {
   ctx.fit(workbench({ w: Math.min(1.8, ctx.W - 1.4) }), ['far:mid', 'right:hi', 'left:hi']);
   PRESETS.store(ctx);
@@ -413,7 +484,14 @@ export function carpenter(ctx) {
 /** crew mess: mess tables with benches, lockers, coat hooks, notices, clock */
 export function crewMess(ctx) {
   ctx.opts = { set: true };
-  PRESETS.mess(ctx);
+  const fl = fineLv();
+  if (fl < 0) PRESETS.mess(ctx);
+  else { // the kit's mess layout, with teapot, bread, jam and cruets laid out on every table
+    const n = ctx.grid(2.2, 3.0, (u, v) => { if (ctx.put(messTable({ w: 2.4, set: true }), u, v, 'right')) ctx.attach(cgMessCentre(), 0, 0, { y: 0.765 }); }, 0.5);
+    if (!n) ctx.grid(3.0, 2.2, (u, v) => ctx.put(messTable({ w: 2.4 }), u, v, 'in'), 0.3);
+    ctx.fit(locker({ n: 3 }), ['far:hi', 'near:hi']);
+    if (fl >= 1) { hangFree(ctx, cgMenuBoard(), ['near', 'far', 'left', 'right'], 1.55); ctx.fit(cgMopBucket(), ['near:lo', 'far:lo'], { collide: false }); }
+  }
   ctx.mount(coatHooks({ n: 4, v: 1 }), 'near', ctx.W * 0.75, 1.7);
   ctx.mount(notice(), 'far', ctx.W * 0.3, 1.6);
   ctx.mount(clockWall(), 'far', ctx.W * 0.6, 2.05);

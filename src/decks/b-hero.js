@@ -13,7 +13,13 @@ import { BM, Deco, roomFaces, sideWindows as sideWin, BWIN } from './bc-util.js'
 import {
   bcBasket, bcBayTree, bcBuffet, bcCardTable, bcCello, bcChairLXVI, bcCurtains, bcGarland, bcIvy, bcLounger, bcMusicStand,
   bcPinkLamp, bcSleighBed, bcSpittoon, bcVanity, bcWreath,
+  bcUrn, bcScuttle, bcVase, bcMenu, bcCooler, bcCoffee, bcFernStand, bcNewsRack, bcSmokerSet,
 } from './bc-props.js';
+import { TIER } from '../core/tier.js';
+import { festoon, modillion, ornRun } from './boat-util.js';
+
+/** fine-detail gate (docs/CONTRACT.md "Detail levels") */
+const fine = (n) => TIER.fine >= n;
 
 // rotations: prop front facing +x / -x / +z / -z
 export const PX = 0, NX = Math.PI, PZ = -Math.PI / 2, NZ = Math.PI / 2;
@@ -33,6 +39,24 @@ addStyle('renB', { wall: 'woodDark', door: 'oak', frame: 'woodDark', lamp: 'bowl
 addStyle('marbleB', { wall: 'marble', door: 'mahogany', frame: 'mahogany', lamp: 'bowl' });
 addStyle('oakLXVI', { wall: 'oak', door: 'oak', frame: 'oak', lamp: 'bowl' });
 
+/**
+ * Modillion cornice under the Deco cornice of face `face`, left out at the pilasters (pil), at full-height holes and at the
+ * extra skip intervals; instanced. mat = bracket wood, leaf = carved leaf material (level 3).
+ */
+function modDeco(d, face, pil = [], o = {}) {
+  if (!face || face.e - face.a < 0.6) return;
+  const skip = [...pil.map((q) => [q - 0.25, q + 0.25]), ...face.holes.filter((h) => !h.p && (h.y1 ?? 0) > d.H - 0.35).map((h) => [h.s - 0.05, h.e + 0.05]), ...(o.skip ?? [])];
+  ornRun(face.F, face.a + 0.12, face.e - 0.12, 0.3, () => modillion({ mat: o.mat ?? 'oak', leaf: TIER.fine >= 3 ? o.leaf : undefined }), (pr, x, z, r, y) => d.inst.add(pr, x, y, z, r), d.Y + d.H - 0.17, 0, skip);
+}
+/** carved festoon on the frieze above a tall panel (panelRun orn), skipped near (x, z) points listed in `avoid` */
+function festDeco(d, mat, avoid = []) {
+  return (F, a, pw) => {
+    if (pw < 0.4) return;
+    const [x, z] = d.xz(F, a, 0.012);
+    if (avoid.some(([ax, az]) => Math.hypot(x - ax, z - az) < 1.0)) return;
+    d.inst.add(festoon({ w: Math.round(Math.min(0.55, pw - 0.12) * 20) / 20, mat, drop: 0.06 }), x, d.Y + d.H - 0.21, z, d.rot(F));
+  };
+}
 /** |z| of the inner face of the exterior side wall at x */
 const wallFace = (plan, x) => plan.halfWidth(x) + 0.05;
 const wallLight = (plan, x, z, rot, plain = false) => plan.prop(sconce(plain ? { plain: true } : {}), x, z, rot, { y: plan.y + 1.85 });
@@ -114,6 +138,8 @@ export function grandLobby(plan, L) {
   for (const s of [-1, 1]) {
     tableGroup(plan, 40.6, s * 4.45, { r: 0.4, mat: 'oak', cover: s < 0 ? 'fabricGreen' : 'fabricRed', seats: [[-1, 0], [1, 0], [0, s]] });
     tableGroup(plan, 43.3, s * 4.45, { r: 0.4, mat: 'oak', cover: s < 0 ? 'fabricGreen' : 'fabricRed', seats: [[-1, 0], [0, s]] });
+    if (fine(1)) plan.prop(bcVase({ v: s > 0 ? 0 : 1 }), 40.6, s * 4.45, 0, { y: Y + 0.75, collide: false });
+    if (fine(2)) plan.prop(newspaper(), 43.3, s * 4.45, 0.5 * s, { y: Y + 0.75, collide: false });
     for (const z of [3.4, 6.0]) plan.prop(pilaster({ h: plan.h, mat: 'oak', capital: 'gold' }), L.x0 + 0.09, s * z, PX);
     wallLight(plan, L.x0 + 0.06, s * 4.7, PX);
     plan.prop(pottedPalm(), 47.3, s * 3.2, 0, { collide: false });
@@ -149,7 +175,8 @@ export function vestibule(plan, R, s) {
 /** walnut panelling with gilt bolections, wreaths, mirrors on the inboard wall, plaster cornice; returns pier positions */
 function ritzWalls(d, f, o = {}) {
   const B = BM(), wreath = bcWreath();
-  const orn = (F, a, pw, yTop) => { if (pw < 0.45) return; const [x, z] = d.xz(F, a, 0.016); d.inst.add(wreath, x, d.Y + yTop - 0.2, z, d.rot(F)); };
+  const fest = fine(2) ? festDeco(d, 'gold') : null;
+  const orn = (F, a, pw, yTop) => { if (pw < 0.45) return; const [x, z] = d.xz(F, a, 0.016); d.inst.add(wreath, x, d.Y + yTop - 0.2, z, d.rot(F)); fest?.(F, a, pw, yTop); };
   return panelRoom(d, f, {
     wood: B.walnut, rail: B.walnut, gilt: 'gold', frieze: B.walnut, cornice: 'plaster', pitch: 0.82, orn, pilMat: 'bc_walnut', capital: 'gold', ...o,
   }, o.sides);
@@ -171,6 +198,7 @@ export function restaurant(ctx, R) {
   const f = roomFaces(ctx, { port: winHoles(wins), fwd: [{ s: -2.35, e: 0.55, y0: 0.9, y1: 2.2, p: true }] });
   const pl = ritzWalls(d, f, { side: { stbd: { mirror: [3, 1] }, aft: { mirror: [4, 2] }, port: { pil: [wins[0] - 1.375, ...wins.slice(1).map((c, i) => (c + wins[i]) / 2), wins.at(-1) + 1.375].filter((a) => a > f.x0 + 0.3 && a < f.x1 - 0.3) } } });
   curtainWindows(d, f.port, wins);
+  if (fine(1)) for (const sd of ['fwd', 'aft', 'port', 'stbd']) modDeco(d, f[sd], pl[sd] ?? [], { mat: 'bc_walnut', leaf: 'gold', skip: sd === 'port' ? wins.map((c) => [c - 1.25, c + 1.25]) : [] });
   // gilt sconces on the piers of the inboard and end walls
   let k = 0;
   for (const s of ['stbd', 'aft', 'fwd']) for (const a of pl[s] ?? []) { if (a - f[s].a < 0.45 || f[s].e - a < 0.45) continue; d.mount(sconce(), f[s].F, a, 1.78, 0.058); /* on the pilaster face, not on corner piers */ if (k++ % 2 === 0) { const [x, z] = d.xz(f[s].F, a, 0.35); d.lamp(x, 1.8, z, 0xffd9a8, 0.35); } }
@@ -195,17 +223,20 @@ export function restaurant(ctx, R) {
   const T2 = tableRect({ w: 0.75, d: 0.75, cloth: true, set: true }), T4 = tableRound({ r: 0.5, cloth: true, set: 4 });
   const T6 = tableRect({ w: 1.86, d: 0.9, cloth: true, set: true }), T8 = tableRound({ r: 0.8, cloth: true, set: 8 });
   let lit = 0;
-  const table = (t, x, z, seats, lampAt = [0.12, 0.12]) => {
+  const menu = fine(1) ? bcMenu() : null, cooler = fine(2) ? bcCooler() : null;
+  const table = (t, x, z, seats, lampAt = [0.12, 0.12], menuAt = [0, -0.16], coolAt = null) => {
     d.ip(t, x, z, 0); d.fpCollider(t.userData.fp, x, z, 0, 0.78);
     for (const [dx, dz] of seats) d.ip(chair, x + dx, z + dz, faceDir(-dx, -dz));
     d.ip(lamp, x + lampAt[0], z + lampAt[1], 0, 0.756);
+    if (menu && menuAt) d.ip(menu, x + menuAt[0], z + menuAt[1], Math.PI / 2, 0.756);
+    if (cooler && coolAt) d.ip(cooler, x + coolAt[0], z + coolAt[1], 0.4, 0.756);
     if (lit++ % 3 === 0) d.lamp(x, 1.1, z, 0xffb4a4, 0.3);
   };
   const diag = (r) => [[r, r], [-r, r], [r, -r], [-r, -r]].map(([a, b]) => [a * 0.7071, b * 0.7071]);
-  for (const c of wins) table(T2, c, f.z0 + 0.82, [[-0.6, 0], [0.6, 0]], [0, -0.2]);
+  for (const c of wins) table(T2, c, f.z0 + 0.82, [[-0.6, 0], [0.6, 0]], [0, -0.2], [0, 0.22]);
   for (const [x, z] of [[-22.2, -10.6], [-15.3, -10.6], [-22.2, -6.0], [-18.75, -6.0], [-15.3, -6.0], [-22.2, 2.6], [-15.3, 2.6], [-21.9, 7.3]]) table(T4, x, z, diag(1.0));
-  table(T6, -18.75, -10.3, [-0.62, 0, 0.62].flatMap((z) => [[-0.82, z], [0.82, z]]), [0, 0.32]);
-  for (const z of [-1.8, 2.45]) table(T8, -18.75, z, Array.from({ length: 8 }, (_, i) => { const a = ((i + 0.5) / 8) * Math.PI * 2; return [Math.cos(a) * 1.04, Math.sin(a) * 1.04]; }), [0.22, 0]);
+  table(T6, -18.75, -10.3, [-0.62, 0, 0.62].flatMap((z) => [[-0.82, z], [0.82, z]]), [0, 0.32], [0, -0.62], [0, 0.62]);
+  for (const z of [-1.8, 2.45]) table(T8, -18.75, z, Array.from({ length: 8 }, (_, i) => { const a = ((i + 0.5) / 8) * Math.PI * 2; return [Math.cos(a) * 1.04, Math.sin(a) * 1.04]; }), [0.22, 0], [0, -0.24], [-0.26, 0.05]);
 
   // the raised bandstand on the aft wall (between the doors to the galley and the pantry)
   const bx0 = f.x0, bx1 = f.x0 + 1.6, bz0 = -3.8, bz1 = 0.8, ph = 0.22, b = d.b;
@@ -240,8 +271,9 @@ export function reception(ctx, R, s) {
   const wins = sideWindows(R.x0, R.x1);
   const open = s < 0 ? { s: -7.85, e: -2.9, y0: 0, y1: 3 } : { s: 2.9, e: 7.85, y0: 0, y1: 3 };
   const f = roomFaces(ctx, { [s < 0 ? 'port' : 'stbd']: winHoles(wins), fwd: [open] });
-  ritzWalls(d, f, { side: { [s < 0 ? 'stbd' : 'port']: { mirror: [2, 1] } } });
+  const pl = ritzWalls(d, f, { side: { [s < 0 ? 'stbd' : 'port']: { mirror: [2, 1] } } });
   curtainWindows(d, s < 0 ? f.port : f.stbd, wins);
+  if (fine(1)) for (const sd of ['fwd', 'aft', 'port', 'stbd']) modDeco(d, f[sd], pl[sd] ?? [], { mat: 'bc_walnut', leaf: 'gold', skip: sd === (s < 0 ? 'port' : 'stbd') ? wins.map((c) => [c - 1.25, c + 1.25]) : [] });
   // ceiling: one beam across, gilt-beaded panels, medallions round the fixtures
   const top = Y + plan.h;
   d.coffers(f.x0, f.x1, f.z0, f.z1, [-10.0], [], { w: 0.3, depth: 0.1, mat: 'plaster', bead: 'gold', cb: (cx, cz, w, dd) => { plan.lamp(cx, cz, 'cut'); for (const k of [-1, 1]) d.inst.add(bcBasket(), cx, top, cz + k * dd * 0.3, Math.PI / 2); } });
@@ -265,6 +297,7 @@ export function aftLobby(plan, L) {
   const sp = imperialPlan(STAIRS.find((q) => q.id === 'grandAft'));
   for (const s of [-1, 1]) {
     tableGroup(plan, -4.1, s * 4.45, { r: 0.4, mat: 'oak', cover: s < 0 ? 'fabricGold' : 'fabricBlue', seats: [[-1, 0], [1, 0], [0, s]] });
+    if (fine(1)) plan.prop(bcVase({ v: s > 0 ? 2 : 3 }), -4.1, s * 4.45, 0, { y: plan.y + 0.75, collide: false });
     plan.prop(pottedPalm(), 1.5, s * 3.1, 0, { collide: false });
     for (const z of [3.4]) plan.prop(pilaster({ h: plan.h, mat: 'oak', capital: 'gold' }), L.x1 - 0.09, s * z, NX);
     wallLight(plan, L.x0 + 0.06, s * 2.65, PX);
@@ -299,8 +332,10 @@ export function cafe(ctx, R) {
   // window row: round and square tables with white cloths, cane chairs facing each other
   const chair = armchair({ kind: 'wicker', mat: 'fabricGreen' }), zw = f.z1 - 0.95;
   const TR = tableRound({ r: 0.38, cloth: true, set: 2 }), TS = tableRect({ w: 0.72, d: 0.72, cloth: true, set: true });
+  const cm = fine(1) ? bcMenu() : null;
   wins.forEach((c, i) => {
     const t = i % 2 ? TS : TR; d.ip(t, c, zw, 0); d.fpCollider(t.userData.fp, c, zw, 0, 0.78);
+    if (cm) d.ip(cm, c + (i % 2 ? 0.0 : 0.16), zw + (i % 2 ? 0.2 : 0.0), 0, 0.756);
     d.ip(chair, c - 0.72, zw, PX); d.ip(chair, c + 0.72, zw, NX);
   });
   // inner row along the trellis
@@ -312,6 +347,7 @@ export function cafe(ctx, R) {
   plan.prop(bcBuffet({ w: 1.6, mat: 'paintWhite' }), f.x0 + 0.31, 9.35, PX, { collide: true });
   for (const [x, z] of [[f.x0 + 0.45, 13.4], [f.x1 - 0.45, 13.4], [-26.0, 13.45], [-20.5, 13.45]]) plan.prop(bcBayTree(), x, z, 0, { collide: false });
   for (const [x, z] of [[f.x1 - 0.55, 9.0], [-27.9, 9.0], [-19.9, 9.0]]) plan.prop(pottedPalm(), x, z, 0, { collide: false });
+  if (fine(2)) for (const [x, v] of [[-26.6, 2], [-18.3, 4]]) plan.prop(bcFernStand({ mat: 'paintWhite', v }), x, 9.12, 0, { collide: false });
   d.flush();
 }
 
@@ -325,6 +361,9 @@ const SUITE_STYLE = {
 export function suiteSitting(ctx) {
   const o = ctx.room.fo ?? {}, cover = o.cover ?? 'fabricGold', mat = o.wood ?? 'mahogany';
   const fp = ctx.fit(fireplace({ mat: o.fire ?? 'marble' }), ['left:hi', 'right:hi', 'left:mid', 'right:mid', 'near:hi'], { gap: 0 });
+  const fpAt = fp && ctx.last ? [ctx.last.x, ctx.last.z] : null;
+  if (fp && fine(1)) { for (const s of [-1, 1]) ctx.attach(bcUrn(), -0.02, s * 0.62, { y: 1.295 }); }
+  if (fp && fine(2)) ctx.attach(bcScuttle(), 0.2, -0.7, { y: 0.04 });
   ctx.fit(sofa({ mat: cover, w: 1.9 }), ['far:lo', 'far:hi', 'near:hi']);
   const u = ctx.W / 2 + 0.2, v = ctx.D / 2 + 0.1;
   if (ctx.put(tableRound({ r: 0.45, mat, lamp: true }), u, v, 'in')) {
@@ -340,8 +379,8 @@ export function suiteSitting(ctx) {
   ctx.mount(picture({ w: 0.8, h: 0.6, v: 1 }), 'near', ctx.W * 0.45, 1.75);
   if (fp) ctx.glow(ctx.W / 2, ctx.D / 2, 0.5);
   // panelled walls, moulded ceiling with a gilt oval and rose
-  const d = new Deco(ctx.plan), f = roomFaces(ctx);
-  panelRoom(d, f, { ...SUITE_STYLE[o.sty ?? 'lxvi'], pilPitch: 2.0 });
+  const d = new Deco(ctx.plan), f = roomFaces(ctx), sty = SUITE_STYLE[o.sty ?? 'lxvi'];
+  panelRoom(d, f, { ...sty, pilPitch: 2.0, orn: fine(2) ? festDeco(d, sty.gilt === 'gold' ? 'gold' : 'paintWhite', fpAt ? [fpAt] : []) : undefined });
   const c = ctx.at(ctx.W / 2, ctx.D / 2), r = { x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1 };
   d.beadRect(r.x0 + 0.3, r.x1 - 0.3, r.z0 + 0.3, r.z1 - 0.3, 'gold'); d.beadRect(r.x0 + 0.42, r.x1 - 0.42, r.z0 + 0.42, r.z1 - 0.42, 'plaster');
   d.rib('x', r.z0 + 0.15, r.x0, r.x1, 0.3, 0.05, 'plaster'); d.rib('x', r.z1 - 0.15, r.x0, r.x1, 0.3, 0.05, 'plaster');
@@ -446,6 +485,10 @@ export function privatePromenade(ctx, R, s, doorXs) {
   for (let x = R.x0 + 0.6; x < R.x1 - 0.5; x += 2.9) if (!nearDoor(x, 0.9)) plan.prop(pottedPalm(), x, zi + s * 0.5, 0, { collide: false });
   plan.prop(bcBayTree(), R.x1 - 0.5, zl, 0, { collide: false });
   plan.prop(bcBayTree(), R.x0 + 0.5, zl, 0, { collide: false });
+  if (fine(2)) {
+    for (let x = R.x0 + 2.05; x < R.x1 - 0.8; x += 2.9) if (!nearDoor(x, 0.95)) plan.prop(bcFernStand({ mat: 'wicker', v: Math.round(x) }), x, zi + s * 0.62, 0, { collide: false });
+    wins.forEach((c, i) => { if (i % 2 === 0 && c >= R.x0 + 1.1 && c <= R.x1 - 1.1) plan.prop(bcCoffee(), c - 1.2, zl - s * 0.05, 0.6, { y: Y + 0.75, collide: false }); });
+  }
   d.flush();
 }
 
@@ -455,8 +498,9 @@ export function smokingRoom(ctx, R) {
   const plan = ctx.plan, d = new Deco(plan), Y = plan.y, top = Y + plan.h, O = mats.oak;
   const wins = sideWindows(R.x0, R.x1);
   const f = roomFaces(ctx, { stbd: winHoles(wins), port: [{ s: -52.7, e: -50.5, y0: 0, y1: 2.2 }] });
-  panelRoom(d, f, { wood: O, rail: O, frieze: O, cornice: 'plaster', pitch: 0.7, pilMat: 'oak', capital: 'oak', lowGilt: null });
+  const pl = panelRoom(d, f, { wood: O, rail: O, frieze: O, cornice: 'plaster', pitch: 0.7, pilMat: 'oak', capital: 'oak', lowGilt: null });
   curtainWindows(d, f.stbd, wins, { mat: 'fabricGreen', frame: O, pelmet: 'oak', sill: O });
+  if (fine(1)) for (const sd of ['fwd', 'aft', 'port', 'stbd']) modDeco(d, f[sd], pl[sd] ?? [], { mat: 'oak', skip: sd === 'stbd' ? wins.map((c) => [c - 1.25, c + 1.25]) : [] });
   // plaster ceiling with oak-cased beams and roses
   d.coffers(f.x0, f.x1, f.z0, f.z1, [-55.2, -51.4], [-3.7, 1.0, 5.7, 10.2], { w: 0.26, depth: 0.12, mat: O, bead: 'plaster', cb: (cx, cz) => plan.lamp(cx, cz, 'bowl') });
   // club chairs in dark green morocco round oak tables, card tables, leather settees along the windows (instanced chairs)
@@ -468,12 +512,14 @@ export function smokingRoom(ctx, R) {
     d.ip(t, x, z, card ? 0.0 : 0); d.fpCollider(t.userData.fp, x, z, 0, 0.78);
     for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) d.ip(card ? cardChair : club, x + dx * (card ? 0.7 : 0.92), z + dz * (card ? 0.7 : 0.92), faceDir(-dx, -dz));
     if (i % 3 === 0) d.ip(spit, x + 0.75, z + 0.75, 0);
+    if (!card && fine(1)) d.ip(bcSmokerSet({ v: i % 4 }), x, z, (i * 1.3) % 6.28, 0.75);
   }
   const settee2 = sofa({ mat: 'leatherGreen', w: 1.8 }), zs = f.z1 - 0.42;
   for (const c of wins) { d.put(settee2, c, zs, NZ, true); d.put(tableRound({ r: 0.3, mat: 'oak' }), c, zs - 0.85, 0, true); }
   plan.prop(clockWall(), f.x1 - 0.005, 5.6, NX, { y: Y + 2.0 });
   for (const [x, z, rot] of [[f.x0 + 0.005, 5.6, PX], [f.x0 + 0.005, -5.0, PX], [f.x1 - 0.005, -5.0, NX]]) plan.prop(picture({ w: 0.9, h: 0.6, v: 0 }), x, z, rot, { y: Y + 1.7 });
   plan.prop(pottedPalm(), f.x0 + 0.5, 13.3, 0, { collide: false });
+  if (fine(2)) d.put(bcNewsRack(), f.x0 + 0.21, 2.3, PX, true);
   void top; d.flush();
 }
 

@@ -6,6 +6,7 @@ import {
   stations, segCollider, edgeColliders, splitLine,
 } from './structure-layout.js';
 import { latheGeo, unitCyl, merge, cylG, torusG } from './inst.js';
+import { TIER } from '../core/tier.js';
 
 const { A, B, C, boat } = DECK_Y;
 const INF = 1e9;
@@ -74,18 +75,25 @@ function waterway(batch, x0, x1, y, edge, { margin = true, scuppers = true } = {
 
 // ---------- railing parts (instanced) ----------
 const stanchionCache = new Map();
-/** Turned stanchion with ball joints at the rail heights (lathe, local y up from the deck). */
+/**
+ * Turned stanchion with ball joints at the rail heights (lathe, local y up from the deck).
+ * Detail by TIER.fine: 0/1 a plain shaft with diamond-turned joints (4/5 sides); 2/3 rounded ball joints, a collar
+ * under the cap (6/8 sides).
+ */
 function stanchionGeo(h, rails) {
-  const k = Math.round(h * 100) + '_' + rails;
+  const f = TIER.fine;
+  const k = Math.round(h * 100) + '_' + rails + '_' + f;
   let g = stanchionCache.get(k);
   if (g) return g;
-  const prof = [[0.05, 0], [0.045, 0.02], [0.026, 0.045], [0.02, 0.11]];
+  const prof = f <= 1 ? [[0.046, 0], [0.022, 0.06]] : [[0.05, 0], [0.042, 0.03], [0.022, 0.08]];
   for (let r = 1; r <= rails; r++) {
     const ry = (h - 0.05) * (r / (rails + 1)) + 0.03;
-    prof.push([0.02, ry - 0.045], [0.034, ry], [0.02, ry + 0.045]);
+    if (f <= 1) prof.push([0.02, ry - 0.035], [0.033, ry], [0.02, ry + 0.035]);
+    else prof.push([0.02, ry - 0.04], [0.03, ry - 0.024], [0.035, ry], [0.03, ry + 0.024], [0.02, ry + 0.04]);
   }
-  prof.push([0.02, h - 0.1], [0.04, h - 0.05], [0.04, h - 0.035]);
-  g = latheGeo('stanchion' + k, prof, 6);
+  if (f <= 1) prof.push([0.02, h - 0.07], [0.038, h - 0.035]);
+  else prof.push([0.02, h - 0.12], [0.027, h - 0.1], [0.04, h - 0.05], [0.04, h - 0.035]);
+  g = latheGeo('stanchion' + k, prof, f === 0 ? 4 : f === 1 ? 5 : f === 2 ? 6 : 8);
   stanchionCache.set(k, g);
   return g;
 }
@@ -95,7 +103,9 @@ function topRail(batch, a, b, y) {
   const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz);
   if (L < 1e-4) return;
   const sx = -dz / L, sz = dx / L; // side
-  const prof = [[-0.045, -0.035], [-0.045, -0.005], [-0.035, 0.012], [-0.015, 0.022], [0.015, 0.022], [0.035, 0.012], [0.045, -0.005], [0.045, -0.035]];
+  const prof = TIER.fine <= 1
+    ? [[-0.045, -0.035], [-0.045, 0.0], [0.0, 0.022], [0.045, 0.0], [0.045, -0.035]]
+    : [[-0.045, -0.035], [-0.045, -0.005], [-0.035, 0.012], [-0.015, 0.022], [0.015, 0.022], [0.035, 0.012], [0.045, -0.005], [0.045, -0.035]];
   for (let k = 0; k < prof.length; k++) {
     const p = prof[k], q = prof[(k + 1) % prof.length];
     const P = (e, pp) => [e[0] + sx * pp[0], y + pp[1], e[1] + sz * pp[0]];
@@ -121,7 +131,7 @@ export function railRun(world, batch, pts, y, { h = RAIL_H, collide = true, post
     }
     for (let r = 1; r <= rails; r++) {
       const ry = y + (h - 0.05) * (r / (rails + 1)) + 0.03;
-      batch.cyl(mats.paintWhite, [a[0], ry, a[1]], [b[0], ry, b[1]], 0.012, 6);
+      batch.cyl(mats.paintWhite, [a[0], ry, a[1]], [b[0], ry, b[1]], 0.012, TIER.fine <= 1 ? 4 : 6);
     }
     topRail(batch, a, b, y + h);
     // scarph joints of the teak rail (brass clips)
@@ -160,7 +170,7 @@ function gapGate(batch, p, q, y) {
 }
 let _link = null;
 const Q90 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-function linkGeo() { return (_link ||= torusG(0.018, 0.005, 4, 8).scale(1, 1.6, 1)); }
+function linkGeo() { return (_link ||= torusG(0.018, 0.005, TIER.fine <= 1 ? 3 : 4, TIER.fine <= 1 ? 6 : 8).scale(1, 1.6, 1)); }
 
 /** Solid hull bulwark (inner face, teak capping rail, plate stays with flanges) between xa and xb on both sides + colliders. */
 function bulwark(world, batch, xa, xb, y) {

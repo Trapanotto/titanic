@@ -2,8 +2,38 @@
 // lowest landing of the forward Grand Staircase (lift shafts, seating).
 import { DECK_Y, ceilingY, STAIRS } from '../core/constants.js';
 import {
-  pipe, matOf, liftCage, sofa, armchair, tableRound, pottedPalm, valve, gauge, bench, sconce, column, imperialPlan, notice, sign, locker,
+  pipe, matOf, liftCage, sofa, armchair, tableRound, pottedPalm, valve, gauge, bench, sconce, column, imperialPlan, notice, sign, locker, def, kitMats,
 } from '../interior/kit.js';
+import { mats } from '../core/materials.js';
+import { fineLv, Rivets, cgFireBuckets, cgMopBucket } from './f-util.js';
+import { bcCello, bcMusicStand } from './bc-props.js';
+
+/** hand gear of a watertight sliding door on the bulkhead face (front +x): back plate, gear case, crank, indicator, label */
+const wtGear = def('eWtGear', [0.3, 0.22, 0.75], (p) => {
+  const M = mats, K = kitMats;
+  p.bb(M.iron, 0.02, 0.7, 0.26, 0.01, -0.35, 0, 0.004);
+  p.c(M.iron, 0.11, 0.1, 0.07, 0.02, 0, 10).rotation.z = Math.PI / 2;
+  p.bb(M.steelDark, 0.08, 0.22, 0.12, 0.06, -0.3, 0, 0.01);
+  p.cx(M.chrome, 0.012, 0.12, 0.17, 0.02, 0, 6);
+  p.b(M.steelDark, 0.03, 0.025, 0.2, 0.2, 0.008, 0.07);
+  p.cx(K.ebony, 0.016, 0.1, 0.25, 0.008, 0.16, 6);
+  for (const y of [-0.22, -0.32]) p.b(M.brass, 0.01, 0.03, 0.08, 0.1, y, 0);
+  p.b(M.brass, 0.006, 0.08, 0.2, 0.023, 0.2, 0); p.b(K.fireRed, 0.004, 0.05, 0.16, 0.027, 0.215, 0);
+});
+/** wicker laundry hamper with a lid */
+const hamper = def('eHamper', [0.55, 0.45, 0.62], (p) => {
+  p.bb(kitMats.cane, 0.4, 0.56, 0.5, 0, 0, 0, 0.02);
+  for (const y of [0.1, 0.42]) p.bb(mats.wicker, 0.415, 0.035, 0.515, 0, y, 0, 0.008);
+  p.bb(mats.wicker, 0.44, 0.05, 0.54, 0, 0.56, 0, 0.015);
+  p.bb(mats.linen, 0.1, 0.06, 0.24, 0.17, 0.52, 0.06, 0.01);
+});
+
+/** musicians' cabin: a cello and a music stand among the bunks */
+export function musiciansExtras(ctx) {
+  const fl = fineLv(); if (fl < 0) return;
+  ctx.fit(bcCello(), ['far:lo', 'far:hi', 'right:lo'], { collide: false });
+  if (fl >= 1) ctx.fit(bcMusicStand(), ['far:mid', 'right:mid', 'left:mid'], { collide: false });
+}
 
 /** door x-positions (with half width) opening onto the corridor strip z0..z1 */
 function corridorDoors(plan, z0, z1) {
@@ -81,7 +111,7 @@ export function scotlandRoadDetails(world, plan, { x0, x1, z0, z1, stations, ben
     const sg = sign({ kind: (Math.round(s) & 1) ? 0 : 3 }); sg.position.set(s + 1.0, Y + 2.05, zin - 0.005); sg.rotation.y = Math.PI / 2; zone.add(sg);
   }
   // notice boards, crew lockers and benches on free stretches of wall
-  let nb = 0, nl = 0;
+  let nb = 0, nl = 0; const locks = [];
   for (let x = x0 + 9; x < x1 - 3; x += 17) {
     if (freeAt(x, 1.1, 'in')) {
       const zone = plan.zone(x);
@@ -93,10 +123,42 @@ export function scotlandRoadDetails(world, plan, { x0, x1, z0, z1, stations, ben
     const lx = x + 6;
     if (freeAt(lx, 2.0, 'out') && lx < x1 - 2 && !benches.some((bx) => Math.abs(bx - lx) < 2.0)) {
       plan.prop(locker({ n: 4, mat: 'steelDark' }), lx, zout + 0.225, -Math.PI / 2, { collide: true });
-      nl++;
+      nl++; locks.push(lx);
     }
   }
   for (const x of benches) plan.prop(bench({ w: 1.6, back: false, iron: true }), x, zout + 0.27, -Math.PI / 2, { collide: false });
+  const fl = fineLv();
+  if (fl >= 0) {
+    // enamel name plates over the doors, fire buckets beside the watertight doors
+    for (const [a, c, side] of doors) {
+      const x = (a + c) / 2; if (x < x0 + 0.5 || x > x1 - 0.5) continue;
+      const n = notice(); n.position.set(x, Y + 2.14, side === 'out' ? zout + 0.004 : zin - 0.004); n.rotation.y = side === 'out' ? -Math.PI / 2 : Math.PI / 2; n.scale.set(1, 0.22, 0.95); plan.zone(x).add(n);
+    }
+    for (const s of stations) if (s > x0 + 3 && s < x1 - 3 && freeAt(s + 2.3, 1.1, 'in')) plan.prop(cgFireBuckets(), s + 2.3, zin - 0.005, Math.PI / 2, { y: Y + 1.25, collide: false });
+  }
+  if (fl >= 1) {
+    // hand gear of the watertight doors on both faces of the bulkheads, laundry hampers and mops parked along the wall
+    for (const s of stations) if (s > x0 + 2 && s < x1 - 2) for (const sx of [-1, 1]) plan.prop(wtGear(), s + sx * 0.035, (z0 + z1) / 2 - 0.85, sx > 0 ? 0 : Math.PI, { y: Y + 1.15, collide: false });
+    let k = 0;
+    for (let x = x0 + 4.5; x < x1 - 3; x += 11.3) {
+      if (!freeAt(x, 0.9, 'out') || benches.some((bx) => Math.abs(bx - x) < 1.4) || locks.some((lx) => Math.abs(lx - x) < 1.4)) continue;
+      plan.prop(k++ % 2 ? cgMopBucket() : hamper(), x, zout + 0.3, -Math.PI / 2, { collide: false });
+    }
+  }
+  if (fl >= 2) {
+    // cleats on the cables and rivets round the watertight door frames
+    const brass2 = matOf('brass');
+    for (let x = x0 + 0.45; x < x1; x += 0.6) b.box(brass2, x - 0.012, yP - 0.045, zout + 0.15, x + 0.012, yP - 0.012, zout + 0.34, 'xXy');
+    const canvas = matOf('canvas'); // lagging bands on the steam heating line
+    for (let x = x0 + 0.6; x < x1 - 0.3; x += 1.2) if (Math.abs(((x - x0 - 1.2) / 2.4) % 1) > 0.1) b.prism(canvas, [x - 0.025, yP, runs[1].z], [x + 0.025, yP, runs[1].z], runs[1].r + 0.008, 8);
+    const rv = new Rivets(world, deck, 0.012), dz = 0.5 + 0.045, rm = matOf('steelDark');
+    for (const s of stations) if (s > x0 + 2 && s < x1 - 2) for (const sx of [-1, 1]) {
+      const fx = s + sx * 0.072, zc = (z0 + z1) / 2;
+      for (const zz of [zc - dz, zc + dz]) rv.row(rm, [fx, Y + 0.18, zz], [fx, Y + 1.945, zz], 0.11, 'x');
+      rv.row(rm, [fx, Y + 1.945, zc - dz + 0.11], [fx, Y + 1.945, zc + dz - 0.11], 0.11, 'x');
+    }
+    rv.flush();
+  }
   return { boards: nb, lockers: nl };
 }
 /** The three lift shafts that end on E deck and the furniture of the staircase hall. */

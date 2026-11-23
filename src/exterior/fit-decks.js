@@ -5,6 +5,7 @@ import { DECK_Y, SHIP, hullHalfWidth } from '../core/constants.js';
 import { cyl, vcyl, ball, mk, lathe, Wires, edge, edgeSlope } from './fit-util.js';
 import { merge, cylG, latheGeo } from './inst.js';
 import { cowl, mushroom, bench, ceilingLamp, gableGeo } from './fit-gear.js';
+import { TIER } from '../core/tier.js';
 
 // Forecastle, well decks, open B deck aft and poop: anchor gear, mooring gear, hatches, cranes, docking bridge.
 
@@ -14,7 +15,7 @@ const TAU = Math.PI * 2;
 // ---------- small fittings ----------
 function capstan(world, g, x, y, z, k = 1) {
   // pawl rim / base, barrel with whelps, drum head with bar holes
-  g.add(lathe(mats.steelDark, [[0.66 * k, 0], [0.66 * k, 0.05], [0.6 * k, 0.07], [0.6 * k, 0.12], [0.5 * k, 0.14], [0.4 * k, 0.2], [0.3 * k, 0.45], [0.29 * k, 0.65], [0.36 * k, 0.86], [0.5 * k, 0.92], [0.53 * k, 0.96], [0.53 * k, 1.04], [0.45 * k, 1.08], [0.2 * k, 1.11], [0, 1.12]], 22, x, y, z));
+  g.add(lathe(mats.steelDark, [[0.66 * k, 0], [0.66 * k, 0.05], [0.6 * k, 0.07], [0.6 * k, 0.12], [0.5 * k, 0.14], [0.4 * k, 0.2], [0.3 * k, 0.45], [0.29 * k, 0.65], [0.36 * k, 0.86], [0.5 * k, 0.92], [0.53 * k, 0.96], [0.53 * k, 1.04], [0.45 * k, 1.08], [0.2 * k, 1.11], [0, 1.12]], TIER.fine <= 1 ? 12 : 22, x, y, z));
   for (let i = 0; i < 8; i++) { // whelps
     const a = (i / 8) * TAU;
     const w = box(mats.iron, 0.06, 0.62, 0.1, x + Math.cos(a) * 0.33 * k, y + 0.52, z + Math.sin(a) * 0.33 * k); w.rotation.y = -a; w.rotation.z = 0.06; g.add(w);
@@ -32,7 +33,7 @@ function capstan(world, g, x, y, z, k = 1) {
 let BOLLARD = null;
 /** Twin mooring bitts along x: cast bollards with waist and capped head on a bed plate. */
 function bitts(world, g, x, y, z, k = 1) {
-  if (!BOLLARD) BOLLARD = latheGeo('bollard', [[0.19, 0], [0.2, 0.04], [0.17, 0.1], [0.155, 0.35], [0.165, 0.55], [0.2, 0.6], [0.23, 0.64], [0.23, 0.69], [0.19, 0.72], [0.12, 0.74], [0.001, 0.75]], 16);
+  if (!BOLLARD) BOLLARD = latheGeo('bollard', [[0.19, 0], [0.2, 0.04], [0.17, 0.1], [0.155, 0.35], [0.165, 0.55], [0.2, 0.6], [0.23, 0.64], [0.23, 0.69], [0.19, 0.72], [0.12, 0.74], [0.001, 0.75]], TIER.fine <= 1 ? 10 : 16);
   g.add(box(mats.iron, 1.5 * k, 0.08, 0.55 * k, x, y + 0.04, z));
   for (let i = 0; i < 6; i++) g.add(vcyl(mats.iron, x + (i % 3 - 1) * 0.6 * k, y + 0.08, z + (i < 3 ? -1 : 1) * 0.22 * k, 0.025, 0.03, 6));
   for (const s of [-1, 1]) {
@@ -46,7 +47,7 @@ function bitts(world, g, x, y, z, k = 1) {
 let ROLLER = null;
 /** Roller fairlead / mooring chock at the bulwark. */
 function fairlead(g, x, y, s) {
-  if (!ROLLER) ROLLER = latheGeo('roller', [[0.06, 0], [0.16, 0.0], [0.16, 0.04], [0.1, 0.07], [0.1, 0.27], [0.16, 0.3], [0.16, 0.34], [0.06, 0.34]], 14);
+  if (!ROLLER) ROLLER = latheGeo('roller', [[0.06, 0], [0.16, 0.0], [0.16, 0.04], [0.1, 0.07], [0.1, 0.27], [0.16, 0.3], [0.16, 0.34], [0.06, 0.34]], TIER.fine <= 1 ? 8 : 14);
   const z = s * (edge(x) - 0.42);
   const f = new THREE.Group(); f.position.set(x, y, z); f.rotation.y = -s * Math.atan(edgeSlope(x)); g.add(f);
   f.add(box(mats.iron, 1.0, 0.1, 0.4, 0, 0.05, 0));
@@ -241,8 +242,9 @@ let LINK = null;
 /** Stud-link chain link (oval with a stud across). */
 function linkGeo() {
   if (LINK) return LINK;
-  const t = new THREE.TorusGeometry(0.115, 0.04, 6, 14); t.scale(1.75, 1, 1);
-  LINK = merge([t, cylG([0, -0.1, 0], [0, 0.1, 0], 0.03, 6)]);
+  const lo = TIER.fine <= 1;
+  const t = new THREE.TorusGeometry(0.115, 0.04, lo ? 4 : 6, lo ? 10 : 14); t.scale(1.75, 1, 1);
+  LINK = merge([t, cylG([0, -0.1, 0], [0, 0.1, 0], 0.03, lo ? 4 : 6)]);
   return LINK;
 }
 

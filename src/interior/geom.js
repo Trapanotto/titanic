@@ -166,6 +166,52 @@ export function rectLoop(w, d, rc = 0.03, n = 3, step = 0) {
   return out;
 }
 
+/**
+ * Moulded rectangular frame facing +x (panel mouldings, picture / mirror frames, cock beads): outer size w (z) × h (y)
+ * at the back plane x = 0. rows [{o, y}]: o = offset from the outer edge (≤ 0 goes inwards), y = height towards +x. One
+ * ring of 8 mitred corner points per row → 16 triangles per profile step.
+ */
+/** Remove zero-area triangles from an indexed geometry (mitre pairs, duplicated rows). */
+export function dropDegenerate(g) {
+  const p = g.attributes.position, idx = g.index.array, keep = [];
+  for (let i = 0; i < idx.length; i += 3) {
+    const a = idx[i], b = idx[i + 1], c = idx[i + 2];
+    const ux = p.getX(b) - p.getX(a), uy = p.getY(b) - p.getY(a), uz = p.getZ(b) - p.getZ(a);
+    const vx = p.getX(c) - p.getX(a), vy = p.getY(c) - p.getY(a), vz = p.getZ(c) - p.getZ(a);
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+    if (cx * cx + cy * cy + cz * cz > 1e-16) keep.push(a, b, c);
+  }
+  g.setIndex(keep);
+  return g;
+}
+export function frameMould(w, h, rows) {
+  const g = dropDegenerate(revolve(rows, { perim: mitreLoop(h, w) }));
+  g.rotateZ(-Math.PI / 2); // revolve's +y (profile height) → +x, loop x (h) → −y
+  return metreUV(g);
+}
+/**
+ * Sharp-cornered rectangle loop (w along x, d along z) for revolve(): two points per corner with the unnormalised mitre
+ * vector, so any offset o (in or out) stays a true mitre and the corners shade crisply (zero-width band between the pair).
+ */
+export function mitreLoop(w, d) {
+  const hw = w / 2, hd = d / 2, out = [];
+  for (const [sx, sz] of [[1, -1], [-1, -1], [-1, 1], [1, 1]]) for (let i = 0; i < 2; i++) out.push({ x: sx * hw, z: sz * hd, nx: sx, nz: sz });
+  out.forEach((p, i) => { p.a = (i / out.length) * TAU; });
+  return out;
+}
+/**
+ * Slab with a moulded edge (table tops, cornices, plinths): d (x) × w (z), rows [{o, y}] bottom → top with o = offset from
+ * the d × w rectangle, flat top (own vertices, so the moulding's smoothing does not tilt it) and optional bottom.
+ * rc = 0: sharp mitred corners; else rounded corners (rc is raised to the deepest inset so the loop never folds over).
+ */
+export function mouldedSlab(d, w, rows, { rc = 0.01, n = 1, bottom = false } = {}) {
+  const last = rows[rows.length - 1];
+  const rs = [...(bottom ? [{ o: rows[0].o, y: rows[0].y }] : []), ...rows, { o: last.o, y: last.y }];
+  const inset = Math.max(0, ...rows.map((r) => -r.o));
+  const perim = rc > 0 ? rectLoop(d, w, Math.max(rc, inset + 0.002), n) : mitreLoop(d, w);
+  return dropDegenerate(revolve(rs, { perim, capTop: true, capBottom: bottom }));
+}
+
 /** Superquadric cushion / mattress / pillow / sack: size sx × sy × sz, bottom at y = 0. e1 vertical, e2 horizontal roundness (0.1 boxy … 1 round). */
 export function pillow(sx, sy, sz, e1 = 0.4, e2 = 0.25, nu = 6, nv = 16, sag = 0) {
   const pos = [], idx = [];

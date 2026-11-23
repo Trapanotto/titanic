@@ -5,6 +5,11 @@ import { DECK_Y, STAIRS, MACHINERY_ACCESS, SLAB, ceilingY } from '../core/consta
 import { Batch, kitMats, overlap } from './batch.js';
 import { def, place } from './props-core.js';
 import { ceilingLight, ceilingRose, chandelier, pilaster, sconce } from './props-decor.js';
+import { TIER } from '../core/tier.js';
+
+/** fine-detail gate (docs/CONTRACT.md "Detail levels") */
+const fine = (n) => TIER.fine >= n;
+let _ipo = {}; // options of the iron balustrade panel template for this build (set in build())
 
 const RISER = 0.18;
 const RAIL_H = 0.92;
@@ -101,7 +106,7 @@ const RAIL = {
 };
 
 /** wrought-iron balustrade panel with C-scrolls, oval and gilt rosettes; unit square (x 0..1 along, y 0..1 up) – placed with a shear matrix */
-const ironPanel = def('stairIron', [1, 0.04, 1], (p) => {
+const ironPanel = def('stairIron', [1, 0.04, 1], (p, o) => {
   const I = mats.iron, Gd = mats.gold, r = 0.009;
   p.b(I, 1, 0.025, 0.014, 0.5, 0, 0); p.b(I, 1, 0.025, 0.014, 0.5, 0.975, 0);
   p.b(I, 0.02, 1, 0.014, 0.01, 0, 0); p.b(I, 0.02, 1, 0.014, 0.99, 0, 0);
@@ -116,6 +121,15 @@ const ironPanel = def('stairIron', [1, 0.04, 1], (p) => {
   p.tube(I, ov, r, 16, 4, true);
   p.rev(Gd, [{ o: 0.0, y: -0.008 }, { o: 0.05, y: 0.0, m: 0.015 }, { o: 0.0, y: 0.01 }], { seg: 12, k: 6 }, 0.5, 0.5, 0).rotation.x = Math.PI / 2;
   for (const y of [0.12, 0.88]) p.b(Gd, 0.04, 0.04, 0.02, 0.5, y - 0.02, 0);
+  if (!o.fine) return;
+  // gilt-bronze acanthus leaves where the scrolls spring from the frame, a husk drop under the oval, beads on the top rail
+  const LEAF = [[-0.022, 0], [0.022, 0], [0.014, 0.04], [0.004, 0.07], [0, 0.085], [-0.004, 0.07], [-0.014, 0.04]];
+  for (const [x, y, a] of o.fine > 1 ? [[0.24, 0.1, 0], [0.76, 0.1, 0], [0.24, 0.9, Math.PI], [0.76, 0.9, Math.PI], [0.5, 0.86, Math.PI]] : [[0.24, 0.1, 0], [0.76, 0.1, 0], [0.5, 0.86, Math.PI]]) {
+    for (const k of [-1, 1]) { const lf = p.extZ(Gd, LEAF, 0.008, x, y, 0, 0); lf.rotation.z = a + k * 0.55; }
+  }
+  if (o.fine < 2) return;
+  for (let i = 0; i < 3; i++) p.s(Gd, 0.016 - i * 0.003, 0.5, 0.11 - i * 0.032 + 0.04, 0, 1, 1.2, 0.7);
+  for (let i = 0; i < 7; i++) p.s(Gd, 0.012, 0.08 + i * 0.14, 0.965, 0, 1.2, 0.8, 0.8);
 });
 
 /** carved oak newel post with panelled shaft, moulded capital and pineapple finial (grand), plain post with ball (oak) */
@@ -126,6 +140,13 @@ const newelProp = def('stairNewel', (o) => [o.kind === 'grand' ? 0.24 : 0.16, o.
     p.bb(W, 0.17, 0.78, 0.17, 0, 0.21, 0, 0.012);
     for (let k = 0; k < 4; k++) { const f = p.fp(W, 0.11, 0.6, 0, 0.6, 0, 0.008, 0.025); const a = (k * Math.PI) / 2; f.position.set(Math.cos(a) * 0.085, 0.6, -Math.sin(a) * 0.085); f.rotation.y = a; }
     p.bb(W, 0.21, 0.04, 0.21, 0, 0.99, 0, 0.01); p.bb(W, 0.24, 0.05, 0.24, 0, 1.03, 0, 0.014);
+    if (o.fine) { // carved acanthus collar under the capital, gilt rosettes on the shaft panels
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2 + Math.PI / 8, lf = p.extZ(W, [[-0.028, 0], [0.028, 0], [0.02, 0.03], [0.008, 0.05], [0, 0.06], [-0.008, 0.05], [-0.02, 0.03]], 0.008, 0, 0, 0, 0);
+        lf.position.set(Math.cos(a) * 0.09, 0.925, -Math.sin(a) * 0.09); lf.rotation.set(0, a + Math.PI / 2, 0); lf.rotateX(-0.3);
+      }
+      for (let k = 0; k < 4; k++) { const a = (k * Math.PI) / 2, r = p.s(mats.gold, 0.026, Math.cos(a) * 0.105, 0.6, -Math.sin(a) * 0.105, 0.35, 1, 1); r.rotation.y = a; }
+    }
     for (let k = 0; k < 4; k++) { const a = (k * Math.PI) / 2; p.t(mats.gold, 0.03, 0.007, Math.cos(a) * 0.088, 0.9, -Math.sin(a) * 0.088, k % 2 ? 'x' : 'z', 10, 3); }
     // pineapple finial: faceted body via a fluted revolve
     if (o.finial === false) return;
@@ -168,7 +189,8 @@ function newel(world, deck, S, x, z, y, cherub = false) {
     place(world.zone(deck, x), knuckle(), x, y + RAIL_H, z, 0);
     return;
   }
-  place(world.zone(deck, x), newelProp(cherub ? { kind: S.newel, finial: false } : { kind: S.newel }), x, y, z, 0);
+  const f = S.newel === 'grand' && fine(2) ? { fine: 1 } : {};
+  place(world.zone(deck, x), newelProp(cherub ? { kind: S.newel, finial: false, ...f } : { kind: S.newel, ...f }), x, y, z, 0);
 }
 
 /**
@@ -200,7 +222,7 @@ function railX(world, deck, b, S, xa, ya, xe, ye, zz, cut = null) {
   b.bar(S.rail, [xa, ya, zz], [xc, ya, zz], S.infill === 'iron' ? 0.1 : 0.08, 0.05);
   if (S.infill === 'iron') {
     const n = Math.max(1, Math.round(Lc / 0.8)), d = (xc - xa) / n;
-    for (let i = 0; i < n; i++) shear(zone, ironPanel(), xa + d * i, ya + 0.05, zz, d, 0, RAIL_H - 0.055);
+    for (let i = 0; i < n; i++) shear(zone, ironPanel(_ipo), xa + d * i, ya + 0.05, zz, d, 0, RAIL_H - 0.055);
   } else {
     const n = Math.max(1, Math.round(Lc / 0.14)), h = Math.round((RAIL_H - 0.05) * 20) / 20;
     for (let i = 1; i < n; i++) place(zone, baluster({ h }), xa + ((xc - xa) * i) / n, ya + 0.05, zz, 0);
@@ -215,7 +237,7 @@ function railX(world, deck, b, S, xa, ya, xe, ye, zz, cut = null) {
   b.bar(S.rail, [xx, yf, za], [xx, yf, ze], S.infill === 'iron' ? 0.1 : 0.08, 0.05);
   if (S.infill === 'iron') {
     const n = Math.max(1, Math.round(L / 0.8)), d = (ze - za) / n;
-    for (let i = 0; i < n; i++) shearZ(zone, ironPanel(), xx, yf + 0.05, za + d * i, d, 0, RAIL_H - 0.055);
+    for (let i = 0; i < n; i++) shearZ(zone, ironPanel(_ipo), xx, yf + 0.05, za + d * i, d, 0, RAIL_H - 0.055);
   } else {
     const n = Math.max(1, Math.round(L / 0.13));
     for (let i = 1; i < n; i++) place(zone, baluster({ h: Math.round((RAIL_H - 0.06) * 20) / 20 }), xx, yf + 0.05, za + ((ze - za) * i) / n, 0);
@@ -270,7 +292,7 @@ function buildFlight(world, f, bl, bu) {
     if (S.infill !== 'pipe') bl.bar(S.rail, [xb, y0 + S.cl, zz], [xt, y1 + S.cl, zz], 0.1, 0.035);
     if (S.infill === 'iron') {
       const n = Math.max(1, Math.round(run / 0.8)), sdx = (xt - xb) / n, sdy = rise / n;
-      for (let i = 0; i < n; i++) shear(zone, ironPanel(), xb + sdx * i, y0 + sdy * i + S.cl + 0.035, zz, sdx, sdy, RAIL_H - S.cl - 0.04);
+      for (let i = 0; i < n; i++) shear(zone, ironPanel(_ipo), xb + sdx * i, y0 + sdy * i + S.cl + 0.035, zz, sdx, sdy, RAIL_H - S.cl - 0.04);
     }
     railX(world, f.from, bl, S, xb, y0, xt, y1, zz);
     if (S.infill === 'pipe') bl.bar(S.rail, [xb, y0 + 0.08, zz], [xt, y1 + 0.08, zz], 0.06, 0.1);
@@ -462,6 +484,26 @@ const honourGlory = def('honourGlory2', (o) => [o.w ?? 1.6, 0.3, (o.h ?? 1.5) + 
   reliefFigure(p, 1, w * 0.28, 0.1, 'palm');
 });
 
+/**
+ * Carved oak drop (festoon of fruit, flowers and leaves hanging from a ribbon bow, in the manner of Grinling Gibbons, as
+ * carved on the William-and-Mary panelling of the Grand Staircase) – wall mounted, origin = top centre, faces +x, h long.
+ */
+export const carvedDrop = def('stairCarvedDrop', (o) => [0.22, 0.07, o.h ?? 0.9], (p, o) => {
+  const W = o.gilt ? mats.gold : mats.oak, h = o.h ?? 0.9;
+  for (const s of [-1, 1]) { const t = p.t(W, 0.028, 0.008, 0.012, -0.03, s * 0.032, 'x', 8, 3); t.scale.set(1, 0.7, 1); }
+  p.s(W, 0.016, 0.014, -0.03, 0, 0.7, 1, 1);
+  for (const s of [-1, 1]) { const rb = p.b(W, 0.006, 0.12, 0.018, 0.006, -0.16, s * 0.03); rb.rotation.x = s * 0.25; }
+  const n = Math.max(4, Math.round(h / 0.085)), LEAF = [[0, 0], [0.018, 0.014], [0.055, 0.01], [0.075, 0], [0.05, -0.012], [0.018, -0.01]];
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1), y = -0.06 - t * (h - 0.1), w = 0.055 * (1 - 0.5 * t), sw = (i % 2 ? 1 : -1) * 0.012;
+    p.s(W, w, 0.022, y, sw, 0.5, 0.85, 1);                                    // fruit / flower cluster
+    p.s(W, w * 0.45, 0.04, y + w * 0.4, sw - w * 0.5, 0.6, 1, 1);
+    p.s(W, w * 0.4, 0.038, y - w * 0.2, sw + w * 0.6, 0.6, 1, 1);
+    for (const s of [-1, 1]) { const lf = p.extX(W, LEAF.map(([a, b]) => [s * a * (1 - 0.4 * t), b]), 0.008, 0.012, y + 0.01, s * w * 0.7, 0); lf.rotation.x = -s * (0.5 + 0.3 * (i % 3)); }
+  }
+  p.s(W, 0.022, 0.024, -h + 0.02, 0, 0.6, 1.4, 0.8); // pendant bud
+});
+
 /** gilt newel lamp with three cut-glass tulips (newel caps at the foot of the central flights) – origin = newel top */
 const newelLamp = def('newelLamp', [0.32, 0.32, 0.75], (p) => {
   const G = mats.gold;
@@ -541,7 +583,7 @@ function slopeBalustrade(world, deck, b, S, xb, y0, xt, y1, zz) {
   b.bar(S.rail, [xb, y0 + S.cl, zz], [xt, y1 + S.cl, zz], 0.1, 0.035);
   b.wallZ(S.rail, xb, zz - 0.05, zz + 0.05, y0 + S.cl, y0 + S.cl + 0.035, -dir); b.wallZ(S.rail, xt, zz - 0.05, zz + 0.05, y1 + S.cl, y1 + S.cl + 0.035, dir);
   const n = Math.max(1, Math.round(run / 0.75)), sdx = (xt - xb) / n, sdy = rise / n;
-  for (let i = 0; i < n; i++) shear(zone, ironPanel(), xb + sdx * i, y0 + sdy * i + S.cl + 0.035, zz, sdx, sdy, RAIL_H - S.cl - 0.04);
+  for (let i = 0; i < n; i++) shear(zone, ironPanel(_ipo), xb + sdx * i, y0 + sdy * i + S.cl + 0.035, zz, sdx, sdy, RAIL_H - S.cl - 0.04);
   railX(world, deck, b, S, xb, y0, xt, y1, zz);
 }
 
@@ -643,6 +685,10 @@ function buildImperial(world, st, B) {
     } else if (art === 'painting') {
       painting(bl, x0, ym + 1.45, zc, Math.min(1.5, wArt), 1.0, f.k % 2);
     }
+    if (art && fine(1)) { // carved drops flanking the work of art
+      const half = (art === 'painting' ? Math.min(1.5, wArt) : Math.round(wArt * 20) / 20) / 2 + 0.3, hd = Math.min(1.0, yNext - ym - 1.45);
+      if (hd > 0.5 && half + 0.12 < hwi - 0.9) for (const s of [-1, 1]) place(zone, carvedDrop({ h: Math.round(hd * 20) / 20 }), x0 + 0.03, ym + 2.35, zc + s * half, 0);
+    }
 
     // ---- rim of the well in the upper deck: moulded oak downstand beams (closed on both faces: the well side carries
     //      an entablature, the hall side a gilt bead), gallery balustrade on the long sides
@@ -737,6 +783,7 @@ export async function build(world) {
   const batches = new Map();
   const B = (deck) => { let b = batches.get(deck); if (!b) batches.set(deck, (b = new Batch(world, deck))); return b; };
 
+  _ipo = fine(3) ? { fine: 2 } : fine(2) ? { fine: 1 } : {};
   await world.tick();
   for (const f of stairFlights()) if (f.type === 'scissor') buildFlight(world, f, B(f.from), B(f.to));
 

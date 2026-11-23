@@ -1,10 +1,13 @@
 // Tank top – reciprocating engine room (two four-cylinder triple-expansion engines with animated cranks, connecting
 // rods and crossheads, galleries, starting platform), turbine room (Parsons low-pressure turbine, condensers,
 // change-over valves), electric engine room (four 400 kW engine-dynamo sets, main switchboard) and the spinning
-// propeller shafts with their plummer blocks.
+// propeller shafts with their plummer blocks, the refrigerating plant (two compressor sets, evaporator, condenser) in
+// the port wing of the engine room; by detail level: cylinder cleading, guide oil boxes, gauge bezels, oil cans, tool
+// board, tunnel bilge main and cables, cable bundles in the dynamo room.
 import * as THREE from 'three';
 import { mats } from '../core/materials.js';
-import { kitMats, telegraph, switchboard, machineBlock, tankV, tankH, stool, place, ladder } from '../interior/kit.js';
+import { TIER } from '../core/tier.js';
+import { Batch, kitMats, telegraph, switchboard, machineBlock, tankV, tankH, stool, place, ladder } from '../interior/kit.js';
 import {
   DECK, Y, CEIL, LOW, TBatch, tube, tubeBetween, pipeRun, cageLamp, railX, railZ, railXs, plate, flight, floorHW,
   stamp, M4, M4dir, gcache, latheAt, nut, rivetLine, rivetArcX,
@@ -35,8 +38,8 @@ function addMesh(world, parts, x, cfg) {
 
 // ------------------------------------------------------------------------------------------------ engine room
 
-function buildEngine(world, b, s, anim) {
-  const E = s * EZ, yc = SHAFT_Y;
+async function buildEngine(world, b, s, anim) {
+  const E = s * EZ, yc = SHAFT_Y, fine = TIER.fine;
   // bedplate: box girders with holding-down bolts, transverse bearing housings with caps, studs and oil boxes
   for (const side of [-1, 1]) {
     const zg = E + side * 1.4;
@@ -54,6 +57,7 @@ function buildEngine(world, b, s, anim) {
     b.box(mats.brass, x + 0.1, yc + 0.55, E - 0.12, x + 0.3, yc + 0.72, E + 0.12);  // oil box
     tube(b, mats.copper, 'y', [x + 0.2, E + 0.2], 0.008, yc + 0.72, CYL0 - 0.1, { seg: 4, caps: false });
   }
+  await world.tick();
   // cast A-frame columns: tapered round legs with flanged feet and heads, bolted; cross stays; guides; entablature
   for (const u of UNITS) {
     for (const side of [-1, 1]) {
@@ -76,10 +80,15 @@ function buildEngine(world, b, s, anim) {
     latheAt(b, mats.brass, [[0, 0], [0.2, 0], [0.2, 0.12], [0.26, 0.14], [0.26, 0.2], [0.17, 0.22], [0.17, 0.35], [0, 0.35]], 'y', [u.x, Y + 5.5, E], 14);
     for (let k = 0; k < 4; k++) { const a = (k / 4) * Math.PI * 2 + 0.4; nut(b, [u.x + Math.cos(a) * 0.22, Y + 5.7, E + Math.sin(a) * 0.22], [0, 1, 0], 0.025); }
   }
+  await world.tick();
+  b.flush();
+  await world.tick();
   b.box(mats.steelDark, EX0 + 0.2, Y + 5.85, E - 1.45, EX1 - 0.2, CYL0, E + 1.45);
   for (const side of [-1, 1]) rivetLine(b, [EX0 + 0.3, Y + 5.97, E + side * 1.452], [EX1 - 0.3, Y + 5.97, E + side * 1.452], [0, 0, side], 0.2, mats.steelDark);
   // cylinders: lagging, brass bands, flanged covers with stud rings, relief valves, drain cocks, lubricators, valve chests
-  UNITS.forEach((u, i) => {
+  for (let i = 0; i < UNITS.length; i++) {
+    const u = UNITS[i];
+    await world.tick();
     const r = u.r + 0.08;
     tube(b, mats.paintGrey, 'y', [u.x, E], r, CYL0, CYL1, { seg: 28, caps: false });
     for (const y of [CYL0 + 0.12, (CYL0 + CYL1) / 2, CYL1 - 0.12]) tube(b, mats.brass, 'y', [u.x, E], r + 0.02, y - 0.05, y + 0.05, { seg: 28 });
@@ -112,12 +121,23 @@ function buildEngine(world, b, s, anim) {
     latheAt(b, mats.brass, [[0, 0], [0.12, 0], [0.12, 0.1], [0.08, 0.12], [0.08, 0.2], [0, 0.2]], 'y', [vx, Y + 5.75, E], 10); // valve-rod gland
     // indicator cocks
     b.box(mats.brass, u.x - 0.08, CYL0 + 0.6, E - s * (r + 0.02) - 0.05, u.x + 0.08, CYL0 + 0.85, E - s * (r + 0.02) + 0.05);
+    if (fine >= 2) {
+      // lagging cleading: planished-steel strips held by the bands, seams every ~0.35 m round the cylinder
+      const n = Math.max(12, Math.round((2 * Math.PI * r) / 0.35));
+      for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2 + 0.1; stamp(b, mats.iron, gcache('clead', () => new THREE.BoxGeometry(0.03, CYL1 - CYL0 - 0.24, 0.012)), M4(u.x + Math.cos(a) * (r + 0.006), (CYL0 + CYL1) / 2, E + Math.sin(a) * (r + 0.006), 0, -a, 0)); }
+      // indicator gear: cock with a small three-way handle and the indicator pipe bend
+      tubeBetween(b, mats.brass, [u.x, CYL0 + 0.85, E - s * (r + 0.02)], [u.x, CYL0 + 1.05, E - s * (r + 0.02)], 0.018, { seg: 6 });
+      b.box(mats.brass, u.x - 0.08, CYL0 + 1.03, E - s * (r + 0.02) - 0.008, u.x + 0.08, CYL0 + 1.05, E - s * (r + 0.02) + 0.008);
+    }
     if (i < 3) {
       const nx = UNITS[i + 1].x + UNITS[i + 1].r + 0.55;
       lagged(b, [vx, Y + 8.85, E], [nx, Y + 8.85, E], 0.3, 0.6);
       for (const x of [vx, nx]) { lagged(b, [x, Y + 8.4, E], [x, Y + 8.85, E], 0.3, 0.6); flange(b, [x, Y + 8.85, E], [1, 0, 0], 0.38); }
     }
-  });
+  }
+  await world.tick();
+  b.flush();
+  await world.tick();
   // Stephenson link motion: reversing shaft with arms and suspension links over the eccentrics of each unit
   const rsZ = E - s * 0.95, rsY = Y + 3.55;
   tube(b, mats.chrome, 'x', [rsY, rsZ], 0.07, EX0 + 0.3, EX1 - 0.2, { seg: 10 });
@@ -156,6 +176,17 @@ function buildEngine(world, b, s, anim) {
   world.addCollider(EX0, Y + 6.0, E - 1.45, EX1, Y + 9.3, E + 1.45);
 
   tube(b, mats.chrome, 'x', [yc, E], 0.3, EX0 + 0.1, EX1 - 0.1, { seg: 14 }); // crankshaft through the main bearings (the cranks turn on it)
+  if (fine >= 1) {
+    // oil boxes on the crosshead guides with syphon wicks and drip pipes; drip trays along the bedplate
+    for (const u of UNITS) for (const side of [-1, 1]) {
+      const zb = E + side * 0.62;
+      b.box(mats.brass, u.x - 0.16, Y + 5.86, zb - 0.07, u.x + 0.16, Y + 6.0, zb + 0.07);
+      b.box(mats.brass, u.x - 0.17, Y + 6.0, zb - 0.08, u.x + 0.17, Y + 6.015, zb + 0.08, 'xXzZY');
+      if (fine >= 2) for (const dx of [-0.1, 0, 0.1]) tubeBetween(b, mats.copper, [u.x + dx, Y + 5.86, zb], [u.x + dx * 1.6, Y + 5.2, E + side * 0.36], 0.006, { seg: 4, caps: false });
+    }
+    for (const side of [-1, 1]) b.box(mats.steelDark, EX0 + 0.1, Y + 0.95, E + side * 0.95 - 0.12, EX1 - 0.1, Y + 1.0, E + side * 0.95 + 0.12, 'yYzZ');
+  }
+  await world.tick();
   // ---- moving parts (one set per crank): built-up crank with webs and balance weights, eccentric sheaves, rods
   const crankT = new TBatch();
   for (const dx of [-0.42, 0.42]) {
@@ -201,6 +232,7 @@ function buildEngine(world, b, s, anim) {
   tube(esT, mats.steel, 'x', [0, 0], 0.55, -0.05, 0.05, { seg: 18 });
   const esParts = esT.parts();
 
+  await world.tick();
   UNITS.forEach((u, i) => {
     const phase = (i * Math.PI) / 2 + (s > 0 ? Math.PI / 4 : 0);
     const crank = addMesh(world, crankParts, u.x, (g) => g.position.set(u.x, yc, E));
@@ -311,6 +343,11 @@ function startingPlatform(world, b) {
       const x = x0 + 1.0 + i * 0.8, y = yp + 1.7 + j * 0.65, n = [0, 0, -s];
       b.ring(mats.brass, [x, y, s * 2.36], n, 0.14, 0.18, 12);
       b.disc(j === 1 && i === 2 ? kitMats.clockFace : kitMats.gaugeFace, [x, y, s * 2.365], n, 0.14, 12, true);
+      if (TIER.fine >= 1) {
+        tube(b, mats.brass, 'z', [x, y], 0.18, Math.min(s * 2.33, s * 2.37), Math.max(s * 2.33, s * 2.37), { seg: 12, caps: false }); // bezel
+        b.box(mats.brass, x - 0.09, y - 0.27, s * 2.365 - 0.004, x + 0.09, y - 0.22, s * 2.365 + 0.004);                      // name plate
+        if (!(j === 1 && i === 2)) tube(b, mats.copper, 'y', [x + 0.1, s * 2.385], 0.008, y + (j ? 0.05 : 0.05), yp + 3.0, { seg: 4, caps: false });
+      }
     }
     // revolution counters, engine telegraph receivers and the reversing levers
     b.box(mats.brass, x0 + 4.4, yp + 2.6, s * 2.3, x0 + 5.2, yp + 2.85, s * 2.37);
@@ -323,6 +360,7 @@ function startingPlatform(world, b) {
     b.ring(mats.brass, [-32.8, yp + 1.6, s * 2.25], [0, 0, -s], 0.02, 0.09, 8);
   }
   place(zone, stool(), -31.5, yp, 1.2, 0, { collide: false });
+  if (TIER.fine >= 2) for (const [x, z] of [[-34.3, -2.15], [-28.75, 2.1]]) stampParts(b, oilCan(), M4(x, yp, z, 0, Math.sign(z) * Math.PI / 2 + 0.3, 0)); // spouts inboard
   // engineers' log desk at the forward end (beside the aisle)
   b.box(mats.oak, x1 + 0.1, Y, -2.3, x1 + 0.8, Y + 0.95, -1.4);
   b.box(mats.paper, x1 + 0.2, Y + 0.95, -2.2, x1 + 0.6, Y + 0.96, -1.8, 'Y');
@@ -330,14 +368,19 @@ function startingPlatform(world, b) {
   for (const z of [-1.8, 1.8]) cageLamp(b, world, -31.5, Y + 4.2, z, { hang: LEVEL_U - 0.1, intensity: 1.2 });
 }
 
-function engineRoomExtras(world, b) {
+async function engineRoomExtras(world, b) {
   // steam from the mains to the HP valve chests, exhaust from the LP cylinders to the change-over valves
   for (const s of [-1, 1]) {
+    await world.tick();
     const hpv = UNITS[0].x + UNITS[0].r + 0.55;
     pipeRun(b, mats.paintWhite, [[-22, Y + 8.4, s * 12.6], [-22.6, Y + 8.4, s * 12.6], [-22.6, Y + 9.3, s * 12.6], [-22.6, Y + 9.3, s * EZ], [hpv, Y + 9.3, s * EZ], [hpv, Y + 8.4, s * EZ]], 0.24, { seg: 10 });
-    b.box(mats.steelDark, -22.95, Y + 8.95, s * 10.5 - 0.35, -22.25, Y + 9.65, s * 10.5 + 0.35); // main stop valve
-    b.box(mats.iron, -23.4, Y + 9.27, s * 10.5 - 0.02, -22.95, Y + 9.33, s * 10.5 + 0.02);
-    b.ring(mats.rust, [-23.4, Y + 9.3, s * 10.5], [-1, 0, 0], 0.3, 0.35, 14);
+    // main stop valve: cast globe chest in the pipe, bolted bonnet, spindle, spoked hand wheel facing aft
+    const vz = s * 10.5, vy = Y + 9.3;
+    latheAt(b, mats.steelDark, [[0.24, -0.42], [0.38, -0.4], [0.38, -0.33], [0.3, -0.3], [0.37, -0.12], [0.37, 0.12], [0.3, 0.3], [0.38, 0.33], [0.38, 0.4], [0.24, 0.42]], 'z', [-22.6, vy, vz], TIER.fine ? 16 : 10);
+    latheAt(b, mats.steelDark, [[0, 0], [0.24, 0], [0.24, 0.07], [0.16, 0.1], [0.12, 0.38], [0.15, 0.41], [0.15, 0.48], [0, 0.5]], '-x', [-22.92, vy, vz], TIER.fine ? 12 : 8);
+    tube(b, mats.chrome, 'x', [vy, vz], 0.03, -23.65, -23.4, { seg: 6 });
+    handwheel(b, mats.rust, -23.65, vy, vz, 0.32, [-1, 0, 0]);
+    if (TIER.fine >= 1) for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 + 0.4; nut(b, [-22.99, vy + Math.cos(a) * 0.2, vz + Math.sin(a) * 0.2], [-1, 0, 0], 0.022); }
     const lp = UNITS[3];
     pipeRun(b, mats.paintGrey, [[lp.x, CYL1 + 0.1, s * (EZ - 0.6)], [lp.x - 1.6, Y + 9.15, s * 4.4], [-44.6, Y + 9.15, s * 3.4], [-45.8, Y + 5.6, s * 2.6]], 0.5, { seg: 12 });
     // auxiliary condensers, feed and bilge pumps along the sides
@@ -346,6 +389,7 @@ function engineRoomExtras(world, b) {
     for (const x of [-42.6, -38.4]) b.box(mats.iron, x - 0.2, Y, s * 11.2 - 0.9, x + 0.2, Y + 0.9, s * 11.2 + 0.9);
     world.addCollider(-43.7, Y, s * 11.2 - 1.05, -37.3, Y + 2.7, s * 11.2 + 1.05);
   }
+  await world.tick();
   const zone = world.zone(DECK, -25);
   for (const [x, z] of [[-26.6, -11.6], [-24.4, -11.6], [-26.6, 11.9], [-24.4, 11.9]]) { pumpSet(b, x, z, z > 0 ? -1 : 1, 'z'); world.addCollider(x - 0.75, Y, z - 0.6, x + 0.75, Y + 2.6, z + 0.6); }
   place(world.zone(DECK, -36), tankV({ r: 0.6, h: 2.6 }), -36.2, Y, -12.4, 0, { collide: true, world });
@@ -356,11 +400,41 @@ function engineRoomExtras(world, b) {
     b.disc(i === 4 ? kitMats.clockFace : kitMats.gaugeFace, [-22.085, Y + 3.2, z], n, 0.15, 12, true);
   }
   b.box(mats.woodDark, -22.12, Y + 2.8, -3.0, -22.05, Y + 3.6, 3.0, 'x');
+  if (TIER.fine >= 2) {
+    spannerBoard(b, -22.05, Y + 1.2, 7.4, 9.2, -1);
+    for (const s of [-1, 1]) for (const [x, y, z] of [[-40.2, LEVEL_M, 7.8], [-25.6, LEVEL_M, 7.85], [-37.6, LEVEL_U, 7.85]]) stampParts(b, oilCan(), M4(x, y, s * z, 0, s * Math.PI / 2 + 0.2 * Math.sin(x), 0));
+  }
   // ceiling lamps
   for (let x = -41; x < -23; x += 4.5) for (const z of [-11, 0, 11]) cageLamp(b, world, x, CEIL - 0.6, z, { hang: CEIL, intensity: 1.2 });
   for (const z of [-1.5, 1.5]) for (const x of [-40, -36, -26.5]) cageLamp(b, world, x, Y + 4.4, z, { hang: LEVEL_U - 0.1, intensity: 0.9 });
 }
 
+let OILCAN = null;
+/** engineer's long-spouted oil feeder (origin on the floor) */
+function oilCan() {
+  if (OILCAN) return OILCAN;
+  const t = new TBatch();
+  latheAt(t, mats.copper, [[0, 0], [0.09, 0], [0.095, 0.02], [0.09, 0.07], [0.05, 0.12], [0.02, 0.15], [0, 0.155]], 'y', [0, 0, 0], 10);
+  tubeBetween(t, mats.brass, [0.04, 0.12, 0], [0.32, 0.3, 0], 0.008, { seg: 5, r1: 0.004, caps: false });
+  stamp(t, mats.iron, gcache('ocH', () => new THREE.TorusGeometry(0.06, 0.008, 3, 8, Math.PI)), M4(-0.04, 0.1, 0, 0, 0, Math.PI / 2 + 0.6));
+  return (OILCAN = t.parts());
+}
+/** tool board on a bulkhead (front +x): spanners of graded sizes on pegs, a hammer, outline of the missing one */
+function spannerBoard(b, x, y, z0, z1, dir) {
+  b.box(mats.woodDark, Math.min(x, x + dir * 0.03), y, z0, Math.max(x, x + dir * 0.03), y + 1.0, z1);
+  const xf = x + dir * 0.03, n = 7;
+  for (let i = 0; i < n; i++) {
+    const z = z0 + 0.15 + ((z1 - z0 - 0.55) * i) / (n - 1), L = 0.28 + i * 0.07, yt = y + 0.92;
+    b.box(mats.iron, Math.min(xf, xf + dir * 0.05), yt - 0.012, z - 0.012, Math.max(xf, xf + dir * 0.05), yt + 0.012, z + 0.012); // peg
+    if (i === 4) continue;
+    b.box(mats.steel, Math.min(xf + dir * 0.02, xf + dir * 0.035), yt - L, z - 0.018 - i * 0.002, Math.max(xf + dir * 0.02, xf + dir * 0.035), yt - 0.04, z + 0.018 + i * 0.002);
+    b.box(mats.steel, Math.min(xf + dir * 0.015, xf + dir * 0.04), yt - L - 0.06, z - 0.05 - i * 0.006, Math.max(xf + dir * 0.015, xf + dir * 0.04), yt - L + 0.02, z + 0.05 + i * 0.006);
+  }
+  // hammer hanging head-down from two pegs at the end of the board
+  for (const dz of [-0.2, -0.1]) b.box(mats.iron, Math.min(xf, xf + dir * 0.05), y + 0.84, z1 + dz - 0.012, Math.max(xf, xf + dir * 0.05), y + 0.87, z1 + dz + 0.012);
+  b.box(mats.oak, Math.min(xf + dir * 0.02, xf + dir * 0.05), y + 0.18, z1 - 0.17, Math.max(xf + dir * 0.02, xf + dir * 0.05), y + 0.86, z1 - 0.13);
+  b.box(mats.iron, Math.min(xf + dir * 0.005, xf + dir * 0.075), y + 0.08, z1 - 0.22, Math.max(xf + dir * 0.005, xf + dir * 0.075), y + 0.18, z1 - 0.08);
+}
 const TORG = (R, r) => gcache(`tor${R}_${r}`, () => new THREE.TorusGeometry(R, r, 4, 12));
 let PUMP = null;
 /** Vertical steam-driven pump (Weir pattern): bedplate, pump barrel, A-frame, steam cylinder, crank and flywheel. Front +x */
@@ -394,10 +468,11 @@ function pumpSet(b, x, z, dir, axis = 'x') {
 
 // ------------------------------------------------------------------------------------------------ turbine room
 
-function buildTurbineRoom(world, b) {
+async function buildTurbineRoom(world, b) {
   const yc = SHAFT_Y;
   const secs = [[-46.5, -49.5, 1.6], [-49.5, -52.5, 1.85], [-52.5, -55.0, 2.1]];
   for (const [xa, xb, r] of secs) {
+    await world.tick();
     tube(b, mats.steelDark, 'x', [yc, 0], r, xb, xa, { seg: 32, caps: false });
     for (const x of [xa, xb]) tube(b, mats.iron, 'x', [yc, 0], r + 0.08, x - 0.09, x + 0.09, { seg: 32 });
     for (const s of [-1, 1]) {
@@ -405,6 +480,10 @@ function buildTurbineRoom(world, b) {
       for (let x = xb + 0.2; x < xa - 0.1; x += 0.3) { nut(b, [x, yc + 0.08, s * (r + 0.1)], [0, 1, 0], 0.035); nut(b, [x, yc - 0.08, s * (r + 0.1)], [0, -1, 0], 0.035); }
     }
     for (const x of [xa, xb]) for (let k = 0; k < 28; k++) { const a = (k / 28) * Math.PI * 2; nut(b, [x + 0.09, yc + Math.cos(a) * (r + 0.02), Math.sin(a) * (r + 0.02)], [1, 0, 0], 0.03); }
+    if (TIER.fine >= 2) for (const t of [0.33, 0.67]) { // circumferential stiffening ribs on the casing
+      const x = xb + (xa - xb) * t;
+      tube(b, mats.steelDark, 'x', [yc, 0], r + 0.06, x - 0.035, x + 0.035, { seg: 32 });
+    }
     for (const dx of [0.35, -0.35]) { // lifting lugs (eye plates) on the top half
       const lx = (xa + xb) / 2 + dx * (xa - xb) / 2;
       b.box(mats.steelDark, lx - 0.04, yc + r - 0.05, -0.16, lx + 0.04, yc + r + 0.22, 0.16);
@@ -422,10 +501,11 @@ function buildTurbineRoom(world, b) {
   world.addCollider(-56.6, Y, -2.3, -44.9, yc + 2.2, 2.3);
   // inlet branches and change-over valves
   for (const s of [-1, 1]) {
+    await world.tick();
     b.box(mats.steelDark, -46.4, Y + 4.9, s * 2.6 - 0.55, -45.2, Y + 6.1, s * 2.6 + 0.55);
     tube(b, mats.steelDark, 'y', [-45.8, s * 2.6], 0.18, Y + 6.1, Y + 6.9, { seg: 8 });
-    b.ring(mats.rust, [-45.8, Y + 6.95, s * 2.6], [0, 1, 0], 0.5, 0.56, 16);
-    b.box(mats.iron, -46.35, Y + 6.93, s * 2.6 - 0.02, -45.25, Y + 6.97, s * 2.6 + 0.02);
+    handwheel(b, mats.rust, -45.8, Y + 6.95, s * 2.6, 0.53, [0, 1, 0]);
+    if (TIER.fine >= 1) for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2; nut(b, [-45.8 + Math.cos(a) * 0.5, Y + 6.1, s * 2.6 + Math.sin(a) * 0.5], [0, 1, 0], 0.025); }
     pipeRun(b, mats.paintGrey, [[-46.2, Y + 5.2, s * 2.3], [-47.4, yc + 1.75, s * 1.0], [-47.4, yc + 1.45, s * 0.9]], 0.42, { seg: 12 });
     pipeRun(b, mats.paintGrey, [[-45.4, Y + 5.0, s * 3.1], [-45.4, Y + 4.4, s * 6.5], [-47.2, Y + 4.4, s * 8.6]], 0.36, { seg: 12 }); // bypass to the condenser
     // exhaust trunk from the turbine to the condensers
@@ -434,6 +514,7 @@ function buildTurbineRoom(world, b) {
       b.box(mats.iron, x - 0.05, Y + 2.86, s > 0 ? 2.0 : -8.5, x + 0.05, Y + 4.94, s > 0 ? 8.5 : -2.0);
       for (const dx of [-0.08, 0.08]) rivetLine(b, [x + dx, Y + 4.902, s > 0 ? 2.1 : -8.4], [x + dx, Y + 4.902, s > 0 ? 8.4 : -2.1], [0, 1, 0], 0.15, mats.steelDark);
     }
+    await world.tick();
     // main condensers
     const cz = s * 10.0, cy = Y + 2.1;
     tube(b, mats.steelDark, 'x', [cy, cz], 1.65, -56.4, -47.4, { seg: 28, caps: false });
@@ -450,6 +531,7 @@ function buildTurbineRoom(world, b) {
     pipeRun(b, mats.copper, [[-46.8, cy - 0.6, cz], [-46.3, cy - 0.6, cz], [-46.3, Y + 0.4, cz], [-46.3, Y + 0.4, s * (floorHW(-46) - 0.3)]], 0.32, { seg: 10 });
     pipeRun(b, mats.copper, [[-57.0, cy + 0.6, cz], [-57.4, cy + 0.6, cz], [-57.4, cy + 0.6, s * (floorHW(-57) - 0.3)]], 0.32, { seg: 10 });
     world.addCollider(-57.2, Y, cz - 1.8, -46.6, cy + 1.8, cz + 1.8);
+    await world.tick();
     // air pumps, circulating pumps, evaporators, feed heaters (outboard)
     const zone = world.zone(DECK, -50);
     pumpSet(b, -57.0, s * 12.0, 1); world.addCollider(-57.6, Y, s * 12.0 - 0.75, -56.4, Y + 2.6, s * 12.0 + 0.75);
@@ -457,6 +539,16 @@ function buildTurbineRoom(world, b) {
     place(zone, tankV({ r: 0.75, h: 3.2, mat: 'steelDark' }), -53.8, Y, s * 12.5, 0, { collide: true, world });
     place(zone, tankV({ r: 0.75, h: 3.2, mat: 'steelDark' }), -51.6, Y, s * 12.5, 0, { collide: true, world });
     place(zone, tankH({ r: 0.55, l: 2.6 }), -49.0, Y, s * 12.6, Math.PI / 2, { collide: true, world });
+  }
+  if (TIER.fine >= 1) {
+    // turbine gauge board on the bulkhead (vacuum, steam inlet, gland steam, oil pressure)
+    b.box(mats.woodDark, -44.14, Y + 1.6, -3.35, -44.06, Y + 2.5, -2.05);
+    for (let i = 0; i < 4; i++) {
+      const gz = -3.05 + (i % 2) * 0.6, gy = Y + 1.85 + Math.floor(i / 2) * 0.4;
+      b.ring(mats.brass, [-44.16, gy, gz + 0.15], [-1, 0, 0], 0.13, 0.16, 14);
+      b.disc(kitMats.gaugeFace, [-44.165, gy, gz + 0.15], [-1, 0, 0], 0.13, 14, true);
+      tube(b, mats.copper, 'y', [-44.12, gz + 0.32], 0.007, gy, CEIL - 1.2, { seg: 4, caps: false });
+    }
   }
   for (let x = -56; x < -45; x += 4) for (const z of [-8, 0, 8]) cageLamp(b, world, x, CEIL - 0.8, z + (z === 0 ? 3.6 : 0), { hang: CEIL, intensity: 1.1 });
   for (const s of [-1, 1]) for (const x of [-56.5, -48.5]) cageLamp(b, world, x, Y + 3.0, s * 4.5, { hang: CEIL, intensity: 0.8 });
@@ -552,7 +644,7 @@ function marbleBoard(b, x, z, w, rotY) {
   stampParts(b, BOARDS.get(w), M4(x, Y, z, 0, rotY, 0));
 }
 
-function buildDynamoRoom(world, b, anim) {
+async function buildDynamoRoom(world, b, anim) {
   const zone = world.zone(DECK, -63);
   DYN ??= dynamoSetTemplate();
   const fwT = new TBatch();
@@ -562,15 +654,22 @@ function buildDynamoRoom(world, b, anim) {
   for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; fwT.box(mats.rust, -0.11, Math.cos(a) * 0.62 - 0.04, Math.sin(a) * 0.62 - 0.04, 0.11, Math.cos(a) * 0.62 + 0.04, Math.sin(a) * 0.62 + 0.04); }
   const fw = fwT.parts();
   for (const s of [-1, 1]) for (const zc of [7.7, 10.6]) {
+    await world.tick();
     const z = s * zc;
     stampParts(b, DYN, M4(0, Y, z));
     pipeRun(b, mats.paintWhite, [[-66.05, Y + 3.38, z], [-66.05, LOW - 0.4, z], [-60, LOW - 0.4, z]], 0.1, { seg: 8 });
     world.addCollider(-67.4, Y, z - 0.95, -61.0, Y + 3.4, z + 0.95);
     const g = addMesh(world, fw, -64.6, (m) => m.position.set(-64.6, Y + 1.25, z));
     anim.push((t) => { g.rotation.x = t * 6.5; });
-    // cables to the switchboard
+    // cables to the switchboard (from level 1: three-core bundle on clips and hangers)
     pipeRun(b, mats.rubber, [[-63.3, Y + 2.3, z], [-63.3, LOW - 0.25, z], [-58.4, LOW - 0.25, z]], 0.05, { seg: 6, flange: null });
+    if (TIER.fine >= 1) {
+      for (const dz of [-0.11, 0.11]) pipeRun(b, mats.rubber, [[-63.3, Y + 2.3, z + dz], [-63.3, LOW - 0.25, z + dz], [-58.4, LOW - 0.25, z + dz]], 0.035, { seg: 6, flange: null });
+      for (let x = -62.6; x < -58.6; x += 1.0) { b.box(mats.iron, x - 0.02, LOW - 0.31, z - 0.19, x + 0.02, LOW - 0.28, z + 0.19); for (const dz of [-0.18, 0.18]) b.box(mats.iron, x - 0.015, LOW - 0.31, z + dz - 0.012, x + 0.015, LOW, z + dz + 0.012, 'xXzZ'); }
+      b.box(mats.iron, -63.32 - 0.05, Y + 2.25, z - 0.2, -63.32 + 0.05, Y + 2.35, z + 0.2); // terminal gland plate
+    }
   }
+  await world.tick();
   // marble main switchboard on the forward bulkhead (starboard), auxiliary boards
   marbleBoard(b, -58.08, 10.2, 3.0, Math.PI); world.addCollider(-58.45, Y, 8.7, -58.0, Y + 2.3, 11.7);
   marbleBoard(b, -58.08, 12.5, 1.5, Math.PI); world.addCollider(-58.45, Y, 11.75, -58.0, Y + 2.3, 13.25);
@@ -579,6 +678,7 @@ function buildDynamoRoom(world, b, anim) {
   b.box(mats.paper, -59.8, Y + 0.95, 9.4, -59.4, Y + 0.96, 9.9, 'Y');
   world.addCollider(-59.9, Y, 9.0, -59.3, Y + 0.95, 10.4);
   place(zone, stool(), -60.3, Y, 9.7, 0, { collide: false });
+  await world.tick();
   // step-over bridges across the wing shafts
   const yb = Y + 2.0;
   for (const s of [-1, 1]) {
@@ -593,7 +693,7 @@ function buildDynamoRoom(world, b, anim) {
 // ------------------------------------------------------------------------------------------------ shafts
 
 /** Rotating shafts (wing shafts from the thrust blocks, centre shaft from the turbine) with plummer blocks. */
-function buildShafts(world, b, anim) {
+async function buildShafts(world, b, anim) {
   const yc = SHAFT_Y;
   const lines = [
     { z: -EZ, x0: -104, x1: -42.6, w: W_ENG, plummers: [-47, -51.5, -55.5, -62.8, -72, -78, -84, -90, -96, -101.5] },
@@ -601,6 +701,7 @@ function buildShafts(world, b, anim) {
     { z: 0, x0: -104, x1: -56.1, w: W_TURB, plummers: [-62.8, -72, -78, -84, -90, -96, -101.5] },
   ];
   for (const L of lines) {
+    await world.tick();
     const cuts = [L.x0, -96, -72, -48, L.x1].filter((x, i, a) => x >= L.x0 && x <= L.x1 && a.indexOf(x) === i).sort((p, q) => p - q);
     for (let i = 0; i < cuts.length - 1; i++) {
       const xa = cuts[i], xb = cuts[i + 1], tb = new TBatch();
@@ -613,6 +714,7 @@ function buildShafts(world, b, anim) {
       anim.push((t) => { g.rotation.x = t * L.w; });
       world.addCollider(xa, yc - 0.32, L.z - 0.32, xb, yc + 0.32, L.z + 0.32);
     }
+    await world.tick();
     for (const x of L.plummers) {
       b.box(mats.iron, x - 0.35, Y, L.z - 0.5, x + 0.35, yc - 0.32, L.z + 0.5);
       b.box(mats.steelDark, x - 0.3, yc - 0.32, L.z - 0.48, x + 0.3, yc + 0.46, L.z + 0.48);
@@ -631,17 +733,124 @@ function buildShafts(world, b, anim) {
     // glands where the shafts pass through the bulkheads
     for (const x of [-44, -58, -68]) if (x > L.x0 && x < L.x1) tube(b, mats.brass, 'x', [yc, L.z], 0.45, x - 0.12, x + 0.12, { seg: 14 });
   }
+  if (TIER.fine >= 1) {
+    await world.tick();
+    // wing shaft tunnels: bilge suction main along the outboard wall on brackets, flanged every 4 m; from level 2 the
+    // lighting cable on clips under the crown and the oil pipe to the plummer blocks
+    for (const s of [-1, 1]) {
+      const zw = s * 6.8, pts = [];
+      for (let x = -99.6; x < -68.2; x += 4) pts.push([x, Y + 0.45, zw]);
+      pts.push([-68.2, Y + 0.45, zw]);
+      pipeRun(b, mats.steelDark, pts, 0.09, { seg: 8 });
+      for (let x = -98.4; x < -68.5; x += 2.4) {
+        b.box(mats.iron, x - 0.03, Y + 0.3, Math.min(zw, s * 6.97), x + 0.03, Y + 0.35, Math.max(zw, s * 6.97));
+        b.box(mats.iron, x - 0.03, Y, s * 6.9 - 0.025, x + 0.03, Y + 0.35, s * 6.9 + 0.025, 'xXzZ');
+      }
+      if (TIER.fine >= 2) {
+        tube(b, mats.rubber, 'x', [LOW - 0.32, s * 6.85], 0.022, -99.6, -68.2, { seg: 6, caps: false });
+        for (let x = -99.0; x < -68.5; x += 1.2) b.box(mats.iron, x - 0.015, LOW - 0.36, s * 6.79, x + 0.015, LOW - 0.28, s * 6.97);
+        tube(b, mats.copper, 'x', [SHAFT_Y + 0.95, s * 6.6], 0.012, -99.6, -68.2, { seg: 5, caps: false });
+        for (const x of [-72, -78, -84, -90, -96]) tubeBetween(b, mats.copper, [x + 0.24, SHAFT_Y + 0.95, s * 6.6], [x + 0.24, SHAFT_Y + 0.72, s * 5.0], 0.008, { seg: 4, caps: false });
+      }
+    }
+  }
 }
 
-/** Builds engine room, turbine room, dynamo room and shafts. Returns per-frame animators. */
-export function buildEngineSpaces(world, b) {
+// ------------------------------------------------------------------------------------------------ refrigerating plant
+
+/**
+ * One steam-driven refrigerating compressor set along +x from x0 on the centre line zc (port side of the engine room):
+ * bedplate, horizontal steam cylinder with valve chest, guide bars and crosshead, crank pedestals with a spoked flywheel
+ * on the inboard side, the thick-walled compressor with suction / delivery valves and gauges (machine stopped).
+ */
+function refrigSet(b, x0, zc, fine) {
+  const ya = Y + 1.0;                                             // axis height; flywheel on the inboard (+z) side
+  b.box(mats.iron, x0, Y, zc - 0.45, x0 + 3.1, Y + 0.32, zc + 0.45);
+  b.box(mats.steelDark, x0 - 0.04, Y, zc - 0.5, x0 + 3.14, Y + 0.06, zc + 0.5, 'xXzZY');
+  if (fine >= 1) for (let x = x0 + 0.2; x < x0 + 3.0; x += 0.55) for (const dz of [-0.4, 0.4]) nut(b, [x, Y + 0.32, zc + dz], [0, 1, 0], 0.022);
+  // steam cylinder (lagged, with covers and studs), pedestal, valve chest, steam branch
+  b.box(mats.iron, x0 + 0.15, Y + 0.32, zc - 0.22, x0 + 0.7, ya - 0.2, zc + 0.22);
+  latheAt(b, mats.paintGrey, [[0, 0], [0.33, 0], [0.33, 0.06], [0.28, 0.08], [0.28, 0.66], [0.33, 0.68], [0.33, 0.74], [0, 0.76]], 'x', [x0 + 0.04, ya, zc], fine ? 16 : 10);
+  if (fine >= 1) for (const x of [x0 + 0.04, x0 + 0.8]) for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; nut(b, [x, ya + Math.cos(a) * 0.29, zc + Math.sin(a) * 0.29], [x < x0 + 0.4 ? -1 : 1, 0, 0], 0.018); }
+  b.box(mats.steelDark, x0 + 0.18, ya + 0.27, zc - 0.17, x0 + 0.62, ya + 0.5, zc + 0.17);
+  pipeRun(b, mats.paintWhite, [[x0 + 0.4, ya + 0.5, zc], [x0 + 0.4, Y + 2.8, zc], [x0 + 0.4, Y + 2.8, -13.3], [x0 + 0.4, CEIL - 0.4, -13.3]], 0.07, { seg: 8 }); // steam from above
+  // guide bars, piston rod, crosshead, connecting rod to the crank
+  for (const dy of [-0.16, 0.16]) b.box(mats.chrome, x0 + 0.8, ya + dy - 0.03, zc - 0.1, x0 + 1.62, ya + dy + 0.03, zc + 0.1);
+  b.box(mats.iron, x0 + 0.8, Y + 0.32, zc - 0.2, x0 + 1.62, ya - 0.2, zc + 0.2);
+  tube(b, mats.chrome, 'x', [ya, zc], 0.035, x0 + 0.8, x0 + 1.3, { seg: 6, caps: false });
+  b.box(mats.steel, x0 + 1.28, ya - 0.12, zc - 0.09, x0 + 1.44, ya + 0.12, zc + 0.09);
+  tubeBetween(b, mats.steel, [x0 + 1.4, ya, zc], [x0 + 1.95, ya + 0.2, zc], 0.045, { seg: 8 });
+  // crank pedestals, shaft, crank disc, flywheel (spokes) on the inboard side
+  const xc = x0 + 1.95;
+  for (const dz of [-0.32, 0.32]) { b.box(mats.iron, xc - 0.18, Y + 0.32, zc + dz - 0.1, xc + 0.18, ya - 0.08, zc + dz + 0.1); b.box(mats.steelDark, xc - 0.15, ya + 0.08, zc + dz - 0.09, xc + 0.15, ya + 0.14, zc + dz + 0.09); }
+  tube(b, mats.chrome, 'z', [xc, ya], 0.07, zc - 0.45, zc + 0.78, { seg: 8 });
+  tube(b, mats.steel, 'z', [xc, ya], 0.26, zc - 0.05, zc + 0.05, { seg: 14 });
+  const zf = zc + 0.66;
+  tube(b, mats.iron, 'z', [xc, ya], 0.6, zf - 0.06, zf + 0.06, { seg: fine >= 2 ? 28 : 18 });
+  tube(b, mats.iron, 'z', [xc, ya], 0.11, zf - 0.08, zf + 0.08, { seg: 10 });
+  for (let k = 0; k < 3; k++) stamp(b, mats.iron, gcache('rfSpoke', () => new THREE.BoxGeometry(0.05, 1.04, 0.04)), M4(xc, ya, zf, 0, 0, (k * Math.PI) / 3));
+  // compressor: forged block with heavy studs, gland, suction and delivery valves, gauges, copper pipes to the condenser
+  tubeBetween(b, mats.chrome, [xc + 0.08, ya, zc], [x0 + 2.42, ya, zc], 0.03, { seg: 6 });
+  latheAt(b, mats.brass, [[0, 0], [0.07, 0], [0.07, 0.1], [0.05, 0.12], [0, 0.12]], 'x', [x0 + 2.3, ya, zc], 8);
+  b.box(mats.steel, x0 + 2.42, ya - 0.24, zc - 0.22, x0 + 2.95, ya + 0.24, zc + 0.22);
+  b.box(mats.iron, x0 + 2.4, Y + 0.32, zc - 0.25, x0 + 2.97, ya - 0.24, zc + 0.25);
+  for (const dx of [0.06, 0.47]) for (const dz of [-0.16, 0.16]) nut(b, [x0 + 2.42 + dx, ya + 0.24, zc + dz], [0, 1, 0], 0.03);
+  for (const [dx, lab] of [[0.14, 0], [0.38, 1]]) {
+    latheAt(b, mats.brass, [[0, 0], [0.06, 0], [0.06, 0.08], [0.04, 0.1], [0.03, 0.26], [0, 0.27]], 'y', [x0 + 2.42 + dx, ya + 0.24, zc - 0.12], 8);
+    handwheel(b, mats.rust, x0 + 2.42 + dx, ya + 0.53, zc - 0.12, 0.08);
+    pipeRun(b, mats.copper, [[x0 + 2.42 + dx, ya + 0.3, zc + 0.12], [x0 + 2.42 + dx, Y + 2.5, zc + 0.12], [x0 + 2.42 + dx, Y + 2.5, -12.36]], 0.03, { seg: 6, flange: null }); void lab;
+  }
+  for (const dz of [-0.12, 0.2]) {
+    tube(b, mats.brass, 'y', [x0 + 2.99, zc + dz], 0.012, ya + 0.1, ya + 0.52, { seg: 4, caps: false });
+    b.ring(mats.brass, [x0 + 3.02, ya + 0.6, zc + dz], [1, 0, 0], 0.075, 0.095, 12);
+    b.disc(kitMats.gaugeFace, [x0 + 3.021, ya + 0.6, zc + dz], [1, 0, 0], 0.075, 12, true);
+    if (fine >= 1) tube(b, mats.brass, 'x', [ya + 0.6, zc + dz], 0.095, x0 + 2.99, x0 + 3.025, { seg: 12, caps: false });
+  }
+}
+
+/** Refrigerating plant in the port wing of the engine room: two compressor sets, the brine evaporator and the condenser. */
+function refrigeratingPlant(world, b) {
+  const fine = TIER.fine, zc = -11.35;
+  refrigSet(b, -35.2, zc, fine);
+  refrigSet(b, -31.7, zc, fine);
+  // brine evaporator (horizontal shell with coil headers) against the ship's side, condenser (vertical shell) forward
+  const ze = -12.75, ye = Y + 0.75;
+  tube(b, mats.steelDark, 'x', [ye, ze], 0.5, -35.1, -30.0, { seg: fine ? 18 : 12, caps: false });
+  for (const x of [-35.1, -30.0]) latheAt(b, mats.steelDark, [[0.55, 0], [0.55, 0.06], [0.4, 0.12], [0, 0.16]], x < -32 ? '-x' : 'x', [x, ye, ze], fine ? 18 : 12);
+  for (const x of [-35.1, -32.55, -30.0]) tube(b, mats.iron, 'x', [ye, ze], 0.54, x - 0.05, x + 0.05, { seg: fine ? 18 : 12 });
+  for (const x of [-34.4, -30.8]) b.box(mats.iron, x - 0.15, Y, ze - 0.4, x + 0.15, ye - 0.35, ze + 0.4);
+  for (const x of [-34.2, -33.0, -31.8, -30.6]) pipeRun(b, mats.copper, [[x, ye + 0.5, ze], [x, Y + 2.5, ze], [x, Y + 2.5, -12.4]], 0.035, { seg: 6, flange: mats.brass });
+  pipeRun(b, mats.copper, [[-35.15, Y + 2.5, -12.4], [-28.75, Y + 2.5, -12.4]], 0.045, { seg: 8, flange: mats.brass }); // refrigerant header to the condenser
+  pipeRun(b, mats.paintWhite, [[-30.3, ye, ze - 0.2], [-29.6, ye, ze - 0.2], [-29.6, CEIL - 0.6, ze - 0.2]], 0.08, { seg: 8 }); // brine to the cold stores
+  const xk = -28.75, zk = -12.7;
+  latheAt(b, mats.paintGrey, [[0, 0], [0.42, 0], [0.42, 0.08], [0.36, 0.1], [0.36, 2.0], [0.42, 2.02], [0.42, 2.1], [0.2, 2.2], [0, 2.22]], 'y', [xk, Y, zk], fine ? 16 : 10);
+  if (fine >= 1) for (const y of [Y + 0.6, Y + 1.4]) tube(b, mats.iron, 'y', [xk, zk], 0.375, y - 0.03, y + 0.03, { seg: 16, caps: false });
+  tube(b, mats.copper, 'y', [xk, -12.4], 0.045, Y + 2.2, Y + 2.5, { seg: 8, caps: false });
+  pipeRun(b, mats.steelDark, [[xk + 0.36, Y + 0.3, zk], [xk + 0.6, Y + 0.3, zk], [xk + 0.6, Y + 0.3, -13.5]], 0.08, { seg: 8 }); // sea water
+  world.addCollider(-35.3, Y, -13.35, -28.25, Y + 2.2, -10.45);
+  world.addInfo({ title: 'Die Kältemaschinen', x: -31.0, y: Y + 1.5, z: -9.8, radius: 3, text: 'Dampfgetriebene Kältekompressoren erzeugten die Kälte für die Proviantkühlräume, die gekühlten Laderäume und die Eisbereitung der Küchen. Das verdichtete Kältemittel wurde im Kondensator mit Seewasser gekühlt und entzog im Verdampfer einer Salzlösung (Sole) die Wärme. Pumpen drückten die kalte Sole durch Rohrleitungen bis in die Kühlräume auf den Decks darüber.' });
+}
+
+/** Builds engine room, turbine room, dynamo room and shafts (one batch per space, time-sliced). Returns per-frame animators. */
+export async function buildEngineSpaces(world) {
   const anim = [];
-  for (const s of [-1, 1]) buildEngine(world, b, s, anim);
+  let b = new Batch(world, DECK);
+  const next = async () => { await world.tick(); b.flush(); b = new Batch(world, DECK); await world.tick(); };
+  for (const s of [-1, 1]) { await buildEngine(world, b, s, anim); await next(); }
   buildEngineAccessAndGalleries(world, b);
+  await world.tick();
   startingPlatform(world, b);
-  engineRoomExtras(world, b);
-  buildTurbineRoom(world, b);
-  buildDynamoRoom(world, b, anim);
-  buildShafts(world, b, anim);
+  await next();
+  await engineRoomExtras(world, b);
+  await next();
+  refrigeratingPlant(world, b);
+  await next();
+  await buildTurbineRoom(world, b);
+  await next();
+  await buildDynamoRoom(world, b, anim);
+  await next();
+  await buildShafts(world, b, anim);
+  await world.tick();
+  b.flush();
   return anim;
 }

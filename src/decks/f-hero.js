@@ -4,9 +4,10 @@ import * as THREE from 'three';
 import { mats } from '../core/materials.js';
 import {
   kitMats, pipe, showerBath, bench, coolingCouch, servingCounter, shelves, locker, gauge, valve, def,
-  basinSmall, desk, chairDining as chair, mirrorWall, clockWall, pottedPalm, deckHalfWidth, wardrobe, coatHooks, towels,
+  basinSmall, desk, chairDining as chair, mirrorWall, clockWall, pottedPalm, deckHalfWidth, wardrobe, coatHooks, towels, slippers,
 } from '../interior/kit.js';
-import { Instancer, moorishCeiling, teakLattice, ceilingPipes, pipeHangers, poster, iznikMat, tileBorderMat, depthMat } from './f-util.js';
+import { Instancer, moorishCeiling, teakLattice, ceilingPipes, pipeHangers, poster, iznikMat, tileBorderMat, depthMat, fineLv, cgTowelHooks, cgMenuBoard, cgTeapot, hangFree as hangFreeF } from './f-util.js';
+import { corbel } from './d-util.js';
 
 const TAU = Math.PI * 2;
 function rngOf(seed) { let s = (seed * 2654435761) >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
@@ -132,6 +133,11 @@ const lounger = def('fhLounger', [0.7, 1.9, 0.75], (p) => {
   for (const s of [-1, 1]) p.loft(mats.oak, [[s * 0.3, 0.33, -0.83], [s * 0.3, 0.86, -1.02]], 0.02, 4);
   p.bb(mats.linen, 0.55, 0.03, 1.2, 0, 0.385, 0.15, 0.01);
   p.g.rotation.y = Math.PI / 2;   // built along z: turn it so that its length runs out from the wall (head end at the wall)
+});
+/** folded Turkish towel and a second one draped over the foot of a cooling couch (same origin as coolingCouch) */
+const couchTowel = def('fhCouchTowel', [0.75, 0.8, 0.55], (p, o) => {
+  p.bb(mats.linen, 0.42, 0.045, 0.3, 0.05, 0.47, 0.55, 0.012);
+  if (o.drape) { p.bb(mats.linen, 0.6, 0.012, 0.36, 0, 0.475, 0.1, 0.004); p.bb(mats.linen, 0.012, 0.2, 0.36, 0.33, 0.28, 0.1, 0.004); }
 });
 /** wall thermometer on a carved board (origin = mounting point, faces +x) */
 const thermometer = def('fhThermo', [0.12, 0.03, 0.45], (p) => {
@@ -345,6 +351,12 @@ export function swimmingBath(ctx) {
     for (const z of [za + 0.05, zb - 0.05]) b.box(mats.deckWood, xa, Y, z - 0.03, xb, Y + 0.012, z + 0.03, 'Y');
   }
   for (const x of [56, 60]) plan.prop(bench({ w: 1.8, back: true, mat: 'oak' }), x, s.z0 + 0.3, -Math.PI / 2, { collide: false });
+  const fl = fineLv();
+  if (fl >= 0) for (const x of [56, 60]) plan.prop(cgTowelHooks({ w: 1.6, v: x }), x, s.z0 + 0.005, -Math.PI / 2, { y: Y + 1.82, collide: false });
+  if (fl >= 1) for (let i = 0; i < n; i += 2) { // folded towels on the cubicle benches
+    const x = cx0 + i * cw + cw / 2, zb = Math.min(hull(deck, x - 0.5), hull(deck, x + 0.5));
+    b.box(mats.linen, x - 0.15, Y + 0.47, zb - 0.36, x + 0.15, Y + 0.52, zb - 0.1, 'xXyYzZ');
+  }
   // tiled walls with a dado line (blue band) on the inner walls
   for (const [ax, c, nn, a0, a1, gaps] of [['x', s.z0 + 0.003, 1, s.x0, s.x1, [[61.6 - 0.85, 61.6 + 0.85], [64.2 - 0.85, 64.2 + 0.85]]], ['z', s.x0 + 0.003, 1, s.z0, CF - 0.1, []], ['z', s.x1 - 0.003, -1, s.z0, CF - 0.1, doorGaps(r, 'fwd')]]) {
     const segs = []; let p0 = a0; for (const [g0, g1] of gaps.sort((p, q) => p[0] - q[0])) { if (g0 > p0) segs.push([p0, g0]); p0 = Math.max(p0, g1); } if (a1 > p0) segs.push([p0, a1]);
@@ -394,7 +406,11 @@ export function coolingRoom(ctx) {
     b.box(kitMats.fireRed, x - 0.05, fc - 0.175, s.z0, x + 0.05, fc - 0.17, hull(deck, x), 'y');
   }
   for (const z of [6.4, 10.2]) b.box(mats.gold, s.x0, fc - 0.13, z - 0.06, s.x1, fc, z + 0.06, 'xXyzZ');
+  if (fineLv() >= 1) for (const x of bx) corbel(b, mats.gold, x, hull(deck, x) - 0.005, [0, -1], fc - 0.17, 0.13, 0.2, 0.15); // gilt brackets where the beams meet the ship's side
   for (const x of bx) for (const z of [6.4, 10.2]) if (z < hull(deck, x) - 0.2) plan.prop(boss(), x, z, 0, { y: fc - 0.17 });
+  if (fineLv() >= 2) for (let i = 0; i < bx.length - 1; i++) for (const z of [8.3]) { // gilt stalactite pendants in the middle of the coffers
+    const x = (bx[i] + bx[i + 1]) / 2; if (z < hull(deck, x) - 0.6) plan.prop(stalactite(), x, z, 0, { y: fc });
+  }
   b.box(mats.gold, s.x0, fc - 0.1, s.z0, s.x1, fc, s.z0 + 0.05, 'yZ');
   // Moorish frieze round the inner walls
   b.wallZ(moorishCeiling, s.x0 + 0.002, s.z0, hull(deck, s.x0), fc - 0.45, fc - 0.1, 1);
@@ -444,10 +460,12 @@ export function coolingRoom(ctx) {
   // mosaic border round the tiled floor
   for (const [x0, x1, z0, z1] of [[s.x0 + 0.1, s.x1 - 0.1, s.z0 + 0.1, s.z0 + 0.35], [s.x0 + 0.1, s.x0 + 0.35, s.z0 + 0.1, hull(deck, s.x0) - 0.2], [s.x1 - 0.35, s.x1 - 0.1, s.z0 + 0.1, hull(deck, s.x1) - 0.2]]) b.flat(tileBorderMat, x0, x1, z0, z1, Y + 0.004);
   // couches along the walls, Damascus tables, coffee trays, folding chairs, palms
-  for (const w of ['left', 'right', 'near', 'far']) for (let k = 0; k < 6; k++) if (!ctx.fit(coolingCouch({ mat: (k + w.length) % 2 ? 'fabricRed' : 'fabricGold' }), [w + ':lo'])) break;
+  const fl = fineLv();
+  const extras = (k) => { if (fl < 0) return; ctx.attach(couchTowel({ drape: k % 3 === 1 }), 0, 0, { y: 0.001 }); if (fl >= 1 && k % 2 === 0) ctx.attach(slippers({ v: k % 2 }), 0.52, (k % 3 - 1) * 0.3, { turn: -Math.PI / 2 }); };
+  for (const w of ['left', 'right', 'near', 'far']) for (let k = 0; k < 6; k++) { if (!ctx.fit(coolingCouch({ mat: (k + w.length) % 2 ? 'fabricRed' : 'fabricGold' }), [w + ':lo'])) break; extras(k + w.length); }
   ctx.grid(2.6, 2.6, (u, v, i, j) => {
     if (!ctx.put(damascusTable(), u, v, 'in')) return;
-    if ((i + j) % 2 === 0) { ctx.put(coolingCouch({ mat: 'fabricRed' }), u, v + 0.85, 'out'); ctx.put(coolingCouch({ mat: 'fabricGold' }), u, v - 0.85, 'in'); }
+    if ((i + j) % 2 === 0) { if (ctx.put(coolingCouch({ mat: 'fabricRed' }), u, v + 0.85, 'out')) extras(i + 2 * j); if (ctx.put(coolingCouch({ mat: 'fabricGold' }), u, v - 0.85, 'in')) extras(i + 2 * j + 1); }
     else { ctx.put(foldingChair(), u + 0.75, v + 0.1, 'left', { collide: false }); ctx.put(foldingChair(), u - 0.75, v - 0.1, 'right', { collide: false }); ctx.put(brassTray(), u, v + 0.75, 'out', { collide: false }); }
   }, 1.4);
   for (const p of ['near:hi', 'far:lo']) ctx.fit(pottedPalm(), [p], { collide: false });
@@ -458,6 +476,11 @@ export function coolingRoom(ctx) {
     world.addLamp({ x, y: fc - 0.8, z, color: 0xffb060, intensity: 0.8 });
   }
 }
+/** gilt Moorish stalactite pendant (muqarnas drop), origin at the ceiling */
+const stalactite = def('fhStalactite', [0.36, 0.36, 0.3], (p) => {
+  p.lathe(mats.gold, [[0, 0], [0.16, 0], [0.15, -0.03], [0.1, -0.05], [0.11, -0.08], [0.06, -0.12], [0.07, -0.16], [0.03, -0.22], [0.02, -0.26], [0, -0.3]], 0, 0, 0, 8);
+  for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU + 0.2; p.lathe(mats.gold, [[0, 0], [0.025, -0.01], [0.012, -0.06], [0, -0.07]], Math.cos(a) * 0.13, -0.025, Math.sin(a) * 0.13, 5); }
+});
 /** gilt ceiling boss (origin at its top) */
 const boss = def('fhBoss', [0.3, 0.3, 0.12], (p) => {
   p.lathe(mats.gold, [[0, 0], [0.13, 0], [0.14, -0.02], [0.1, -0.05], [0.06, -0.06], [0.05, -0.09], [0.02, -0.12], [0, -0.125]], 0, 0, 0, 12);
@@ -505,6 +528,7 @@ export function bathEntrance(ctx) {
   ctx.fit(bench({ w: 1.8, mat: 'mahogany', iron: false }), ['left:mid', 'right:mid'], { collide: false });
   ctx.fit(shelves({ kind: 'linen', w: 1.5 }), ['right:hi', 'left:hi']);
   ctx.mount(clockWall(), 'far', ctx.W / 2, 2.0);
+  if (fineLv() >= 0) hangFreeF(ctx, cgTowelHooks({ w: 1.2, mat: 'oak' }), ['left', 'right', 'near'], 1.8);
 }
 
 // ---------------------------------------------------------------- third-class dining saloon
@@ -512,15 +536,19 @@ export function bathEntrance(ctx) {
 const CHAIR = chair3();
 const TABLES = [0, 1, 2].map((v) => table3({ w: 2.9, d: 0.85, v: v + 1 }));
 const URN = urn();
+let teapot = null;
+const TEAPOT = () => (teapot ??= cgTeapot());
 /** Long clothed tables with simple settings and slat-back chairs (both InstancedMesh), sideboards with crockery and
  *  urns, pine dado, coat hooks, posters, exposed beams and pipes. */
 export function thirdDining(inst, o = {}) {
   return (ctx) => {
     const { plan, world, deck } = ctx, b = plan.batch, Y = ctx.y, r = ctx.room, s = r.safe;
-    // sideboards along the walls first, with water urns
+    // sideboards along the walls first, with water urns (and the bill of fare above them)
+    const boards = [], posters = [];
     for (const w of ['left', 'right']) for (let k = 0; k < 2; k++) {
       if (!ctx.fit(servingCounter({ w: 2.2, d: 0.6, mat: 'pine', top: 'oak', items: true }), [w + (k ? ':hi' : ':lo')])) continue;
       const L = ctx.last; inst.add(URN, L.x + Math.cos(ctx.rot(L.dir)) * -0.05, Y + 0.925, L.z - Math.sin(ctx.rot(L.dir)) * -0.05 + 0, ctx.rot(L.dir));
+      boards.push([L.wall, L.pos + 0.75, ctx.at(L.wall === 'left' ? 0 : ctx.W, L.pos + 0.75)]);
     }
     ctx.fit(shelves({ kind: 'crockery', w: 1.5, mat: 'pine' }), ['far:mid', 'far:lo']);
     const TL = 2.9, TD = 0.85;
@@ -530,6 +558,7 @@ export function thirdDining(inst, o = {}) {
       if (!ctx.free(u, v, TL + 0.2, TD + 1.15)) return;
       const q = ctx._rect(u, v, TL, TD), p = ctx.at(u, v), rot = ctx.rot('in');
       inst.add(TABLES[tables % 3], p.x, Y, p.z, rot); tables++;
+      if (fineLv() >= 1) inst.add(TEAPOT(), p.x, Y + 0.762, p.z, rot + tables);
       world.addCollider(q.x0, Y, q.z0, q.x1, Y + 0.78, q.z1);
       for (let k = 0; k < 5; k++) for (const sgn of [-1, 1]) {
         const c = ctx.at(u - 1.16 + k * 0.58 + (rr() - 0.5) * 0.06, v + sgn * (0.66 + rr() * 0.08));
@@ -542,8 +571,9 @@ export function thirdDining(inst, o = {}) {
     const doorsAt = (side) => (r.doorsAll ?? []).filter((d) => d.side === side).map((d) => d.at);
     for (const [side, x, n] of [['aft', r.x0 + 0.05, 1], ['fwd', r.x1 - 0.05, -1]]) {
       const ds = doorsAt(side), zl = Math.max(s.z0, -hull(deck, x)) + 1, zr = Math.min(s.z1, hull(deck, x)) - 1;
-      for (let z = zl; z <= zr; z += 3.1) if (!ds.some((d) => Math.abs(d - z) < 1.4) && !(Math.abs(z) < 3.4 && o.casingWalls?.includes(side))) poster(b, 'z', x, z, Y + 1.25, 0.6, 0.8, n);
+      for (let z = zl; z <= zr; z += 3.1) if (!ds.some((d) => Math.abs(d - z) < 1.4) && !(Math.abs(z) < 3.4 && o.casingWalls?.includes(side))) { poster(b, 'z', x, z, Y + 1.25, 0.6, 0.8, n); posters.push([x, z]); }
     }
+    if (fineLv() >= 0) for (const [wall, pos, q] of boards) if (!posters.some(([x, z]) => Math.hypot(x - q.x, z - q.z) < 0.8)) ctx.mount(cgMenuBoard(), wall, pos, 1.75);
     for (const sg of [-1, 1]) {
       const zw = sg * (hull(deck, (s.x0 + s.x1) / 2) - 0.02);
       if (zw < s.z0 || zw > s.z1 + 0.05) continue;

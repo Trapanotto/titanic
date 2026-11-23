@@ -4,6 +4,7 @@ import { mats } from '../core/materials.js';
 import { T_WALL, bw, X, stations, segCollider } from './structure-layout.js';
 import { deckRegion } from './structure-decks.js';
 import { rivetGeo, merge, boxG, cylG, sphG } from './inst.js';
+import { TIER } from '../core/tier.js';
 
 const { A, B, C, boat, roof } = DECK_Y;
 
@@ -11,14 +12,18 @@ const { A, B, C, boat, roof } = DECK_Y;
 let LAMP = null;
 /** Caged bulkhead lamp: local y up, local z = out of the wall. */
 export function lampGeos() {
-  if (LAMP) return LAMP;
-  const brass = [boxG(0.16, 0.2, 0.03, 0, 0, 0.015), cylG([0, 0, 0.03], [0, 0, 0.12], 0.06, 10), cylG([0, 0.1, 0.12], [0, 0.14, 0.12], 0.075, 10, 0.05)];
+  const f = TIER.fine;
+  if (LAMP && LAMP.f === f) return LAMP;
+  const rs = f <= 1 ? 6 : 10;
+  const brass = [boxG(0.16, 0.2, 0.03, 0, 0, 0.015), cylG([0, 0, 0.03], [0, 0, 0.12], 0.06, rs), cylG([0, 0.1, 0.12], [0, 0.14, 0.12], 0.075, rs, 0.05)];
   for (let k = 0; k < 4; k++) { // cage wires
     const a = (k / 4) * Math.PI * 2 + 0.4, x = Math.cos(a) * 0.082, z = 0.12 + Math.sin(a) * 0.082;
-    brass.push(cylG([x, -0.08, z], [x, 0.1, z], 0.007, 4));
+    brass.push(cylG([x, -0.08, z], [x, 0.1, z], 0.007, f <= 1 ? 3 : 4));
   }
-  brass.push(cylG([0, -0.1, 0.12], [0, -0.075, 0.12], 0.05, 8));
-  LAMP = { brass: merge(brass), glow: sphG(0.068, 0, 0.0, 0.12, 10, 8, 1.25) };
+  brass.push(cylG([0, -0.1, 0.12], [0, -0.075, 0.12], 0.05, f <= 1 ? 6 : 8));
+  // fine 3: the cage's two hoops round the globe
+  if (f >= 3) for (const y of [-0.04, 0.05]) brass.push(new THREE.TorusGeometry(0.082, 0.006, 3, 10).rotateX(Math.PI / 2).translate(0, y, 0.12));
+  LAMP = { f, brass: merge(brass), glow: f <= 1 ? sphG(0.068, 0, 0.0, 0.12, 6, 5, 1.25) : sphG(0.068, 0, 0.0, 0.12, 10, 8, 1.25) };
   return LAMP;
 }
 
@@ -102,7 +107,7 @@ function windowDetail(batch, P, fpiece, piece, { u0, u1, v0, v1, t, op, frameMat
   const wm = t * 0.55, r = Math.min(op.arch || 0, (u1 - u0) / 2 - 0.05, (v1 - v0) / 2);
   // glass (behind the sash)
   if (r > 0) {
-    const seg = 5, pts = [];
+    const seg = TIER.fine >= 3 ? 8 : 5, pts = [];
     pts.push([u0, v0], [u1, v0], [u1, v1 - r]);
     for (let i = 1; i <= seg; i++) { const a = (i / seg) * Math.PI / 2; pts.push([u1 - r + Math.cos(a) * r, v1 - r + Math.sin(a) * r]); }
     for (let i = 1; i <= seg; i++) { const a = Math.PI / 2 + (i / seg) * Math.PI / 2; pts.push([u0 + r + Math.cos(a) * r, v1 - r + Math.sin(a) * r]); }
@@ -235,6 +240,7 @@ function plating(batch, inst, P, fpiece, { L, H, openings, piers, matOut, outN }
   const R = rivetGeo(0.01), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(outN[0], outN[1], outN[2]));
   const strap = (uc, va, vb) => {
     fpiece(uc - 0.045, uc + 0.045, va, vb, -0.006, 0, matOut);
+    if (TIER.fine === 0) return; // rivet heads are dropped on phones anyway
     for (const du of [-0.025, 0.025]) for (let v = va + 0.06; v < vb - 0.04; v += 0.15) { const p = P(uc + du, v + (du > 0 ? 0.075 : 0), -0.006); inst.at(R, matOut, p[0], p[1], p[2], q); }
   };
   for (const [p0, p1] of piers) {
@@ -443,7 +449,25 @@ function decorateInner(batch, info, rail, seed) {
   }
 }
 
+/** Teak margin (nibbing) planks round the foot of the deckhouses with a thin caulked seam (fine >= 2). */
+function marginPlanks(batch) {
+  const w = 0.22, up = [0, 1, 0];
+  const rect = (y, x0, x1, z0, z1, m) => batch.oquad(m, [x0, y, z1], [x1, y, z1], [x1, y, z0], [x0, y, z0], up);
+  const ring = (y, x0, x1, hw) => {
+    for (const s of [1, -1]) {
+      rect(y + 0.009, x0 - w, x1 + w, Math.min(s * hw, s * (hw + w)), Math.max(s * hw, s * (hw + w)), mats.woodDark);
+      rect(y + 0.0095, x0 - w, x1 + w, Math.min(s * (hw + w), s * (hw + w + 0.012)), Math.max(s * (hw + w), s * (hw + w + 0.012)), mats.iron);
+    }
+    for (const [xa, xb] of [[x0 - w, x0], [x1, x1 + w]]) rect(y + 0.009, xa, xb, -hw, hw, mats.woodDark);
+    for (const xs of [x0 - w - 0.012, x1 + w]) rect(y + 0.0095, xs, xs + 0.012, -hw - w, hw + w, mats.iron);
+  };
+  for (const h of BOAT_HOUSES) ring(boat, h.x0, h.x1, h.hw);
+  for (const r of BOAT_LOW_ROOFS) ring(boat, r.x0, r.x1, r.hw);
+  ring(A, A_HOUSE.x0, A_HOUSE.x1, A_HOUSE.hw);
+}
+
 export function buildWalls(world, batch, inst, ports) {
+  if (TIER.fine >= 2) { batch.cast = false; marginPlanks(batch); }
   batch.cast = true;
 
   // ================= well-deck bulkheads (C floor -> B floor) =================

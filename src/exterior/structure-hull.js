@@ -4,6 +4,7 @@ import { mats } from '../core/materials.js';
 import { stations, HULL_TOPS, X, BULWARK_H, hullEdge } from './structure-layout.js';
 import { rivetGeo, latheGeo } from './inst.js';
 import { strokeText } from './structure-font.js';
+import { TIER } from '../core/tier.js';
 
 const C = DECK_Y.C, B = DECK_Y.B;
 const Y_RED = 11.3, Y_STRIPE0 = 19.25, Y_STRIPE1 = 19.5;
@@ -201,6 +202,7 @@ function shellDoor(batch, inst, xc, y0, w, h, s, leaves = 2) {
   const hx = leaves === 2 ? xc + 0.1 : x1 - 0.18;
   batch.plate(mats.brass, S, N, hx - 0.025, hx + 0.025, y0 + h * 0.47, y0 + h * 0.56, 0.012, 0.05);
   // rivets round the frame
+  if (TIER.fine === 0) return;
   const R = rivetGeo(0.011), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), nv = new THREE.Vector3();
   const rv = (x, y) => { const n = hullNormal(x, y, s), p = hullPoint(x, y, s, base + 0.03); q.setFromUnitVectors(up, nv.set(n[0], n[1], n[2])); inst.at(R, m, p[0], p[1], p[2], q); };
   for (let x = x0 - f / 2; x <= x1 + f / 2 + 1e-6; x += 0.11) { rv(x, y1 + f / 2); rv(x, y0 - f / 2); }
@@ -210,15 +212,22 @@ function shellDoor(batch, inst, xc, y0, w, h, s, leaves = 2) {
 // ---------------- portholes ----------------
 let PH = null;
 function portholeGeos() {
-  if (PH) return PH;
+  const f = TIER.fine;
+  if (PH && PH.f === f) return PH;
+  // fine 0/1: 8-sided rim with a 3-step profile; 2/3: 12/16 sides, rounded lip and the inner ring of the glass frame
+  const rimProf = f <= 1
+    ? [[0.316, -0.03], [0.29, 0.035], [0.225, 0.054], [0.2, -0.005]]
+    : [[0.316, -0.03], [0.302, 0.016], [0.275, 0.044], [0.24, 0.056], [0.208, 0.042], [0.2, 0.02], [0.186, 0.016], [0.186, -0.002]];
+  const rs = f <= 1 ? 8 : f === 2 ? 12 : 16;
   PH = {
+    f,
     // brass rim: flange on the plating, raised lip, bore going in towards the glass
     // (flange starts 3 cm inside the plating so no gap opens where the faceted shell lies below the true surface)
-    rim: latheGeo('portRim', [[0.316, -0.03], [0.3, 0.018], [0.265, 0.046], [0.225, 0.054], [0.2, 0.035], [0.2, -0.005]], 12),
-    glass: new THREE.CircleGeometry(0.2, 12).rotateX(-Math.PI / 2).translate(0, 0.004, 0),
+    rim: latheGeo('portRim' + f, rimProf, rs),
+    glass: new THREE.CircleGeometry(f >= 2 ? 0.186 : 0.2, rs).rotateX(-Math.PI / 2).translate(0, 0.004, 0),
     // eyebrow (rigol) above the porthole: arc in the local x/z plane, local z = up
     rigol: (() => {
-      const pos = [], seg = 10, R0 = 0.34, R1 = 0.4, H = 0.035;
+      const pos = [], seg = f <= 1 ? 6 : 10, R0 = 0.34, R1 = 0.4, H = 0.035;
       const P = (t, r, h) => [Math.cos(t) * r, h, Math.sin(t) * r];
       for (let i = 0; i < seg; i++) {
         const t0 = 0.35 + (i / seg) * (Math.PI - 0.7), t1 = 0.35 + ((i + 1) / seg) * (Math.PI - 0.7);
@@ -276,6 +285,10 @@ export function buildPortholes(inst, ports) {
 
 // ---------------- details ----------------
 function rivets(inst, xsRanges) {
+  // fine 0: none (tiny instances are dropped on these devices anyway); fine 1: only the rows on the upper strakes
+  // that are seen close up from the open decks; fine 2/3: all rows above the waterline
+  if (TIER.fine === 0) return 0;
+  const yMin = TIER.fine === 1 ? 16.9 : 0;
   const R = rivetGeo(0.012);
   const q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), nv = new THREE.Vector3();
   const put = (x, y, s, mat) => {
@@ -287,7 +300,7 @@ function rivets(inst, xsRanges) {
   for (const [x0, x1, top] of HULL_TOPS) {
     for (let k = 1; k < STRAKES.length - 1; k++) {
       const yb = STRAKES[k];
-      if (yb < 11.5 || yb >= top - 0.05) continue;
+      if (yb < 11.5 || yb < yMin || yb >= top - 0.05) continue;
       // rows on the outer strake beside the lap
       const outBelow = isOut(k - 1), sgn = outBelow ? -1 : 1;
       for (const [dy, ph] of [[0.045, 0], [0.105, 0.06]]) {
@@ -313,7 +326,7 @@ function rivets(inst, xsRanges) {
         if (hw(xb, (ya + yb) / 2) < 1.0) continue;
         for (let y = ya + 0.08; y < yb - 0.06; y += 0.12) {
           const mat = matAt(y);
-          if (y < 10.9) continue;
+          if (y < 10.9 || y < yMin) continue;
           for (const dx of [-0.05, 0.05]) for (const s of [1, -1]) { put(xb + dx, y, s, mat); count++; }
         }
       }

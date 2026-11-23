@@ -4,7 +4,7 @@
 // Aft: third-class cabins along both sides, in the centre the ship's provision stores and refrigerated rooms
 // along two provision alleys either side of the hold stair 'holdAft', stair 'thirdAft' at the after end.
 import { buildDeckShell, bulkhead, createDeckPlan, sink, bench } from '../interior/kit.js';
-import { shortcuts } from './f-util.js';
+import { shortcuts, fineLv, dormitoryPlus, hangFree, cgMenuBoard, cgMopBucket } from './f-util.js';
 import {
   squashCourt, squashChanging, postOffice, baggageRoom, meatRoom, fishRoom, produceRoom, dairyRoom, iceRoom, mineralRoom, wineCellar, beerStore, dryStore,
 } from './g-hero.js';
@@ -14,6 +14,14 @@ const S0 = 3.05, S1 = 4.25, SC = 3.65;   // forward side corridors
 const C0 = 4.4, C1 = 5.6, CC = 5.0;       // aft side corridors
 const BULKHEADS = { 90: [-SC, SC], 108: [0], '-80': [-CC, 0, CC], '-100': [-CC, CC] };
 
+/** store room furnishing plus the store-keeper's stock list by the door (and a mop and bucket from fine level 1) */
+const stocked = (fn, mop = false) => (ctx) => {
+  fn(ctx);
+  const fl = fineLv(); if (fl < 0) return;
+  hangFree(ctx, cgMenuBoard({ mat: 'oak' }), ['near', 'left', 'right'], 1.6, [0.75, 0.25, 0.5, 0.85]);
+  if (mop && fl >= 1) ctx.fit(cgMopBucket(), ['near:hi', 'left:lo', 'right:lo'], { collide: false });
+};
+function berths(ctx) { ctx.opts = { pine: true }; dormitoryPlus(ctx); }
 function washroom(ctx) {
   ctx.fit(sink({ w: 1.0 }), ['far:mid', 'left:hi', 'right:hi']);
   ctx.fit(bench({ w: 1.2, back: false, mat: 'pine' }), ['left:mid', 'right:mid'], { collide: false });
@@ -79,7 +87,7 @@ export async function build(world) {
   await world.tick();
   room('lampen', 'Lampen- und Farbenlast', 104, 108, 0.6, 99, { preset: 'store', shelves: 3 }, [dP(106, { style: 'steel' })], SVC);
   await world.tick();
-  room('kojen-bug', 'Offene Kojen 3. Klasse (Bug)', 108, 116, -99, 99, { preset: 'dormitory', pine: true }, [dA(0, { w: 1.0, style: 'steel' })], {
+  room('kojen-bug', 'Offene Kojen 3. Klasse (Bug)', 108, 116, -99, 99, berths, [dA(0, { w: 1.0, style: 'steel' })], {
     type: 'dormitory', cls: 'third', wall: 'paintWhite', floor: 'linoRed', lamp: 'bulkhead', group: '3. Klasse',
     teleport: { name: 'Offene Kojen 3. Klasse', group: '3. Klasse' },
     info: { title: 'Offene Kojen im Bug', text: 'Ganz vorne im Bug, wo das Schiff am stärksten stampfte, schliefen allein reisende Männer der Dritten Klasse in offenen Kojen aus Kiefernholz. Diese Räume lagen der Kollisionsstelle am nächsten. Bewohner berichteten später, dass hier schon wenige Minuten nach dem Zusammenstoß Wasser über den Boden lief.' } });
@@ -101,27 +109,27 @@ export async function build(world) {
   gang('prov-a', 'Proviantgang (achtern)', -100, -80, -0.6, 0.6, { lamp: 'bulkhead', group: 'Besatzung' });
   // refrigerated rooms off the forward provision alley
   await world.tick();
-  room('fleisch', 'Fleischkühlraum (Hängefleisch)', -64, -58, -C0, -0.6, meatRoom, [dS(-61, { style: 'steel' })], { ...COLD,
+  room('fleisch', 'Fleischkühlraum (Hängefleisch)', -64, -58, -C0, -0.6, stocked(meatRoom, true), [dS(-61, { style: 'steel' })], { ...COLD,
     info: { title: 'Fleischkühlraum', text: 'In diesem Kühlraum hingen Rinderhälften, Hammel und Lämmer an Stahlschienen. Die Metzger des Schiffes zerlegten das Fleisch hier für alle drei Klassen. Kühlschlangen an den Wänden hielten die Temperatur knapp über dem Gefrierpunkt.' } });
   await world.tick();
-  room('fisch', 'Fischkühlraum', -70, -64, -C0, -0.6, fishRoom, [dS(-67, { style: 'steel' })], COLD);
+  room('fisch', 'Fischkühlraum', -70, -64, -C0, -0.6, stocked(fishRoom, true), [dS(-67, { style: 'steel' })], COLD);
   await world.tick();
-  room('gemuese', 'Gemüsekühlraum', -64, -58, 0.6, C0, produceRoom('veg'), [dP(-61, { style: 'steel' })], COLD);
+  room('gemuese', 'Gemüsekühlraum', -64, -58, 0.6, C0, stocked(produceRoom('veg')), [dP(-61, { style: 'steel' })], COLD);
   await world.tick();
-  room('obst', 'Obstkühlraum', -70, -64, 0.6, C0, produceRoom('fruit'), [dP(-67, { style: 'steel' })], COLD);
+  room('obst', 'Obstkühlraum', -70, -64, 0.6, C0, stocked(produceRoom('fruit')), [dP(-67, { style: 'steel' })], COLD);
   // stores off the after provision alley
   await world.tick();
-  room('molkerei', 'Kühlraum für Milch, Butter und Eier', -86, -80, -C0, -0.6, dairyRoom, [dS(-83, { style: 'steel' })], COLD);
+  room('molkerei', 'Kühlraum für Milch, Butter und Eier', -86, -80, -C0, -0.6, stocked(dairyRoom, true), [dS(-83, { style: 'steel' })], COLD);
   await world.tick();
-  room('eis', 'Eisraum', -92, -86, -C0, -0.6, iceRoom, [dS(-89, { style: 'steel' })], COLD);
+  room('eis', 'Eisraum', -92, -86, -C0, -0.6, stocked(iceRoom), [dS(-89, { style: 'steel' })], COLD);
   await world.tick();
-  room('mineral', 'Mineralwasserlager', -100, -92, -C0, -0.6, mineralRoom, [dS(-96, { style: 'steel' })], { ...COLD, floor: 'steelFloor' });
+  room('mineral', 'Mineralwasserlager', -100, -92, -C0, -0.6, stocked(mineralRoom), [dS(-96, { style: 'steel' })], { ...COLD, floor: 'steelFloor' });
   await world.tick();
-  room('wein', 'Wein- und Spirituosenlager', -90, -80, 0.6, C0, wineCellar, [dP(-85, { style: 'steel' })], { ...COLD, floor: 'steelFloor',
+  room('wein', 'Wein- und Spirituosenlager', -90, -80, 0.6, C0, stocked(wineCellar), [dP(-85, { style: 'steel' })], { ...COLD, floor: 'steelFloor',
     teleport: { name: 'Wein- und Spirituosenlager', group: 'Besatzung' },
     info: { title: 'Wein- und Spirituosenlager', text: 'Der verschlossene Getränkekeller enthielt unter anderem mehr als 1 000 Flaschen Wein, rund 15 000 Flaschen Bier und Stout sowie 850 Flaschen Spirituosen. Den Schlüssel verwahrte der Chefsteward. 2009 wurden im Wrack noch ungeöffnete Champagnerflaschen gefunden.' } });
   await world.tick();
-  room('bier', 'Bier- und Trockenproviantlager', -100, -90, 0.6, C0, (ctx) => { beerStore(ctx); dryStore(ctx); }, [dP(-95, { style: 'steel' })], { ...COLD, floor: 'steelFloor' });
+  room('bier', 'Bier- und Trockenproviantlager', -100, -90, 0.6, C0, stocked((ctx) => { beerStore(ctx); dryStore(ctx); }), [dP(-95, { style: 'steel' })], { ...COLD, floor: 'steelFloor' });
   // third-class cabins in the centre aft and the stair 'thirdAft'
   await world.tick();
   row(-107, -100, 0, 1, 'third', { zOut: C0, flip: true, pitch: 3.5 }); row(-107, -100, 0, -1, 'third', { zOut: C0, flip: true, pitch: 3.5 });

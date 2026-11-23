@@ -2,7 +2,9 @@
 // cargo-hold furnishing that keeps walking lanes free (crates, barrels, bales, netted sack piles), mail-room furnishing.
 import * as THREE from 'three';
 import { mats } from '../core/materials.js';
-import { PRESETS, overlap, sackPile, shelves, tableRect, safe, crate, stool, trunk, def, kitMats } from '../interior/kit.js';
+import { TIER } from '../core/tier.js';
+import { DECK_Y, hullHalfWidth } from '../core/constants.js';
+import { PRESETS, overlap, sackPile, shelves, tableRect, safe, crate, stool, trunk, def, kitMats, Batch, LINING_INSET } from '../interior/kit.js';
 import { carPaint } from './f-util.js';
 import { bagPile } from './g-hero.js';
 import { gratingMat } from './tank-lib.js';
@@ -118,6 +120,16 @@ export const renault = def('ghRenault', [1.8, 4.6, 2.12], (p) => {
   p.b(mats.iron, 0.3, 0.02, 1.0, -2.25, 0.62, 0); for (const z of [-0.45, 0.45]) p.b(mats.iron, 0.3, 0.2, 0.02, -2.25, 0.62, z);
   p.lathe(mats.brass, [[0, 0], [0.04, 0], [0.045, 0.1], [0, 0.12]], -2.135, 0.82, 0.55, 8); p.b(mats.navRed, 0.01, 0.04, 0.04, -2.185, 0.86, 0.55);
   p.b(kitMats.slate, 0.01, 0.12, 0.42, -2.12, 0.62, 0);
+  if (TIER.fine >= 1) {
+    // carbide (acetylene) generator for the headlamps on the near-side running board, rubber hose to the lamps
+    p.lathe(mats.brass, [[0, 0], [0.07, 0], [0.075, 0.02], [0.07, 0.3], [0.05, 0.34], [0.02, 0.36], [0, 0.37]], 0.75, 0.596, -0.8, 10);
+    for (const y of [0.66, 0.84]) p.t(mats.iron, 0.074, 0.006, 0.75, y, -0.8, 'y', 12, 3);
+    p.tube(mats.rubber, [[0.75, 0.94, -0.8], [1.4, 0.88, -0.62], [2.0, 0.97, -0.42]], 0.008, 8, 3);
+    // mudguard stays from the frame rails, door hinges, step plates on the running boards
+    for (const x of [1.45, -1.35]) for (const s of [-1, 1]) p.tube(mats.iron, [[x + 0.22, 0.45, s * 0.46], [x + 0.28, 0.7, s * 0.68], [x + 0.31, 0.84, s * 0.8]], 0.01, 6, 3);
+    for (const s of [-1, 1]) for (const y of [0.68, 1.0]) p.b(mats.brass, 0.04, 0.06, 0.012, -0.22, y, s * 0.742);
+    if (TIER.fine >= 2) for (const s of [-1, 1]) for (const x of [-0.55, 0.55]) p.b(mats.brass, 0.3, 0.004, 0.2, x, 0.6, s * 0.8);
+  }
 });
 
 /** the opened shipping crate (front +x = open end): sides of planed boards with stencils, battens, lid off,
@@ -139,12 +151,46 @@ export const carCrate = def('ghCarCrate', [2.4, 5.0, 2.3], (p) => {
   for (let i = 0; i < 26; i++) { const g = new THREE.SphereGeometry(0.2 + r() * 0.15, 6, 4); g.scale(1.6, 0.35, 1.2); p.ag(STRAW, g, -2.1 + r() * 4.4, 0.13, -0.85 + r() * 1.7); }
   for (let i = 0; i < 70; i++) { const m = p.ab(STRAW, 0.25 + r() * 0.2, 0.006, 0.01, 2.5 + r() * 1.2, 0.026, -1.0 + r() * 2.0); m.rotation.y = r() * 3; }
   p.b(mats.paper, 0.01, 0.35, 0.6, -2.46, 1.3, 0.3);
+  if (TIER.fine >= 1) {
+    // hoop-iron corner straps and the lifting eyes of the crate
+    for (const s of [-1, 1]) {
+      for (const x of [-2.42, 2.42]) p.b(mats.iron, 0.07, 2.05, 0.006, x, 0.12, s * 1.1);
+      for (const y of [0.3, 1.9]) p.b(mats.iron, 4.86, 0.05, 0.006, 0, y, s * 1.1);
+      p.t(mats.iron, 0.05, 0.012, -1.8, 2.25, s * 1.1, 'z', 10, 3); p.t(mats.iron, 0.05, 0.012, 1.8, 2.25, s * 1.1, 'z', 10, 3);
+    }
+  }
 });
 /** canvas-wrapped bale tied with rope bands */
 const bale = def('ghBale', [1.0, 0.7, 0.7], (p, o) => {
-  p.bb(mats.canvas, 0.7, 0.62, 1.0, 0, 0, 0, 0.08);
-  for (const z of [-0.3, 0, 0.3]) { p.b(mats.rope, 0.72, 0.03, 0.03, 0, 0.6, z); for (const s of [-1, 1]) p.b(mats.rope, 0.03, 0.62, 0.03, s * 0.355, 0, z); }
-  p.b(kitMats.stencil, 0.005, 0.3, 0.45, 0.352, 0.15, 0.0);
+  const f = TIER.fine;
+  if (f >= 1) {
+    // pressed bale: bulging canvas wrap, the bands cut into it, sewn seam along the top, shipping mark on the front
+    p.pil(mats.canvas, 0.7, 0.62, 1.0, 0, 0, 0, 0.18, 0.12, 3, 12, -0.015);
+    for (const z of [-0.3, 0, 0.3]) { p.b(mats.rope, 0.66, 0.026, 0.03, 0, 0.6, z); for (const sg of [-1, 1]) p.b(mats.rope, 0.026, 0.58, 0.03, sg * 0.338, 0.02, z); }
+    if (f >= 2) for (let k = 0; k < 9; k++) p.b(mats.rope, 0.012, 0.006, 0.03, -0.05 + (k % 2) * 0.1, 0.618, -0.4 + k * 0.1);
+    p.b(kitMats.stencil, 0.005, 0.28, 0.42, 0.342, 0.17, 0.0);
+  } else {
+    p.bb(mats.canvas, 0.7, 0.62, 1.0, 0, 0, 0, 0.08);
+    for (const z of [-0.3, 0, 0.3]) { p.b(mats.rope, 0.72, 0.03, 0.03, 0, 0.6, z); for (const s of [-1, 1]) p.b(mats.rope, 0.03, 0.62, 0.03, s * 0.355, 0, z); }
+    p.b(kitMats.stencil, 0.005, 0.3, 0.45, 0.352, 0.15, 0.0);
+  }
+});
+/** stack of dunnage (loose planks for stowing cargo), crossed in layers – low clutter, no collider */
+const dunnage = def('ghDunnage', [0.9, 1.5, 0.22], (p, o) => {
+  const r = rng(o.v ?? 1), n = 3 + Math.floor(r() * 3);
+  for (let i = 0; i < n; i++) {
+    const across = i % 2 === 1, y = i * 0.045;
+    for (let k = 0; k < (across ? 3 : 4); k++) {
+      const m = across ? p.b(mats.pine, 0.85, 0.04, 0.14, (r() - 0.5) * 0.04, y, -0.5 + k * 0.5) : p.b(mats.pine, 0.15, 0.04, 1.45 - r() * 0.2, -0.33 + k * 0.22, y, (r() - 0.5) * 0.05);
+      m.rotation.y = (r() - 0.5) * 0.06;
+    }
+  }
+});
+/** coiled mooring / lashing rope lying on the floor */
+const ropeCoil = def('ghRopeCoil', [0.62, 0.62, 0.16], (p) => {
+  for (let k = 0; k < 3; k++) p.t(mats.rope, 0.24 - k * 0.025, 0.026, 0.0, 0.026 + k * 0.05, 0, 'y', 16, 4);
+  p.t(mats.rope, 0.17, 0.024, 0.02, 0.03, 0.02, 'y', 14, 4);
+  p.tube(mats.rope, [[0.24, 0.13, 0], [0.3, 0.06, 0.05], [0.26, 0.026, 0.22]], 0.024, 6, 4);
 });
 /** pile of sacks and small crates under a rope cargo net, ring bolts */
 const nettedPile = def('ghNetted', [1.6, 1.3, 1.1], (p, o) => {
@@ -172,6 +218,13 @@ export function cargoHold(lanes, extra) {
     let k = 0;
     ctx.grid(3.1, 2.7, (u, v, i, j) => { if ((i + j) % 2 === 0) ctx.put(k++ % 2 ? bale() : nettedPile({ v: i * 3 + j }), u, v, (i + j) % 4 ? 'in' : 'right'); }, 1.2);
     PRESETS.hold(ctx);
+    // low clutter in what is left over (dunnage stacks, rope coils): no colliders, placed after all cargo
+    const f = TIER.fine;
+    if (f >= 1) {
+      let n = 0;
+      const cap = f >= 3 ? 8 : f >= 2 ? 5 : 3;
+      ctx.grid(2.2, 1.9, (u, v, i, j) => { if (n < cap && (i * 7 + j * 3) % 4 === 1 && ctx.put((i + j) % 3 ? dunnage({ v: i * 5 + j }) : ropeCoil(), u, v, (i + j) % 2 ? 'in' : 'left', { collide: false })) n++; }, 0.5);
+    }
   };
 }
 
@@ -212,5 +265,36 @@ export function mailHold(ctx) {
   if (ctx.put(tableRect({ w: 1.6, d: 0.8, mat: 'oak', items: true }), 1.4, Math.min(2.0, ctx.D / 2), 'in')) ctx.put(stool({ mat: 'oak', seat: 'oak' }), 1.4, Math.min(2.0, ctx.D / 2) - 0.65, 'in', { collide: false });
   ctx.grid(1.6, 1.25, (u, v, i, j) => { if (!((i === 0 && j < 2))) ctx.put((i + j) % 3 ? bagPile({ v: i * 5 + j }) : sackPile(), u, v, (i + j) % 2 ? 'in' : 'right'); }, 0.7);
   ctx.fit(trunk({ big: true }), ['right:lo', 'left:lo']);
+}
+/**
+ * Spar ceiling in the cargo holds: horizontal wooden battens on the hull frames (they keep the cargo off the cold,
+ * sweating shell plating). holds = [{ x0, x1, sides: [-1|1, ...] }]. Level 0: three rows, from level 1 six.
+ */
+export async function holdBattens(world, holds) {
+  const deck = 'orlop', Y = DECK_Y.orlop, f = TIER.fine, b = new Batch(world, deck);
+  const rows = f === 0 ? [0.5, 1.15, 1.8] : [0.35, 0.68, 1.01, 1.34, 1.67, 2.0], hgt = 0.14, step = f === 0 ? 2.0 : 1.0;
+  const w = (x, y) => hullHalfWidth(x, y) - LINING_INSET - 0.075;     // inner edge of the kit's hull frames
+  for (const h of holds) {
+    await world.tick();
+    const n = Math.max(1, Math.round((h.x1 - h.x0 - 0.2) / step));
+    for (const s of h.sides) for (const dy of rows) {
+      const y0 = Y + dy, y1 = y0 + hgt;
+      for (let i = 0; i < n; i++) {
+        const xa = h.x0 + 0.1 + ((h.x1 - h.x0 - 0.2) * i) / n, xb = h.x0 + 0.1 + ((h.x1 - h.x0 - 0.2) * (i + 1)) / n;
+        const fa0 = s * (w(xa, y0) - 0.03), fb0 = s * (w(xb, y0) - 0.03), fa1 = s * (w(xa, y1) - 0.03), fb1 = s * (w(xb, y1) - 0.03);
+        b.poly(mats.pine, [[xa, y0, fa0], [xb, y0, fb0], [xb, y1, fb1], [xa, y1, fa1]], [0, 0, -s]);
+        b.poly(mats.pine, [[xa, y1, fa1], [xb, y1, fb1], [xb, y1, s * w(xb, y1)], [xa, y1, s * w(xa, y1)]], [0, 1, 0]);
+        if (dy > 1.5) b.poly(mats.pine, [[xa, y0, fa0], [xb, y0, fb0], [xb, y0, s * w(xb, y0)], [xa, y0, s * w(xa, y0)]], [0, -1, 0]);
+      }
+    }
+    // lashing ring bolts let into the deck along the sides (level 2+)
+    if (f >= 2) for (const s of h.sides) for (let x = h.x0 + 1.0; x < h.x1 - 0.6; x += 2.0) {
+      const z = s * (w(x, Y) - 0.35);
+      b.disc(mats.iron, [x, Y + 0.004, z], [0, 1, 0], 0.05, 8);
+      b.prism(mats.iron, [x - 0.045, Y + 0.012, z], [x + 0.045, Y + 0.012, z], 0.011, 4);
+    }
+  }
+  await world.tick();
+  b.flush();
 }
 export { gratingMat };

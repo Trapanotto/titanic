@@ -218,6 +218,20 @@ export function strapCeiling(plan, f, { x0, x1, z0, z1, xs, zs, avoid = [], mat 
   return b.tris - t0;
 }
 
+/**
+ * Carved console bracket (corbel) under the end of a ceiling beam where it meets a wall: (x, z) = point on the wall face
+ * under the beam centre line, A = unit direction of the beam into the room, yb = underside of the beam, w = width.
+ */
+export function corbel(b, mat, x, z, A, yb, w = 0.2, h = 0.26, d = 0.22) {
+  const S = [-A[1], A[0]], prof = [[0, 0], [d, 0], [d * 0.92, -h * 0.12], [d * 0.6, -h * 0.22], [d * 0.42, -h * 0.42], [d * 0.36, -h * 0.66], [d * 0.18, -h * 0.84], [0.02, -h], [0, -h]];
+  const P = (a, y, s) => [x + A[0] * a + S[0] * s, yb + y, z + A[1] * a + S[1] * s];
+  for (const sd of [-1, 1]) b.poly(mat, prof.map(([a, y]) => P(a, y, sd * w / 2)), [S[0] * sd, 0, S[1] * sd]);
+  for (let i = 1; i < prof.length - 1; i++) {
+    const [a0, y0] = prof[i], [a1, y1] = prof[i + 1];
+    b.poly(mat, [P(a0, y0, -w / 2), P(a1, y1, -w / 2), P(a1, y1, w / 2), P(a0, y0, w / 2)], [A[0] * (y0 - y1), -(a0 - a1) * 0 - Math.abs(a0 - a1) - 0.001, A[1] * (y0 - y1)]);
+  }
+}
+
 /** instanced ceiling ornaments for strapCeiling: plaster rosette, small pendant drop, beam-crossing boss */
 export function ceilingOrnaments(f, mat = mats.paintWhite, gilt = null) {
   const rose = G.revolve([{ o: 0.03, y: -0.045, m: 0 }, { o: 0.13, y: -0.03, m: 0.028 }, { o: 0.2, y: 0 }], { seg: 10, k: 5, capBottom: true });

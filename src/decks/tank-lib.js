@@ -5,6 +5,7 @@ import { mats } from '../core/materials.js';
 import { DECK_Y, ZONE_LEN, SLAB, hullHalfWidth } from '../core/constants.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Batch, LINING_INSET } from '../interior/kit.js';
+import { TIER } from '../core/tier.js';
 
 export const DECK = 'tank';
 export const Y = DECK_Y.tank;                         // tank top floor
@@ -63,8 +64,15 @@ export class Instancer {
     e.list.push(new THREE.Matrix4().compose(_v.set(x, y, z), _q, _s));
     this.count++;
   }
-  flush() {
-    for (const e of this.map.values()) {
+  flush() { for (const e of this.map.values()) this._flushOne(e); this.map.clear(); }
+  /** flush with a world.tick() between the templates (time slicing) */
+  async flushAsync() {
+    let k = 0;
+    for (const e of this.map.values()) { this._flushOne(e); if (++k % 6 === 0) await this.world.tick(); }
+    this.map.clear();
+  }
+  _flushOne(e) {
+    {
       const zone = this.world.zone(DECK, e.zi * ZONE_LEN + 1);
       for (const p of e.tpl.parts) {
         const im = new THREE.InstancedMesh(p.geo, p.mat, e.list.length);
@@ -76,7 +84,6 @@ export class Instancer {
         zone.add(im);
       }
     }
-    this.map.clear();
   }
 }
 
@@ -138,14 +145,70 @@ export function latheAt(b, mat, prof, axis, p, seg = 16) {
   const m = axis === 'x' ? M4(p[0], p[1], p[2], 0, 0, -Math.PI / 2) : axis === 'z' ? M4(p[0], p[1], p[2], Math.PI / 2, 0, 0) : axis === '-x' ? M4(p[0], p[1], p[2], 0, 0, Math.PI / 2) : M4(p[0], p[1], p[2]);
   stamp(b, mat, g, m);
 }
-/** hexagonal nut + washer with its axis along d at p (lying on a surface whose normal is d) */
-export function nut(b, p, d, r = 0.03, mat = mats.iron) {
-  stamp(b, mat, gcache('nut' + r, () => { const g = new THREE.CylinderGeometry(r, r, r * 1.1, 6); g.translate(0, r * 0.75, 0); return g; }), M4dir(p, d));
-  stamp(b, mat, gcache('wash' + r, () => { const g = new THREE.CylinderGeometry(r, r * 1.45, r * 0.4, 6, 1, true); return g; }), M4dir(p, d));
+/**
+ * Nut geometry (axis +y, standing on y = 0, radius r) without hidden faces. fine 0: square nut, no washer (10 tris);
+ * fine 1: hexagon nut (16); fine ≥ 2: hexagon nut on a bevelled washer (28). (The old cylinder nut + washer had 36.)
+ */
+function nutGeo(r) {
+  const f = TIER.fine;
+  return gcache('nutF' + f + '_' + r, () => {
+    const n = f === 0 ? 4 : 6, pos = [], nor = [], idx = [];
+    const ring = (rad, y, ny, ph) => { const base = pos.length / 3; for (let i = 0; i < n; i++) { const a = ph + (i / n) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a), k = Math.hypot(1, ny); pos.push(rad * c, y, rad * s); nor.push(c / k, ny / k, s / k); } return base; };
+    const side = (lo, hi) => { for (let i = 0; i < n; i++) { const j = (i + 1) % n; idx.push(lo + i, hi + j, lo + j, lo + i, hi + i, hi + j); } };
+    const ph = Math.PI / n, yb = f >= 2 ? r * 0.2 : -r * 0.1, yt = r * 1.3;
+    if (f >= 2) { const w0 = ring(r * 1.45, -r * 0.2, 0.9, ph), w1 = ring(r * 1.05, r * 0.2, 0.9, ph); side(w0, w1); }
+    const s0 = ring(r, yb, 0, ph), s1 = ring(r, yt, 0, ph); side(s0, s1);
+    const c0 = pos.length / 3;
+    for (let i = 0; i < n; i++) { const a = ph + (i / n) * Math.PI * 2; pos.push(r * Math.cos(a), yt, r * Math.sin(a)); nor.push(0, 1, 0); }
+    for (let i = 1; i < n - 1; i++) idx.push(c0, c0 + i + 1, c0 + i);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(new Array((pos.length / 3) * 2).fill(0), 2));
+    g.setIndex(idx);
+    return g;
+  });
 }
-const RIVET = new THREE.ConeGeometry(0.017, 0.013, 5, 1); RIVET.translate(0, 0.004, 0); RIVET.computeVertexNormals();
+/** nut (+ washer from fine 2) with its axis along d at p (lying on a surface whose normal is d) */
+export function nut(b, p, d, r = 0.03, mat = mats.iron) { stamp(b, mat, nutGeo(r), M4dir(p, d)); }
+/** rivet head: open cone (its base lies under the plate surface) – 4 / 5 / 6 sides by detail level */
+function rivetGeo() {
+  const f = TIER.fine;
+  return gcache('rivetF' + f, () => { const g = new THREE.ConeGeometry(0.017, 0.013, f === 0 ? 4 : f === 1 ? 5 : 6, 1, true); g.translate(0, 0.004, 0); g.computeVertexNormals(); return g; });
+}
 /** rivet head (cone) at p, outward direction d */
-export function rivet(b, p, d, mat = mats.steelDark, s = 1) { stamp(b, mat, RIVET, M4dir(p, d, s)); }
+export function rivet(b, p, d, mat = mats.steelDark, s = 1) { stamp(b, mat, rivetGeo(), M4dir(p, d, s)); }
+/**
+ * Rivet heads as InstancedMesh (one per zone and material): for long rows on big plates. add(p, d) / line(p, q, d, pitch);
+ * flushAsync() creates the meshes.
+ */
+export class RivetSet {
+  constructor(world) { this.world = world; this.map = new Map(); this.count = 0; }
+  add(p, d, mat = mats.steelDark) {
+    const zi = Math.floor(p[0] / ZONE_LEN), k = zi + '|' + mat.uuid;
+    let e = this.map.get(k);
+    if (!e) this.map.set(k, (e = { zi, mat, list: [] }));
+    e.list.push(M4dir(p, d));
+    this.count++;
+  }
+  line(p, q, d, pitch = 0.1, mat = mats.steelDark) {
+    const L = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]), n = Math.max(1, Math.round(L / pitch));
+    for (let i = 0; i <= n; i++) { const t = i / n; this.add([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t], d, mat); }
+  }
+  async flushAsync() {
+    const geo = rivetGeo();
+    for (const e of this.map.values()) {
+      const im = new THREE.InstancedMesh(geo, e.mat, e.list.length);
+      e.list.forEach((m, i) => im.setMatrixAt(i, m));
+      im.instanceMatrix.needsUpdate = true;
+      im.computeBoundingSphere();
+      im.userData.noMerge = true;
+      this.world.zone(DECK, e.zi * ZONE_LEN + 1).add(im);
+      await this.world.tick();
+    }
+    this.map.clear();
+  }
+}
 /** rivet row along a straight line p→q on a surface with normal d, pitch */
 export function rivetLine(b, p, q, d, pitch = 0.1, mat = mats.steelDark, s = 1) {
   const L = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]), n = Math.max(1, Math.round(L / pitch));
@@ -233,17 +296,92 @@ export function tube(b, mat, axis, c, r, a0, a1, opts = {}) {
   tubeBetween(b, mat, P(a0), P(a1), r, opts);
 }
 
-/** Pipe through world points with flanges at the bends. */
+/** bolted flange ring at p, axis d (unit or not), pipe radius r */
+function flangeAt(b, fm, p, d, r, seg) {
+  const l = Math.hypot(d[0], d[1], d[2]) || 1, h = r * 0.35, dn = d.map((v) => (v / l) * h);
+  tubeBetween(b, fm, [p[0] - dn[0], p[1] - dn[1], p[2] - dn[2]], [p[0] + dn[0], p[1] + dn[1], p[2] + dn[2]], r * 1.35, { seg, flat: true });
+}
+/**
+ * Pipe through world points. From detail level 1 the corners are swept bends (radius opts.rb, default 2.5 r) with
+ * flanges where a bend meets a straight leg; level 0 keeps mitred corners with one flange each (opts.bend = false too).
+ */
 export function pipeRun(b, mat, pts, r, opts = {}) {
-  const seg = opts.seg ?? 8;
-  for (let i = 0; i < pts.length - 1; i++) tubeBetween(b, mat, pts[i], pts[i + 1], r, { seg, caps: false });
-  const fm = opts.flange === undefined ? mats.iron : opts.flange;
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[Math.max(0, i - 1)], c = pts[Math.min(pts.length - 1, i + 1)];
-    const d = [c[0] - a[0], c[1] - a[1], c[2] - a[2]], l = Math.hypot(...d) || 1, h = r * 0.35;
-    const p = pts[i], dn = d.map((v) => (v / l) * h);
-    if (fm) tubeBetween(b, fm, [p[0] - dn[0], p[1] - dn[1], p[2] - dn[2]], [p[0] + dn[0], p[1] + dn[1], p[2] + dn[2]], r * 1.35, { seg, flat: true });
+  const seg = opts.seg ?? 8, fm = opts.flange === undefined ? mats.iron : opts.flange, f = TIER.fine;
+  if (f >= 1 && opts.bend !== false && pts.length > 2) {
+    const { path, joints } = roundPath(pts, opts.rb ?? r * 2.5, f === 1 ? 2 : f === 2 ? 3 : 4);
+    sweepTube(b, mat, path, r, seg);
+    if (!fm) return;
+    const n = pts.length;
+    flangeAt(b, fm, pts[0], [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1], pts[1][2] - pts[0][2]], r, seg);
+    flangeAt(b, fm, pts[n - 1], [pts[n - 1][0] - pts[n - 2][0], pts[n - 1][1] - pts[n - 2][1], pts[n - 1][2] - pts[n - 2][2]], r, seg);
+    for (const j of joints) flangeAt(b, fm, j.p, j.d, r, seg);
+    return;
   }
+  for (let i = 0; i < pts.length - 1; i++) tubeBetween(b, mat, pts[i], pts[i + 1], r, { seg, caps: false });
+  for (let i = 0; i < pts.length && fm; i++) {
+    const a = pts[Math.max(0, i - 1)], c = pts[Math.min(pts.length - 1, i + 1)];
+    flangeAt(b, fm, pts[i], [c[0] - a[0], c[1] - a[1], c[2] - a[2]], r, seg);
+  }
+}
+
+/**
+ * Polyline with its corners rounded into circular bends (bend radius rb, `steps` segments per 90°). The radius shrinks
+ * where a leg is too short. Returns { path, joints, bends } – joints = the points where a straight leg meets a bend,
+ * bends = [i0, i1] index ranges of the bends in path.
+ */
+export function roundPath(pts, rb, steps = 4) {
+  const path = [pts[0]], joints = [], bends = [];
+  const sub = (a, c) => [a[0] - c[0], a[1] - c[1], a[2] - c[2]], len = (v) => Math.hypot(v[0], v[1], v[2]);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const P = pts[i], u1 = sub(P, pts[i - 1]), u2 = sub(pts[i + 1], P), l1 = len(u1), l2 = len(u2);
+    if (l1 < 1e-5 || l2 < 1e-5) continue;
+    const d1 = u1.map((v) => v / l1), d2 = u2.map((v) => v / l2), cs = Math.max(-1, Math.min(1, d1[0] * d2[0] + d1[1] * d2[1] + d1[2] * d2[2]));
+    const th = Math.acos(cs);
+    if (th < 0.06) { path.push(P); joints.push({ p: P, d: d1 }); continue; }
+    const t = Math.min(rb * Math.tan(th / 2), 0.45 * l1, 0.45 * l2), r = t / Math.tan(th / 2), sn = Math.sin(th);
+    const nm = [(d2[0] - d1[0] * cs) / sn, (d2[1] - d1[1] * cs) / sn, (d2[2] - d1[2] * cs) / sn];
+    const A = [P[0] - d1[0] * t, P[1] - d1[1] * t, P[2] - d1[2] * t], C = [A[0] + nm[0] * r, A[1] + nm[1] * r, A[2] + nm[2] * r];
+    const n = Math.max(2, Math.round((steps * th) / (Math.PI / 2))), i0 = path.length;
+    for (let k = 0; k <= n; k++) {
+      const ph = (th * k) / n, c = Math.cos(ph), s = Math.sin(ph);
+      path.push([C[0] + r * (-nm[0] * c + d1[0] * s), C[1] + r * (-nm[1] * c + d1[1] * s), C[2] + r * (-nm[2] * c + d1[2] * s)]);
+    }
+    joints.push({ p: A, d: d1 }, { p: path[path.length - 1], d: d2 });
+    bends.push([i0, path.length - 1]);
+  }
+  path.push(pts[pts.length - 1]);
+  return { path, joints, bends };
+}
+
+/** Tube swept along a polyline (smooth normals, parallel-transported rings, no caps). Works on Batch and TBatch. */
+export function sweepTube(b, mat, path, r, seg = 10) {
+  const N = path.length;
+  if (N < 2) return;
+  const T = [];
+  for (let i = 0; i < N; i++) {
+    const a = path[Math.max(0, i - 1)], c = path[Math.min(N - 1, i + 1)], p = path[i];
+    const d0 = i > 0 ? [p[0] - a[0], p[1] - a[1], p[2] - a[2]] : null, d1 = i < N - 1 ? [c[0] - p[0], c[1] - p[1], c[2] - p[2]] : null;
+    const nz = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+    T.push(nz(d0 && d1 ? nz(d0).map((v, k) => v + nz(d1)[k]) : (d0 || d1)));
+  }
+  let [u] = basis(T[0]);
+  const zx = (path[0][0] + path[N - 1][0]) / 2, bk = b._bucket(mat, zx), base = bk.pos.length / 3, circ = 2 * Math.PI * r;
+  let s = 0;
+  for (let i = 0; i < N; i++) {
+    const t = T[i];
+    if (i) { s += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1], path[i][2] - path[i - 1][2]); const k = u[0] * t[0] + u[1] * t[1] + u[2] * t[2]; u = [u[0] - t[0] * k, u[1] - t[1] * k, u[2] - t[2] * k]; const l = Math.hypot(...u) || 1; u = u.map((v) => v / l); }
+    const v = [t[1] * u[2] - t[2] * u[1], t[2] * u[0] - t[0] * u[2], t[0] * u[1] - t[1] * u[0]];
+    for (let j = 0; j <= seg; j++) {
+      const a = (j / seg) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), n = [u[0] * ca + v[0] * sa, u[1] * ca + v[1] * sa, u[2] * ca + v[2] * sa];
+      bk.pos.push(path[i][0] + n[0] * r, path[i][1] + n[1] * r, path[i][2] + n[2] * r); bk.nor.push(n[0], n[1], n[2]); bk.uv.push((j / seg) * circ, s);
+    }
+  }
+  const W = seg + 1;
+  for (let i = 0; i < N - 1; i++) for (let j = 0; j < seg; j++) {
+    const a = base + i * W + j, d = a + 1, bq = a + W, c = bq + 1;
+    bk.idx.push(a, c, bq, a, d, c);
+  }
+  b.tris += (N - 1) * seg * 2;
 }
 
 /** Vertical cylinder standing on y0 (smooth). */
@@ -255,22 +393,25 @@ export function column(b, mat, x, z, y0, y1, r, opts = {}) { tube(b, mat, 'y', [
  * Caged bulkhead lamp. dir: '+x'|'-x'|'+z'|'-z' = direction it faces (mounted on a wall behind it), or null = pendant
  * hanging from `hang` (y of the ceiling). Registers world.addLamp.
  */
-const LAMP_GLOBE = latheGeo([[0, -0.11], [0.05, -0.1], [0.075, -0.06], [0.08, -0.01], [0.07, 0.04], [0.05, 0.075], [0, 0.08]], 10);
-const LAMP_GUARD = (() => {
-  const parts = [];
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2, pts = [[0.06, 0.09], [0.1, 0.04], [0.105, -0.04], [0.085, -0.1], [0.03, -0.135]].map(([r, y]) => new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
-    parts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 6, 0.006, 3, false));
+// globe and wire guard by detail level (fine 0: four guard wires, one ring, coarse globe – a third of the triangles)
+const lampGlobe = () => (TIER.fine === 0
+  ? latheGeo([[0, -0.11], [0.07, -0.08], [0.08, -0.01], [0.06, 0.06], [0, 0.08]], 6)
+  : latheGeo([[0, -0.11], [0.05, -0.1], [0.075, -0.06], [0.08, -0.01], [0.07, 0.04], [0.05, 0.075], [0, 0.08]], 10));
+const lampGuard = () => gcache('lampGuard' + Math.min(1, TIER.fine), () => {
+  const lo = TIER.fine === 0, parts = [], nw = lo ? 4 : 6;
+  for (let k = 0; k < nw; k++) {
+    const a = (k / nw) * Math.PI * 2 + (lo ? Math.PI / 4 : 0), pts = [[0.06, 0.09], [0.1, 0.04], [0.105, -0.04], [0.085, -0.1], [0.03, -0.135]].map(([r, y]) => new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
+    parts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), lo ? 4 : 6, 0.006, 3, false));
   }
-  for (const [r, y] of [[0.103, 0.0], [0.09, -0.08]]) { const t = new THREE.TorusGeometry(r, 0.006, 3, 14); t.rotateX(Math.PI / 2); t.translate(0, y, 0); parts.push(t); }
-  const base = new THREE.CylinderGeometry(0.07, 0.085, 0.05, 10); base.translate(0, 0.11, 0); parts.push(base);
-  const cap = new THREE.CylinderGeometry(0.015, 0.03, 0.03, 6); cap.translate(0, -0.14, 0); parts.push(cap);
+  for (const [r, y] of lo ? [[0.103, 0.0]] : [[0.103, 0.0], [0.09, -0.08]]) { const t = new THREE.TorusGeometry(r, 0.006, 3, lo ? 10 : 14); t.rotateX(Math.PI / 2); t.translate(0, y, 0); parts.push(t); }
+  const base = new THREE.CylinderGeometry(0.07, 0.085, 0.05, lo ? 8 : 10, 1, lo); base.translate(0, 0.11, 0); parts.push(base);
+  if (!lo) { const cap = new THREE.CylinderGeometry(0.015, 0.03, 0.03, 6); cap.translate(0, -0.14, 0); parts.push(cap); }
   return mergeGeometries(parts.map((g) => g.toNonIndexed()), false);
-})();
+});
 export function cageLamp(b, world, x, y, z, opts = {}) {
   const dir = opts.dir ?? null, s = 0.09;
-  stamp(b, mats.lampGlow, LAMP_GLOBE, M4(x, y, z));
-  stamp(b, mats.iron, LAMP_GUARD, M4(x, y, z));
+  stamp(b, mats.lampGlow, lampGlobe(), M4(x, y, z));
+  stamp(b, mats.iron, lampGuard(), M4(x, y, z));
   if (dir) {
     const sx = dir === '+x' ? -1 : dir === '-x' ? 1 : 0, sz = dir === '+z' ? -1 : dir === '-z' ? 1 : 0, l = 0.2;
     b.box(mats.iron, Math.min(x, x + sx * l) - 0.025, y + 0.02, Math.min(z, z + sz * l) - 0.025, Math.max(x, x + sx * l) + 0.025, y + 0.07, Math.max(z, z + sz * l) + 0.025);

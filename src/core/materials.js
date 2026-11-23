@@ -245,15 +245,18 @@ export const mats = {
   linoRed: std(surf({ roughness: 1 }, S.linoRed, 'anro')),
   tileWhite: std(surf({ roughness: 1 }, S.tileWhite, 'anro')),
   // --- soft goods ---
-  fabricRed: phys(surf({ color: 0x6c2228, roughness: 1, sheen: 0.9, sheenRoughness: 0.4, sheenColor: new THREE.Color(0xa0525a) }, S.fabric, 'ano', 0.6)),
-  fabricGreen: phys(surf({ color: 0x2f4a37, roughness: 1, sheen: 0.9, sheenRoughness: 0.4, sheenColor: new THREE.Color(0x5f8068) }, S.fabric, 'ano', 0.6)),
-  fabricBlue: phys(surf({ color: 0x2b3a5a, roughness: 1, sheen: 0.9, sheenRoughness: 0.4, sheenColor: new THREE.Color(0x5a6a90) }, S.fabric, 'ano', 0.6)),
-  fabricGold: phys(surf({ color: 0xa88a4c, roughness: 0.95, sheen: 0.8, sheenRoughness: 0.35, sheenColor: new THREE.Color(0xd8c090) }, S.fabric, 'ano', 0.6)),
-  linen: std(surf({ color: 0xf0ede4, roughness: 1 }, S.fabric, 'ano', 0.4)),
+  fabricRed: phys(surf({ color: 0x6c2228, roughness: 1, sheen: 0.9, sheenRoughness: 0.4, sheenColor: new THREE.Color(0xa0525a) }, S.fabric, 'anro', 0.6)),
+  fabricGreen: phys(surf({ color: 0x2f4a37, roughness: 1, sheen: 0.9, sheenRoughness: 0.4, sheenColor: new THREE.Color(0x5f8068) }, S.fabric, 'anro', 0.6)),
+  fabricBlue: phys(surf({ color: 0x2b3a5a, roughness: 1, sheen: 0.9, sheenRoughness: 0.4, sheenColor: new THREE.Color(0x5a6a90) }, S.fabric, 'anro', 0.6)),
+  fabricGold: phys(surf({ color: 0xa88a4c, roughness: 0.95, sheen: 0.8, sheenRoughness: 0.35, sheenColor: new THREE.Color(0xd8c090) }, S.fabric, 'anro', 0.6)),
+  linen: std(surf({ color: 0xf0ede4, roughness: 1 }, S.fabric, 'anro', 0.4)),   // damask table linen
   blanket: std(surf({ color: 0x8c2e29, roughness: 1 }, S.fabric, 'ano', 0.9)),
   leather: std(surf({ color: 0x4a2a1a, roughness: 0.62 }, S.leather, 'anro')),
   leatherGreen: std(surf({ color: 0x25402d, roughness: 0.62 }, S.leather, 'anro')),
-  wicker: std(surf({ color: 0xc6ab76, roughness: 0.9 }, S.wicker, 'ano')),
+  // deep-buttoned (Chesterfield) upholstery; not used by any module yet
+  leatherTufted: std(surf({ color: 0x4a2a1a, roughness: 0.62 }, S.leatherTufted, 'anro')),
+  leatherTuftedGreen: std(surf({ color: 0x25402d, roughness: 0.62 }, S.leatherTufted, 'anro')),
+  wicker: std(surf({ color: 0xc6ab76, roughness: 1 }, S.wicker, 'anro')),
   // --- misc ---
   plaster: std(surf({ roughness: 1 }, S.plaster, 'anro', 0.9)),
   marble: phys(surf({ roughness: 1, clearcoat: 0.4, clearcoatRoughness: 0.08 }, S.marble, 'anr')),

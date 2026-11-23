@@ -8,9 +8,14 @@ import {
   settee, servingCounter, pipe, matOf, sconce, def, kitMats, berthSecond, coatHooks, picture, faceDir,
 } from '../interior/kit.js';
 import { mats } from '../core/materials.js';
-import { drawer, mattress, pillowAt, blanket, papers, bookRow, knob } from '../interior/props-core.js';
+import { drawer, mattress, pillowAt, blanket, papers, bookRow, knob, rngOf } from '../interior/props-core.js';
 import { AT } from '../interior/batch.js';
-import { detailer, wput, iput, reserve, reserveExtDoors, wx, wz, boatWindows, extDoorSpans, deckMats, PR } from './boat-util.js';
+import { detailer, wput, iput, reserve, reserveExtDoors, wx, wz, boatWindows, extDoorSpans, deckMats, PR, modillion, ornRun, beginInst, runs } from './boat-util.js';
+import { bcBeadRow } from './bc-props.js';
+import { TIER } from '../core/tier.js';
+
+/** fine-detail gate (docs/CONTRACT.md "Detail levels") */
+const fine = (n) => TIER.fine >= n;
 
 const FW = 7.35; // inner face of the forward house side walls
 const K = kitMats, B = mats.brass, TEAK = mats.oak;
@@ -237,6 +242,76 @@ export const sextantBox = def('abSextant', [0.3, 0.28, 0.14], (p) => {
   p.b(B, 0.18, 0.008, 0.01, 0.0, 0.11, 0); p.cx(mats.iron, 0.015, 0.1, 0.0, 0.125, 0.06, 8);
 });
 
+/** modillion cornice under the kit cornice along wall w (a..e), left out at the pilasters pil and skip intervals; instanced */
+function modRunB(ctx, d, w, a, e, pil = [], skip = [], off = 0) {
+  const I = ctx.inst;
+  ornRun(w, a + 0.12, e - 0.12, 0.3, () => modillion({ mat: 'oak', leaf: fine(3) ? 'gold' : undefined }), (pr, x, z, r, y) => { ctx.plan.prop(pr, x, z, r, { y, collide: false }); I?.take(pr); }, d.Y + d.H - 0.16, off, [...pil.map((q) => [q - 0.25, q + 0.25]), ...skip]);
+}
+/** officer's uniform cap (navy cloth, black patent peak, gilt White Star badge) lying on its side */
+const officerCap = def('abOfficerCap', [0.28, 0.26, 0.12], (p) => {
+  p.lathe(mats.fabricBlue, [[0, 0], [0.1, 0], [0.11, 0.05], [0.13, 0.08], [0.12, 0.1], [0, 0.105]], 0, 0, 0, 12);
+  p.b(mats.rubber, 0.012, 0.018, 0.2, 0.1, 0.0, 0).rotation.z = 0.4;
+  p.extY(mats.rubber, [[0.06, -0.09], [0.15, -0.06], [0.17, 0], [0.15, 0.06], [0.06, 0.09]], 0.008, 0, 0.0, 0);
+  p.s(mats.gold, 0.018, 0.112, 0.045, 0, 0.4, 1, 1.4);
+});
+/** closed log book (lying) */
+const bookRowLog = def('abLogBook', [0.3, 0.24, 0.05], (p) => { p.bb(mats.leather, 0.3, 0.04, 0.22, 0, 0, 0, 0.004); p.b(mats.paper, 0.29, 0.032, 0.2, 0.004, 0.004, 0.004); p.ab(AT.gilt, 0.1, 0.002, 0.04, 0, 0.04, 0); });
+/** officer's binoculars (lying) */
+export const binoculars = def('abBinoculars', [0.14, 0.18, 0.06], (p) => {
+  for (const s of [-1, 1]) {
+    p.latheX(K.ebony, [[0, 0], [0.026, 0], [0.026, 0.03], [0.022, 0.05], [0.022, 0.1], [0.028, 0.11], [0.028, 0.13], [0, 0.13]], -0.065, 0.028, s * 0.034, 10);
+    p.latheX(B, [[0.022, 0], [0.024, 0], [0.024, 0.012], [0.022, 0.012]], 0.052, 0.028, s * 0.034, 10);
+  }
+  p.b(B, 0.03, 0.012, 0.04, 0.0, 0.045, 0); p.tube(mats.leather, [[-0.05, 0.05, -0.06], [-0.04, 0.012, -0.09], [0.03, 0.004, -0.08], [0.06, 0.01, -0.05]], 0.004, 6, 3);
+});
+/** brass megaphone hanging on a hook – origin = hook on the wall */
+export const megaphone = def('abMegaphone', [0.24, 0.24, 0.62], (p) => {
+  p.b(B, 0.04, 0.012, 0.012, 0.02, -0.006, 0);
+  const m = p.lathe(B, [[0.02, 0], [0.024, 0.01], [0.03, 0.1], [0.06, 0.3], [0.1, 0.48], [0.108, 0.5], [0.1, 0.5], [0.054, 0.3], [0.022, 0.1], [0.016, 0.01], [0.02, 0]], 0.1, -0.56, 0, 14); void m;
+  p.t(B, 0.018, 0.004, 0.06, -0.03, 0, 'z', 8, 3);
+});
+/** pendulum clinometer (heel indicator): brass arc scale on a mahogany board – wall mounted, origin = centre */
+export const clinometer = def('abClinometer', [0.44, 0.06, 0.3], (p) => {
+  p.bb(mats.mahogany, 0.02, 0.28, 0.44, 0.01, -0.14, 0, 0.004);
+  const arc = []; for (let i = 0; i <= 12; i++) { const a = -0.9 + (1.8 * i) / 12; arc.push([0.024, 0.1 - Math.cos(a) * 0.19, Math.sin(a) * 0.19]); }
+  p.tube(B, arc, 0.006, 12, 4);
+  for (let i = 0; i <= 8; i++) { const a = -0.8 + (1.6 * i) / 8, t = p.b(i === 4 ? mats.hullRed : mats.iron, 0.004, 0.025, 0.004, 0.024, 0.1 - Math.cos(a) * 0.175 - 0.0125, Math.sin(a) * 0.175); t.rotation.x = a; }
+  p.s(B, 0.012, 0.026, 0.1, 0, 1, 1, 1); const pd = p.b(mats.iron, 0.004, 0.2, 0.006, 0.028, -0.09, 0.0); pd.rotation.x = 0.08;
+  p.latheX(mats.glass, [[0, 0], [0.2, 0], [0.18, 0.01], [0, 0.012]], 0.03, -0.02, 0, 16).scale.set(1, 0.6, 1);
+});
+/** course board: mahogany board with slotted brass figure plates (course to steer) – wall mounted, origin = centre */
+export const courseBoard = def('abCourseBoard', [0.5, 0.05, 0.3], (p) => {
+  p.bb(mats.mahogany, 0.022, 0.3, 0.5, 0.011, -0.15, 0, 0.005);
+  p.ab(AT.gilt, 0.004, 0.035, 0.36, 0.024, 0.08, 0);
+  for (let i = 0; i < 3; i++) { p.bb(B, 0.008, 0.1, 0.1, 0.026, -0.08, -0.13 + i * 0.13, 0.002); p.ab(AT.black, 0.003, 0.06, 0.04, 0.031, -0.06, -0.13 + i * 0.13); }
+});
+/** wall rack with rolled charts – wall mounted, origin = centre */
+export const chartRack = def('abChartRack', (o) => [o.w ?? 0.9, 0.3, 0.4], (p, o) => {
+  const w = o.w ?? 0.9, r = rngOf(23);
+  for (const s of [-1, 1]) p.extZ(TEAK, [[0, 0.2], [0.26, 0.2], [0.26, 0.17], [0.06, -0.18], [0, -0.18]], 0.025, 0, 0, s * (w / 2 - 0.0125), 0.003);
+  for (const [x, y] of [[0.08, 0.12], [0.16, 0.12], [0.24, 0.12], [0.06, 0.0], [0.13, 0.0], [0.07, -0.1]]) {
+    const len = w - 0.1 - r() * 0.1;
+    p.alathe(r() < 0.6 ? AT.paper : AT.chalk, [[0, 0], [0.032, 0], [0.032, len], [0, len]], x, y + 0.035, -len / 2, 8).rotation.x = Math.PI / 2;
+  }
+  for (const y of [0.12, 0.0, -0.1]) p.b(TEAK, 0.27 - (0.12 - y), 0.012, w - 0.05, (0.27 - (0.12 - y)) / 2, y, 0);
+});
+/** headphone set lying on a desk */
+export const headphones = def('abHeadphones', [0.2, 0.22, 0.08], (p) => {
+  for (const s of [-1, 1]) p.lathe(K.ebony, [[0, 0], [0.032, 0], [0.034, 0.016], [0.026, 0.024], [0, 0.026]], 0, 0, s * 0.08, 10);
+  p.tube(mats.chrome, [[0, 0.022, -0.08], [0.06, 0.03, -0.05], [0.08, 0.034, 0], [0.06, 0.03, 0.05], [0, 0.022, 0.08]], 0.004, 8, 3);
+  p.tube(mats.rope, [[0, 0.01, 0.1], [-0.05, 0.004, 0.14], [-0.12, 0.004, 0.1]], 0.003, 6, 3);
+});
+/** message spike with impaled Marconigram forms, and a stack of blank forms */
+export const msgSpike = def('abMsgSpike', [0.2, 0.3, 0.2], (p) => {
+  p.lathe(B, [[0, 0], [0.04, 0], [0.04, 0.012], [0.006, 0.02], [0.003, 0.18], [0, 0.19]], 0, 0, 0, 8);
+  for (let i = 0; i < 6; i++) { const m = p.ab(i % 3 ? AT.paper : AT.label, 0.13, 0.002, 0.1, 0, 0.03 + i * 0.006, 0); m.rotation.y = i * 0.5; }
+});
+/** leather medicine ball and a pair of Indian clubs lying on the floor */
+export const gymSmall = def('abGymSmall', [0.6, 0.5, 0.3], (p) => {
+  p.s(mats.leather, 0.15, 0.1, 0.15, 0.1, 1, 0.95, 1, false);
+  for (const s of [-1, 1]) p.latheX(TEAK, [[0, 0], [0.022, 0], [0.018, 0.04], [0.016, 0.12], [0.04, 0.28], [0.045, 0.36], [0.03, 0.42], [0, 0.43]], -0.25, 0.046, -0.12 + s * 0.06, 10).rotation.y = s * 0.15;
+});
+
 // ============================================================================================== bridge & navigation
 
 export function furnishBridge(ctx) {
@@ -274,6 +349,10 @@ export function furnishBridge(ctx) {
   d.wmount(gauge({ r: 0.14 }), aw, -0.6, 2.2);
   d.wmount(barometer(), aw, 2.2, 1.6);
   for (const s of [-1, 1]) d.lamp(69.5, s * 3.5, 'bulkhead');
+  if (fine(1)) { // binoculars on the bulwark capping, megaphone on the wheelhouse front
+    for (const [z, r] of [[-1.3, 0.3], [4.1, -0.2]]) d.mount(binoculars(), 72.74, z, Math.PI / 2 + r, 1.0);
+    if (fine(2)) d.wmount(megaphone(), aw, -4.2, 2.05, 0.0);
+  }
 }
 
 export function furnishWheelhouse(ctx) {
@@ -295,12 +374,14 @@ export function furnishWheelhouse(ctx) {
   d.b.prism(mats.brass, [64.35, d.Y + 0.95, 0.85], [64.35, d.Y + 1.02, 0.85], 0.11, 12, true);
   d.b.disc(K.gaugeFace, [64.35, d.Y + 1.022, 0.85], [0, 1, 0], 0.09, 16, true);
   d.world.addCollider(64.25, d.Y, 0.75, 64.45, d.Y + 1.05, 0.95);
+  if (fine(1)) { d.wmount(clinometer(), fw, -0.75, 2.12, 0.0); d.wmount(courseBoard(), aw, 0.7, 1.65, 0.0); }
 }
 
 export function furnishChartRoom(ctx) {
   const d = detailer(ctx), M = deckMats();
   ctx.put(chartTable(), ctx.W / 2, ctx.D / 2, 'in');
   ctx.attach(chrono(), 0.1, 0.55, { y: 0.94 });
+  if (fine(2)) { ctx.attach(bookRowLog(), -0.28, 0.62, { y: 0.944, turn: 0.15 }); ctx.attach(binoculars(), -0.32, -0.15, { y: 0.944, turn: 1.2 }); }
   ctx.fit(flagLocker(), ['far:mid', 'left:mid', 'right:mid']);
   if (ctx.fit(desk({ w: 1.2, mat: 'oak' }), ['right:hi', 'left:hi', 'far:lo'])) for (let k = 0; k < 3; k++) ctx.attach(chrono(), -0.12, -0.35 + k * 0.25, { y: 0.775 });
   ctx.fit(chairDining({ cls: 'plain' }), ['near:hi'], { collide: false });
@@ -310,6 +391,7 @@ export function furnishChartRoom(ctx) {
   d.wbox('oak', wx(-2.65, -1), 62.15, 63.25, 1.15, 1.95, 0.015);
   d.wmount(barometer(), wx(-2.65, -1), 64.2, 1.6);
   d.wmount(clockWall(), wz(61.45, 1), -6.0, 1.9);
+  if (fine(2)) d.wmount(chartRack({ w: 0.9 }), wx(-2.65, -1), 65.3, 2.2, 0.0);
 }
 
 export function furnishCaptainSitting(ctx) {
@@ -337,7 +419,7 @@ export function furnishCaptainBed(ctx) {
 
 /** officers' cabins: mahogany bunk with drawers, desk with sextant box, washstand, uniforms on hooks */
 export function furnishOfficer(ctx) {
-  ctx.fit(officerBunk(), ['far:mid', 'right:hi', 'left:hi']);
+  if (ctx.fit(officerBunk(), ['far:mid', 'right:hi', 'left:hi']) && fine(1)) ctx.attach(officerCap(), 0.05, 0.5, { y: 0.6, turn: 0.4 }); // uniform cap left on the bunk
   if (ctx.fit(desk({ w: 1.0, mat: 'mahogany' }), ['right:mid', 'left:mid', 'right:hi', 'left:hi'])) {
     ctx.attach(sextantBox(), -0.12, 0.25, { y: 0.775, turn: 0.2 });
     const L = ctx.last;
@@ -370,6 +452,13 @@ export function furnishMarconi(ctx) {
   d.box('woodDark', 49.15, 2.2, 49.7, 2.9, 0, 0.5, true);       // accumulator box
   for (let i = 0; i < 4; i++) d.box(K.ebony, 49.2 + i * 0.12, 2.3, 49.28 + i * 0.12, 2.38, 0.5, 0.56);
   d.wmount(picture({ w: 0.5, h: 0.35, v: 2, frame: 'oak' }), fw, 1.2, 1.7);
+  if (fine(1)) { // aerial lead-in from the deck head (porcelain insulator) down to the tuner on the set
+    const z0 = 1.45, x0 = 52.3;
+    pipe(ctx.plan.zone(52), mats.copper, [[x0, d.Y + d.H, z0], [x0, d.Y + 1.7, z0], [52.385, d.Y + 1.45, z0 - 0.15]], 0.008); // to the terminal on top of the slate panel
+    d.b.prism(mats.porcelain, [x0, d.Y + d.H - 0.2, z0], [x0, d.Y + d.H, z0], 0.045, 8);
+    for (let k = 0; k < 3; k++) d.b.prism(mats.porcelain, [x0, d.Y + d.H - 0.06 - k * 0.06, z0], [x0, d.Y + d.H - 0.035 - k * 0.06, z0], 0.06, 8, true);
+  }
+  if (fine(2)) { d.mount(headphones(), 51.25, 2.36, 0.4, 0.775); d.mount(msgSpike(), 50.27, 2.62, 0.0, 0.775); }
 }
 
 export function furnishSilentRoom(ctx) {
@@ -411,6 +500,15 @@ export function furnishGym(ctx) {
   d.wbox('paintWhite', pw, 28.85, 29.95, 1.55, 2.55, 0.02);
   d.b.disc(matOf('gaugeFace'), [29.4, d.Y + 2.05, 3.05 + 0.035], [0, 0, 1], 0.42, 24, true);
   d.b.ring(mats.brass, [29.4, d.Y + 2.05, 3.05 + 0.04], [0, 0, 1], 0.42, 0.48, 24);
+  { // graduations of the distance dial
+    const cx = 29.4, cy = d.Y + 2.05, zt = 3.05 + 0.037;
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * Math.PI * 2, L = i % 5 ? 0.035 : 0.07, w = i % 5 ? 0.004 : 0.008, r1 = 0.405, r0 = r1 - L, ca = Math.cos(a), sa = Math.sin(a);
+      d.b.poly(mats.iron, [[cx + ca * r0 + sa * w, cy + sa * r0 - ca * w, zt], [cx + ca * r1 + sa * w, cy + sa * r1 - ca * w, zt], [cx + ca * r1 - sa * w, cy + sa * r1 + ca * w, zt], [cx + ca * r0 - sa * w, cy + sa * r0 + ca * w, zt]], [0, 0, 1]);
+    }
+    if (fine(1)) for (const [a, m] of [[0.4, mats.hullRed], [2.2, mats.fabricBlue]]) d.b.prism(m, [29.4 + Math.cos(a) * 0.3, d.Y + 2.05 + Math.sin(a) * 0.3, 3.112], [29.4 + Math.cos(a) * 0.37, d.Y + 2.05 + Math.sin(a) * 0.37, 3.112], 0.012, 5, true);
+    if (fine(1)) d.b.prism(mats.brass, [29.4, d.Y + 2.05, 3.1], [29.4, d.Y + 2.05, 3.13], 0.03, 10, true);
+  }
   for (const a of [0.4, 2.2]) d.b.poly(mats.iron, [[29.4, d.Y + 2.05, 3.1], [29.4 + Math.cos(a) * 0.36, d.Y + 2.05 + Math.sin(a) * 0.36, 3.1], [29.4 + Math.cos(a + 0.06) * 0.05, d.Y + 2.05 + Math.sin(a + 0.06) * 0.05, 3.1]], [0, 0, 1]);
   wput(ctx, electricHorse(), 31.0, 3.7, 'stbd');
   wput(ctx, electricHorse(), 31.9, 3.7, 'stbd');
@@ -436,6 +534,10 @@ export function furnishGym(ctx) {
   d.wmount(clockWall(), aw, 3.8, 2.25);
   d.wmount(mirrorWall({ w: 0.6, h: 1.4, frame: 'oak' }), fw, 5.85, 1.95);
   for (const x of [30.4, 33.8, 36.6]) d.wmount(sconce({ plain: true }), sw, x, 2.3, 0.03);
+  if (fine(1)) { // leather exercise mat on the floor between the bench and the rowing machine (flat: walked over)
+    d.box('leather', 30.3, 5.05, 32.0, 5.95, 0, 0.03);
+    if (fine(2)) d.mount(gymSmall(), 31.55, 5.32, 0.2, 0.03);
+  }
 }
 
 // ============================================================================================== Grand Staircase (forward) – top landing
@@ -457,6 +559,12 @@ export function furnishLandingFwd(ctx) {
     wput(ctx, pottedPalm(), 38.0, s * 4.1, 'fwd', { collide: false });
     d.lamp(38.6, s * 3.75, 'bowl'); d.lamp(45.6, s * 3.75, 'bowl');
   }
+  if (fine(1)) {
+    beginInst(ctx);
+    for (const s of [-1, 1]) modRunB(ctx, d, aw, s < 0 ? -4.55 : 2.7, s < 0 ? -2.7 : 4.55, [-4.45, -2.88, 2.88, 4.45]);
+    modRunB(ctx, d, fw, -3.0, 3.0, [-2.95, 0, 2.95]);
+    ctx.inst.flush(); ctx.inst = null;
+  }
 }
 
 export function furnishVestibule(ctx) {
@@ -466,6 +574,7 @@ export function furnishVestibule(ctx) {
   for (const x of [39.6, 44.4]) wput(ctx, settee({ mat: 'fabricGreen', w: 1.6 }), x, s * 6.95, s < 0 ? 'stbd' : 'port', { collide: true });
   wput(ctx, pottedPalm(), 45.95, s * 6.85, 'aft', { collide: false });
   d.sconces(wx(s * FW, -s), [40.9, 43.1], 2.2);
+  if (fine(1)) { beginInst(ctx); modRunB(ctx, d, wx(s * FW, -s), 37.55, 46.45, [], [], 0.03); ctx.inst.flush(); ctx.inst = null; }
 }
 
 export function furnishMess(ctx) {
@@ -555,6 +664,18 @@ export function ceilingDetails(plan, { domeF, domeA }) {
       b.box(g, x0, top - 0.13, z0, x1, top - 0.1, z1, 'xXzZy');
     }
     for (const [x0, x1, z0, z1] of [[h.x0, h.x1, h.z0 - 0.01, h.z0], [h.x0, h.x1, h.z1, h.z1 + 0.01], [h.x0 - 0.01, h.x0, h.z0, h.z1], [h.x1, h.x1 + 0.01, h.z0, h.z1]]) b.box(g, x0, top, z0, x1, top + 0.05, z1, 'xXzZ');
+    if (fine(1)) { // moulded oak cove round the outer edge of the frame
+      const C = [[0, 0], [0.02, -0.004], [0.034, -0.02], [0.04, -0.045], [0.03, -0.06], [0, -0.065]];
+      for (const [p0, A, O, L] of [[[h.x0 - E, top - 0.13, h.z0 - E], [1, 0, 0], [0, 0, -1], h.x1 - h.x0 + 2 * E], [[h.x0 - E, top - 0.13, h.z1 + E], [1, 0, 0], [0, 0, 1], h.x1 - h.x0 + 2 * E],
+        [[h.x0 - E, top - 0.13, h.z0 - E], [0, 0, 1], [-1, 0, 0], h.z1 - h.z0 + 2 * E], [[h.x1 + E, top - 0.13, h.z0 - E], [0, 0, 1], [1, 0, 0], h.z1 - h.z0 + 2 * E]]) b.sweep(o, C, p0, A, O, [0, 1, 0], L, [false, false]);
+    }
+    if (fine(2)) { // gilt bead row under the inner edge of the frame
+      const zone = plan.world.zone(plan.deck, (h.x0 + h.x1) / 2), nx = Math.floor((h.x1 - h.x0 + 2 * e) / 0.1), nz = Math.floor((h.z1 - h.z0 + 2 * e) / 0.1);
+      for (const s of [-1, 1]) {
+        const bx = bcBeadRow({ n: nx }); bx.position.set((h.x0 + h.x1) / 2, top - 0.125, s < 0 ? h.z0 - 0.07 : h.z1 + 0.07); bx.rotation.y = Math.PI / 2; zone.add(bx);
+        const bz = bcBeadRow({ n: nz }); bz.position.set(s < 0 ? h.x0 - 0.07 : h.x1 + 0.07, top - 0.125, (h.z0 + h.z1) / 2); zone.add(bz);
+      }
+    }
   }
 }
 void iput; void faceDir; void knob; void papers; void bookRow; void heater;

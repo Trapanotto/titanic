@@ -8,8 +8,9 @@ import { buildDeckShell, bulkhead, createDeckPlan, bench, shelves, workbench, lo
 import { DINING1, DINING2, dining1Walls, dining2Walls, furnishDining1, furnishDining2 } from './d-saloon.js';
 import {
   RECEPTION, furnishReception, furnishVestibule, furnishGalley, furnishBakery, furnishPastry, furnishButcher, furnishVeg,
-  furnishScullery, furnishSurgery, furnishDispensary, furnishWard, washroom,
+  furnishScullery, furnishSurgery, furnishDispensary, furnishWard, washroom, furnishPantry,
 } from './d-hero.js';
+import { dormitoryPlus } from './f-util.js';
 
 const deck = 'D';
 // longitudinal lines (wall centre lines, z)
@@ -83,16 +84,16 @@ export async function build(world) {
     type: 'lobby', stairs: true, wall: 'paintWhite', lamp: 'bulkhead', teleport: { name: 'Treppe 3. Klasse vorn – D-Deck', group: '3. Klasse', x: 103.3, z: 2.2, yaw: Math.PI } });
   const FIREMEN = 'Im Vorschiff des D-Decks schliefen Heizer, Trimmer und Schmierer in großen Sälen mit eisernen Doppelkojen. Sie arbeiteten in Wachen von vier Stunden vor den 159 Feuerungen der 29 Kessel. Um die Passagiere nicht zu stören, erreichten sie die Kesselräume über eigene Wendeltreppen und einen Tunnel unter den Laderäumen.';
   await world.tick();
-  room('heizer-bb', 'Schlafsaal der Heizer (Backbord)', 95, 104, -99, -CH, 'dormitory', [dS(96.2)], { ...CREW,
+  room('heizer-bb', 'Schlafsaal der Heizer (Backbord)', 95, 104, -99, -CH, dormitoryPlus, [dS(96.2)], { ...CREW,
     teleport: { name: 'Heizerunterkünfte', group: 'Besatzung' }, info: { title: 'Heizerunterkünfte auf dem D-Deck', text: FIREMEN } });
   await world.tick();
-  room('heizer-stb', 'Schlafsaal der Heizer (Steuerbord)', 95, 104, CH, 99, 'dormitory', [dP(96.2)], CREW);
+  room('heizer-stb', 'Schlafsaal der Heizer (Steuerbord)', 95, 104, CH, 99, dormitoryPlus, [dP(96.2)], CREW);
   await world.tick();
   gang('gang-heizer', 'Gang im Heizerlogis', 87.2, 95, -CC, CC, { lamp: 'bulkhead' });
   await world.tick();
-  room('trimmer', 'Schlafsaal der Trimmer', 87.2, 95, -99, -CC, 'dormitory', [dS(93.5)], CREW);
+  room('trimmer', 'Schlafsaal der Trimmer', 87.2, 95, -99, -CC, dormitoryPlus, [dS(93.5)], CREW);
   await world.tick();
-  room('schmierer', 'Schlafsaal der Schmierer', 87.2, 95, CC, 99, 'dormitory', [dP(93.5)], CREW);
+  room('schmierer', 'Schlafsaal der Schmierer', 87.2, 95, CC, 99, dormitoryPlus, [dP(93.5)], CREW);
   await world.tick();
   gang('quer-heizer', 'Quergang vor dem Schott (Heizerlogis)', 86, 87.2, -99, 99, { lamp: 'bulkhead' });
   await world.tick();
@@ -110,7 +111,7 @@ export async function build(world) {
   plan.cabinRow({ x0: 64, x1: 84.8, z0: -99, z1: -T3b, count: 7, corridorSide: 'stbd', berths: 6, ...T3 });
   await world.tick();
   plan.cabinRow({ x0: 64, x1: 84.8, z0: T3b, z1: 99, count: 7, corridorSide: 'port', berths: 6, ...T3 });
-  const OPEN3 = { type: 'third', cls: 'third', wall: 'paintWhite', floor: 'linoRed', lamp: 'bulkhead', furnish: { preset: 'dormitory', pine: true } };
+  const OPEN3 = { type: 'third', cls: 'third', wall: 'paintWhite', floor: 'linoRed', lamp: 'bulkhead', furnish: (ctx) => { ctx.opts = { pine: true }; dormitoryPlus(ctx); } };
   await world.tick();
   room('kojen-3v-bb', 'Offener Schlafsaal 3. Klasse (Backbord)', 68, 84.8, -T3a, 0, undefined, [dP(70.5, { style: 'pine' }), dP(82.3, { style: 'pine' })], { ...OPEN3,
     teleport: { name: 'Offener Schlafsaal 3. Klasse', group: '3. Klasse' },
@@ -151,7 +152,7 @@ export async function build(world) {
   await world.tick();
   room('bad-1b', 'Bad 1. Klasse', 61, 64, 1, CH, 'bathroom', [dA(2)], { ...WET, cls: 'first' });
   await world.tick();
-  room('anrichte-empf', 'Anrichte des Empfangsraums', RECEPTION.x1, 52.5, -F1a, -CH, 'pantry', [dP(50)], { ...SVC, floor: 'tileWhite' });
+  room('anrichte-empf', 'Anrichte des Empfangsraums', RECEPTION.x1, 52.5, -F1a, -CH, furnishPantry, [dP(50)], { ...SVC, floor: 'tileWhite' });
   await world.tick();
   room('silber', 'Silberkammer', RECEPTION.x1, 52.5, -CH, CH, { preset: 'store', shelves: 3 }, [dP(50)], SVC);
   await world.tick();
@@ -194,7 +195,7 @@ export async function build(world) {
     gang(bb ? 'stewards-bb' : 'stewards-stb', bb ? 'Stewardgang Backbord (Kombüse)' : 'Stewardgang Steuerbord (Kombüse)', -36, DINING1.x0, bb ? -99 : GZ, bb ? -GZ : 99, {
       wall: 'paintWhite', lamp: 'bulkhead', group: 'Besatzung',
       ...(bb ? { teleport: { name: 'Stewardgang (Kombüse)', group: 'Besatzung', x: -10, z: -13.15, yaw: Math.PI } } : {}) });
-    room(bb ? 'anrichte-1-bb' : 'anrichte-1-stb', bb ? 'Anrichte 1. Klasse (Backbord)' : 'Anrichte 1. Klasse (Steuerbord)', -16, DINING1.x0, bb ? -GZ : CH, bb ? -CH : GZ, 'pantry',
+    room(bb ? 'anrichte-1-bb' : 'anrichte-1-stb', bb ? 'Anrichte 1. Klasse (Backbord)' : 'Anrichte 1. Klasse (Steuerbord)', -16, DINING1.x0, bb ? -GZ : CH, bb ? -CH : GZ, furnishPantry,
       [dF(s * 4.6, { w: 1.2 }), dF(s * 11.0, { w: 1.0 }), dA(s * 7.5, { w: 1.2 }), bb ? dP(-9.5) : dS(-9.5)], { ...KIT,
         ...(bb ? { teleport: { name: 'Anrichte 1. Klasse', group: 'Besatzung' } } : {}) });
   }
@@ -218,7 +219,7 @@ export async function build(world) {
   await world.tick();
   room('spuel-2', 'Spülküche (achtern)', -36, -30, -GZ, -CH, furnishScullery, [dP(-33), dA(-7.6, { w: 1.0 })], KIT);
   await world.tick();
-  room('anrichte-2', 'Anrichte 2. Klasse', -36, -30, CH, GZ, 'pantry', [dS(-33), dA(7.6, { w: 1.2 })], KIT);
+  room('anrichte-2', 'Anrichte 2. Klasse', -36, -30, CH, GZ, furnishPantry, [dS(-33), dA(7.6, { w: 1.2 })], KIT);
 
   await world.tick();
   // ============================================================== x −59..−36  Second-class Dining Saloon

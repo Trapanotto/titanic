@@ -2,7 +2,7 @@
 import { mats } from '../core/materials.js';
 import { DECK_Y, ceilingY } from '../core/constants.js';
 import {
-  Batch, kitMats, matOf, deckHalfWidth, minHalfWidth, deckRanges, casingsOn, overlap, rectMinus, intervalMinus, problem, PLATE_CHARS,
+  Batch, kitMats, matOf, deckHalfWidth, minHalfWidth, deckRanges, casingsOn, overlap, rectMinus, intervalMinus, problem, PLATE_CHARS, kitFine,
 } from './batch.js';
 import { stairKeepouts, stairHoles, stairSolids } from './stairs.js';
 import * as P from './props.js';
@@ -93,6 +93,7 @@ const PR = {
   arch: [[0, 0], [0.012, 0], [0.018, 0.02], [0.016, 0.05], [0.022, 0.07], [0.012, 0.085], [0, 0.085]],
   bolection: [[0, 0], [0.01, 0.006], [0.012, 0.016], [0, 0.024]],
   bead: [[0, 0], [0.005, 0.006], [0, 0.012]],
+  head: [[0, 0], [0.03, 0], [0.034, 0.01], [0.028, 0.022], [0.04, 0.03], [0.04, 0.042], [0, 0.042]],
 };
 
 const CLASS = {
@@ -111,7 +112,8 @@ const leafCache = new Map();
 /** Deck streaming: forget the cached door-leaf templates (rebuilt on demand, frees memory). */
 export function flushRoomCaches() { leafCache.clear(); }
 function doorLeaf(w, h, style, variant = '') {
-  const key = `${Math.round(w * 100)}_${Math.round(h * 100)}_${style}_${variant}`;
+  const fine = kitFine();
+  const key = `${Math.round(w * 100)}_${Math.round(h * 100)}_${style}_${variant}_${fine}`;
   let t = leafCache.get(key);
   if (!t) {
     const p = new P.PB(), m = matOf(DOOR_MATS[style] ?? style, mats.paintWhite), knobMat = style === 'steel' || style === 'grey' ? mats.iron : mats.brass;
@@ -144,6 +146,23 @@ function doorLeaf(w, h, style, variant = '') {
       const k = p.lathe(knobMat, [[0, 0], [0.014, 0], [0.007, 0.035], [0.026, 0.055], [0, 0.078]], w - 0.075, h * 0.47, s * 0.023, 7); k.rotation.x = s * Math.PI / 2;
     }
     for (const y of [0.2, h - 0.25]) p.b(knobMat, 0.02, 0.1, 0.02, 0.0, y, 0.025);
+    // fine detail (only materials the leaf already uses, so no extra meshes per door)
+    const steel = style === 'steel' || style === 'grey';
+    if (fine >= 1) {
+      p.b(knobMat, 0.02, 0.1, 0.02, 0.0, h * 0.5 - 0.05, 0.025); // third hinge
+      if (style === 'pine') for (const s of faces) { // ledged & braced: diagonal brace between the two lower ledges
+        const dx = w - 0.16, dy = h * 0.45 - 0.25, br = p.b(m, 0.09, Math.hypot(dx, dy), 0.012, 0, 0, 0);
+        br.position.set(w / 2, (0.25 + h * 0.45) / 2, s * 0.026); br.rotation.z = -Math.atan2(dx, dy);
+      }
+      else if (!steel) for (const s of faces) p.b(knobMat, 0.05, 0.24, 0.003, w - 0.075, h * 0.47 + 0.14, s * 0.0225); // finger plates
+    }
+    if (fine >= 2) {
+      for (const y of [0.2, h * 0.5 - 0.05, h - 0.25]) p.c(knobMat, 0.011, 0.12, 0.0, y - 0.01, 0.03, 6); // hinge knuckles
+      if (!steel) for (const s of faces) { p.b(knobMat, 0.016, 0.03, 0.004, w - 0.075, h * 0.47 - 0.065, s * 0.0255); } // key escutcheon
+    }
+    if (fine >= 3 && steel) for (const s of faces) { // rivets round the stiffened edge
+      for (let y = 0.12; y < h - 0.08; y += 0.24) for (const a of [0.035, w - 0.035]) p.b(mats.iron, 0.018, 0.018, 0.008, a, y, s * 0.025);
+    }
     t = P._bakeTemplate(p.g);
     leafCache.set(key, t);
   }
@@ -318,6 +337,7 @@ class DeckPlan {
     const doorsOfRoom = new Map(this.rooms.map((r) => [r, []]));
     let nWalls = 0, nDoors = 0;
 
+    this._phase = 'lines';
     for (const l of lines.values()) {
       yield;
       // elementary intervals → runs
@@ -384,6 +404,7 @@ class DeckPlan {
     // rooms: floor / ceiling overlays, lamps, furniture, registries
     const upHoles = this.solids; // ceiling openings above the flights that rise from this deck
     world.rooms ??= [];
+    this._phase = 'rooms';
     for (const r of this.rooms) {
       yield;
       const fm = r.floor ?? this.def.floor;
@@ -412,9 +433,12 @@ class DeckPlan {
           const t0 = b.tris;
           try { fn(ctx); } catch (e) { this._problem(`room ${r.id}: furnish failed: ${e.message}`); }
           // a hand-detailed room that panels its own walls keeps flat wall faces (only the mouldings are added)
-          r._detailed = typeof f === 'function' && b.tris - t0 > 120;
+          r._detailed = typeof f === 'function' && b.tris - t0 - ctx.clutterTris > 120;
         }
       }
+      // what the furnishing occupies (for the wall fittings added later); rooms furnished by own code may place props
+      // that are not tracked, so they get no fittings
+      r._fit = !(typeof r.furnish === 'function') ? { occ: ctx?.occupied ?? [], mounts: ctx?.mounted ?? [] } : null;
       world.rooms.push({ id: r.id, name: r.name, deck, type: r.type, cls: r.cls, x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, safe: r.safe, noAccess: !!r.noAccess });
       const entry = ctx ? ctx.entryPoint() : { x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2, yaw: 0 };
       r.entry = entry;
@@ -424,6 +448,7 @@ class DeckPlan {
     // wall faces (deferred so hand-detailed rooms can be recognised), then corridor fittings and porthole curtains
     const jobs = this._jobs ?? [];
     yield;
+    this._phase = 'faces';
     for (let i = 0; i < jobs.length; i++) {
       const j = jobs[i];
       if ((i & 7) === 7) yield;
@@ -431,19 +456,26 @@ class DeckPlan {
     }
     this._jobs = [];
     yield;
-    this._corridorDetails(jobs);
+    this._phase = 'corridors';
+    yield* this._corridorDetails(jobs);
     yield;
+    this._phase = 'fittings';
+    yield* this._roomFittings(jobs);
+    yield;
+    this._phase = 'curtains';
     this._portCurtains();
     yield;
-    b.flush();
+    this._phase = 'flush';
+    yield* b.flushSteps(); // one zone/material bucket per step (large decks: tens of ms in one go otherwise)
     return { rooms: this.rooms, walls: nWalls, doors: nDoors, problems: this.problems };
   }
 
   /** ceiling services / battens and fire appliances (extinguisher, hose reel) along the corridors */
-  _corridorDetails(jobs) {
-    const b = this.batch, Y = this.y, TOP = Y + this.h;
+  *_corridorDetails(jobs) {
+    const b = this.batch, Y = this.y, TOP = Y + this.h, fine = kitFine();
     for (const r of this.rooms) {
       if (r.type !== 'corridor' || r._detailed) continue;
+      yield; // one corridor per time slice (long corridors with pipes, trays and fittings)
       const s = r.safe, alongX = s.x1 - s.x0 >= s.z1 - s.z0, len = alongX ? s.x1 - s.x0 : s.z1 - s.z0, wid = alongX ? s.z1 - s.z0 : s.x1 - s.x0;
       if (len < 2.5 || wid < 0.6) continue;
       const kind = r.style.kind;
@@ -466,6 +498,17 @@ class DeckPlan {
             for (const t of [0.61, 0.83]) { const r0 = W(a - 0.008, TOP - 0.185, t - 0.008), r1 = W(a + 0.008, TOP, t + 0.008); b.box(mats.iron, Math.min(r0[0], r1[0]), r0[1], Math.min(r0[2], r1[2]), Math.max(r0[0], r1[0]), r1[1], Math.max(r0[2], r1[2]), 'xXzZ'); }
             const c0 = W(a - 0.015, TOP - 0.19, 0.6), c1 = W(a + 0.015, TOP - 0.17, 0.84); b.box(mats.iron, Math.min(c0[0], c1[0]), c0[1], Math.min(c0[2], c1[2]), Math.max(c0[0], c1[0]), c1[1], Math.max(c0[2], c1[2]));
           }
+          if (fine >= 2) for (let a = p0 + 1.05; a < p1 - 0.2; a += 2.4) { // pipe flanges / couplings
+            b.prism(mats.steelDark, W(a - 0.016, TOP - 0.13, 0.22), W(a + 0.016, TOP - 0.13, 0.22), 0.05, 8, true);
+            if (a + 0.5 < p1) b.prism(mats.paintWhite, W(a + 0.5 - 0.012, TOP - 0.2, 0.22), W(a + 0.5 + 0.012, TOP - 0.2, 0.22), 0.035, 8, true);
+          }
+          if (fine >= 3) for (let a = p0 + 3.6; a < p1 - 0.6; a += 9) { // stop valve with hand wheel under the steam pipe
+            const wc = W(a, TOP - 0.3, 0.22);
+            b.prism(mats.brass, W(a - 0.06, TOP - 0.13, 0.22), W(a + 0.06, TOP - 0.13, 0.22), 0.045, 8, true);
+            b.prism(mats.brass, W(a, TOP - 0.17, 0.22), wc, 0.01, 5);
+            for (const n of [[0, -1, 0], [0, 1, 0]]) b.ring(mats.iron, [wc[0], wc[1] + n[1] * 0.006, wc[2]], n, 0.06, 0.078, 10);
+            for (const [tx, tz] of [[0.068, 0.004], [0.004, 0.068]]) b.box(mats.iron, wc[0] - tx, wc[1] - 0.005, wc[2] - tz, wc[0] + tx, wc[1] + 0.005, wc[2] + tz); // spokes
+          }
         }
       } else if (kind === 'panel' || kind === 'wainscot') {
         // moulded ceiling battens across the corridor
@@ -482,7 +525,73 @@ class DeckPlan {
         const sd = f.side, c = f.l.c + sd * T2, x = alongX ? a : c, z = alongX ? c : a;
         if (Math.abs(z) > this.halfWidth(x) - 0.2) continue;
         const hose = k++ % 2 === 1, prop = hose ? P.fireHose() : P.extinguisher();
-        P.place(this.zone(x), prop, x, Y + (hose ? 1.35 : 1.25), z, P.faceDir(alongX ? 0 : sd, alongX ? sd : 0));
+        // above the hand rail where the wall has one (extinguisher body would reach down to 0.65 m)
+        const st = f.st, railed = st.rail || (fine >= 1 && !st.grand && st.kind !== 'tile' && st.kind !== 'none' && (fine >= 2 || (st.kind !== 'panel' && st.kind !== 'wainscot')));
+        P.place(this.zone(x), prop, x, Y + (hose ? 1.35 : railed ? 1.6 : 1.25), z, P.faceDir(alongX ? 0 : sd, alongX ? sd : 0));
+      }
+    }
+  }
+
+  /**
+   * Fine detail per room (kitFine ≥ 1): light switch beside the main door (latch side), from fine 2 a ventilation
+   * grille under the cornice and a moulded ceiling frame in 1st / 2nd class cabins. Batched, no colliders.
+   */
+  *_roomFittings(jobs) {
+    const fine = kitFine();
+    if (fine < 0) return;
+    const b = this.batch, Y = this.y, TOP = Y + this.h;
+    const byLine = new Map(), key = (axis, c, side) => axis + Math.round(c * 100) + ':' + side;
+    for (const j of jobs) { const k = key(j.l.axis, j.l.c, j.side); let a = byLine.get(k); if (!a) byLine.set(k, (a = [])); a.push(j); }
+    const wallAt = (k, a, hw, ya, yb) => (byLine.get(k) ?? []).some((j) => j.s <= a - hw && j.e >= a + hw && j.y0 <= ya + 1e-4 && j.y1 >= yb - 1e-4);
+    const blocked = (q) => this.solids.some((o) => overlap(o, q)) || this.holes.some((o) => overlap(o, q)) || this.casings.some((o) => overlap(o, q));
+    let n = 0;
+    for (const r of this.rooms) {
+      if ((++n & 31) === 0) yield;
+      if (r.type === 'corridor' || r._detailed || r.stairs || !r._fit || !r.doorsAll?.length) continue;
+      // nothing tall placed or hung against the wall there (furniture rects carry their height, wall props a y range)
+      const free = (p, q, ya, yb) => { const rc = { x0: Math.min(p[0], q[0]), x1: Math.max(p[0], q[0]), z0: Math.min(p[2], q[2]), z1: Math.max(p[2], q[2]) };
+        return !r._fit.occ.some((o) => overlap(o, rc, 0) && (o.h ?? 9) > ya - Y - 0.02) && !r._fit.mounts.some((o) => overlap(o, rc, 0) && o.y0 < yb - Y && o.y1 > ya - Y); };
+      const d = r.doorsAll.find((q) => q.own) ?? r.doorsAll[0], sd = d.side, alongX = sd === 'port' || sd === 'stbd';
+      const c = sd === 'aft' ? r.x0 : sd === 'fwd' ? r.x1 : sd === 'port' ? r.z0 : r.z1, side = sd === 'aft' || sd === 'port' ? 1 : -1;
+      const lo = alongX ? r.x0 : r.z0, hi = alongX ? r.x1 : r.z1, k = key(alongX ? 'x' : 'z', c, side), f = c + side * T2;
+      const at = (a, y, off) => (alongX ? [a, y, f + side * off] : [f + side * off, y, a]);
+      const O = alongX ? [0, 0, side] : [side, 0, 0];
+      const box = (m, a0, a1, ya, yb, o1, o0 = 0) => { const p = at(a0, ya, o0), q = at(a1, yb, o1); b.box(m, p[0], p[1], p[2], q[0], q[1], q[2]); };
+      const ok = (a, hw, ya, yb, m) => a - hw > lo + 0.06 && a + hw < hi - 0.06 && r.doorsAll.every((o) => o.side !== sd || Math.abs(o.at - a) > o.w / 2 + m)
+        && wallAt(k, a, hw, ya, yb) && free(at(a - hw, 0, 0), at(a + hw, 0, 0.08), ya, yb) && (() => { const p = at(a, 0, 0); return Math.abs(p[2]) < this.halfWidth(p[0]) - 0.1; })();
+      const kind = r.style.kind, posh = kind === 'panel' || kind === 'wainscot', cover = posh ? mats.brass : mats.porcelain;
+      // rotary light switch on a wooden pattress, latch side of the door
+      const sw = d.at + (d.hinge === 'hi' ? -1 : 1) * (d.w / 2 + 0.16);
+      if (ok(sw, 0.05, Y + 1.24, Y + 1.35, 0.1)) {
+        box(kind === 'steel' ? mats.steelDark : mats.woodDark, sw - 0.045, sw + 0.045, Y + 1.25, Y + 1.34, 0.014);
+        b.prism(cover, at(sw, Y + 1.295, 0.014), at(sw, Y + 1.295, 0.034), 0.03, 8, true);
+        box(mats.brass, sw - 0.005, sw + 0.005, Y + 1.283, Y + 1.307, 0.046, 0.034);
+      }
+      if (fine < 1) continue;
+      // ventilation grille high on the door wall (the deck's supply trunks run over the corridors)
+      if (kind !== 'steel' && this.h >= 2.45) {
+        const cand = [(lo + hi) / 2, hi - 0.45, lo + 0.45].find((a) => ok(a, 0.19, TOP - 0.36, TOP - 0.2, 0.35));
+        if (cand !== undefined) {
+          box(posh ? mats.brass : mats.paintWhite, cand - 0.17, cand + 0.17, TOP - 0.355, TOP - 0.205, 0.012);
+          b.poly(kitMats.louvre, [at(cand - 0.145, TOP - 0.335, 0.0125), at(cand + 0.145, TOP - 0.335, 0.0125), at(cand + 0.145, TOP - 0.225, 0.0125), at(cand - 0.145, TOP - 0.225, 0.0125)], O);
+        }
+      }
+      // moulded ceiling frame in 1st / 2nd class cabins and suites
+      const s = r.safe;
+      if (fine < 2) continue;
+      if (posh && (r.type === 'cabin' || r.type === 'suite') && s.x1 - s.x0 > 1.4 && s.z1 - s.z0 > 1.4 && !blocked(s)) {
+        const x0 = s.x0 + 0.28, x1 = s.x1 - 0.28, z0 = s.z0 + 0.28, z1 = s.z1 - 0.28, zm = Math.max(Math.abs(z0), Math.abs(z1));
+        if (zm < Math.min(this.halfWidth(x0), this.halfWidth(x1)) - 0.25) {
+          const m = r.style.cornice ?? r.style.frame ?? mats.paintWhite, y0 = TOP - 0.03, y1 = TOP - 0.004, t = 0.025;
+          b.box(m, x0 - t, y0, z0 - t, x1 + t, y1, z0 + t, 'xXyzZ'); b.box(m, x0 - t, y0, z1 - t, x1 + t, y1, z1 + t, 'xXyzZ');
+          b.box(m, x0 - t, y0, z0 + t, x0 + t, y1, z1 - t, 'xXy'); b.box(m, x1 - t, y0, z0 + t, x1 + t, y1, z1 - t, 'xXy');
+          // 1st class: the frame divided into four panels by moulded ribs, clear of the centre lamp (fine 3)
+          if (fine >= 3 && (r.cls === 'first' || r.type === 'suite')) {
+            const xm = (x0 + x1) / 2, zm2 = (z0 + z1) / 2, g = 0.22;
+            b.box(m, xm - t, y0, z0 + t, xm + t, y1, zm2 - g, 'xXyzZ'); b.box(m, xm - t, y0, zm2 + g, xm + t, y1, z1 - t, 'xXyzZ');
+            b.box(m, x0 + t, y0, zm2 - t, xm - g, y1, zm2 + t, 'xXyzZ'); b.box(m, xm + g, y0, zm2 - t, x1 - t, y1, zm2 + t, 'xXyzZ');
+          }
+        }
       }
     }
   }
@@ -539,6 +648,9 @@ class DeckPlan {
       b.box(mat, p[0], p[1], p[2], q[0], q[1], q[2], front + (X ? 'xX' : 'zZ') + 'yY');
     };
     const kind = st.kind, relief = !flat && (kind === 'panel' || kind === 'wainscot');
+    const fine = kitFine(), owners = info.room ? [...info.room] : [];
+    // 1st-class cabins and suites: moulded (bolection) panels like the grand rooms, from fine 2
+    const moulded = st.grand || (fine >= 2 && kind === 'panel' && owners.some((q) => q.cls === 'first' || q.type === 'suite'));
     const wallM = flat ? st.wall : st.wallR ?? st.wall, wainM = flat ? st.wainscot : st.wainR ?? st.wainscot;
     const frameM = st.frame ?? st.skirt ?? wallM;
     // base surfaces
@@ -559,7 +671,7 @@ class DeckPlan {
         for (let i = 0; i < n; i++) {
           const a = a0 + pw / 2 + i * (pw + 0.08);
           b.fielded(pm, P(a, (r0 + r1) / 2, 0), A, O, U, pw, ph, 0.01, Math.min(0.05, pw * 0.2, ph * 0.2));
-          if (st.grand && tall) { // bolection moulding round the panel
+          if (moulded && tall) { // bolection moulding round the panel
             const m = st.cornice ?? frameM;
             b.sweep(m, PR.bolection, P(a - pw / 2, r0, 0), A, O, [0, -1, 0], pw, [true, true]);
             b.sweep(m, PR.bolection, P(a - pw / 2, r1, 0), A, O, U, pw, [true, true]);
@@ -575,9 +687,13 @@ class DeckPlan {
         wbox(st.cornice ?? frameM, a + 0.005, a + cw - 0.005, TOP - 0.34, TOP - 0.26, 0.04);
         for (let k = 0; k < 3; k++) wbox(frameM, a + 0.05 + k * ((cw - 0.1) / 2) - 0.008, a + 0.05 + k * ((cw - 0.1) / 2) + 0.008, Y + 0.36, TOP - 0.42, 0.03, 0.024);
       }
-    } else if (!flat && kind === 'boards' && st.wall === mats.paintWhite && [...(info.room ?? [])].some((q) => q.cls === 'third' || (q.type === 'corridor' && !q.cls))) {
+    } else if (!flat && kind === 'boards' && ((st.wall === mats.paintWhite && owners.some((q) => q.cls === 'third' || (q.type === 'corridor' && !q.cls))) || (fine >= 1 && st.wall === mats.pine))) {
       const n = Math.floor((ve - vs) / 0.2);
       for (let i = 1; i < n; i++) { const a = vs + ((ve - vs) * i) / n; b.sweep(wallM, PR.bead, P(a, Math.max(y0, Y + 0.1)), U, O, A, Math.min(y1, TOP - 0.04) - Math.max(y0, Y + 0.1), [false, false]); }
+    } else if (!flat && fine >= 1 && kind === 'boards' && st.wall === mats.paintWhite && y0 < Y + 0.5 && ve - vs > 0.3 && owners.some((q) => q.cls === 'crew')) {
+      // crew quarters: painted steel bulkhead with a riveted butt strap
+      wbox(wallM, vs + 0.02, ve - 0.02, Y + 1.22, Y + 1.3, 0.007);
+      if (fine >= 3) for (let a = vs + 0.1; a < ve - 0.06; a += 0.14) for (const yy of [Y + 1.24, Y + 1.28]) b.stud(wallM, P(a, yy, 0.007), O, A, 0.008, 0.008);
     } else if (!flat && kind === 'steel' && y0 < Y + 0.5) {
       const dark = mats.steelDark;
       for (let a = Math.ceil((vs + 0.15) / 0.61) * 0.61; a < ve - 0.15; a += 0.61) { wbox(dark, a - 0.006, a + 0.006, Y, TOP, 0.075); wbox(dark, a - 0.035, a + 0.035, Y, TOP, 0.085, 0.075); }
@@ -593,13 +709,27 @@ class DeckPlan {
     const dadoM = st.dado ?? (relief && kind === 'panel' ? frameM : (kind === 'plain' && st.skirt ? st.skirt : null));
     if (dadoM && inY(Y + 0.85, Y + 0.95)) mould(dadoM, PR.dado, Y + (st.wainscot ? 0.92 : 0.86));
     if ((kind === 'wainscot' || kind === 'plain') && !flat && inY(TOP - 0.45, TOP - 0.4)) mould(st.cornice ?? st.skirt ?? frameM, PR.picture, TOP - 0.44);
-    if (st.cornice && inY(TOP - 0.16, TOP)) { const g = st.grand && !flat; mould(st.cornice, g ? PR.corniceGrand : PR.cornice, TOP - (g ? 0.16 : 0.13)); }
+    else if (relief && kind === 'panel' && fine >= 1 && inY(TOP - 0.4, TOP - 0.36)) mould(frameM, PR.picture, TOP - 0.395); // frieze rail over the tall panels
+    if (st.cornice && inY(TOP - 0.16, TOP)) {
+      const g = st.grand && !flat, cb = TOP - (g ? 0.16 : 0.13);
+      mould(st.cornice, g ? PR.corniceGrand : PR.cornice, cb);
+      // carved dentil course under the cornice (moulded panelling, fine 3)
+      if (moulded && !flat && fine >= 3 && inY(cb - 0.04, cb)) for (let a = vs + 0.05; a < ve - 0.05; a += 0.075) wbox(st.cornice, a - 0.014, a + 0.014, cb - 0.036, cb, 0.022);
+    }
     else if (kind === 'boards' && inY(TOP - 0.04, TOP)) mould(wallM, PR.cap, TOP - 0.035);
     if (st.rail && e - s > 0.4 && inY(Y + 0.8, Y + 0.95)) {
       const o = c + side * 0.07;
       if (X) b.bar(st.rail, [s + 0.05, Y + 0.88, o], [e - 0.05, Y + 0.88, o], 0.05, 0.05); else b.bar(st.rail, [o, Y + 0.88, s + 0.05], [o, Y + 0.88, e - 0.05], 0.05, 0.05);
       const n = Math.max(1, Math.round((ve - vs) / 1.3));
       for (let i = 0; i <= n; i++) { const a = vs + 0.15 + ((ve - vs - 0.3) * i) / Math.max(1, n); wbox(mats.brass, a - 0.012, a + 0.012, Y + 0.85, Y + 0.885, 0.06); wbox(mats.brass, a - 0.03, a + 0.03, Y + 0.83, Y + 0.9, 0.006); }
+    } else if (!flat && fine >= 1 && !st.grand && kind !== 'tile' && kind !== 'none' && ve - vs > 0.7 && y0 <= Y + 0.01 && inY(Y + 0.8, Y + 0.95)
+      && (fine >= 2 || (kind !== 'panel' && kind !== 'wainscot')) && owners.some((q) => q.type === 'corridor' && !q._detailed)) {
+      // corridor hand rail on brackets (stops short of the door architraves)
+      const ra = vs + 0.14, rb = ve - 0.14, steel = kind === 'steel';
+      if (steel) b.prism(mats.iron, P(ra, Y + 0.9, 0.135), P(rb, Y + 0.9, 0.135), 0.022, 6, true); // clear of the frames (0.085)
+      else { const o = c + side * 0.068, rm = kind === 'panel' || kind === 'wainscot' ? mats.oak : mats.woodDark; if (X) b.bar(rm, [ra, Y + 0.875, o], [rb, Y + 0.875, o], 0.045, 0.05); else b.bar(rm, [o, Y + 0.875, ra], [o, Y + 0.875, rb], 0.045, 0.05); }
+      const n = Math.max(1, Math.round((rb - ra) / 1.4)), bm = steel ? mats.iron : mats.brass;
+      for (let i = 0; i <= n; i++) { const a = ra + 0.08 + ((rb - ra - 0.16) * i) / n; wbox(bm, a - 0.01, a + 0.01, Y + 0.85, Y + 0.875, steel ? 0.115 : 0.05); wbox(bm, a - 0.028, a + 0.028, Y + 0.82, Y + 0.89, 0.006); }
     }
   }
   /** end cap of a wall at along-coordinate p, facing dir (-1/+1) */
@@ -622,12 +752,15 @@ class DeckPlan {
       if (X) { b.wallZ(fm, da, l.c - e, l.c + e, Y, yh, 1); b.wallZ(fm, db, l.c - e, l.c + e, Y, yh, -1); b.poly(fm, [[da, yh, l.c - e], [db, yh, l.c - e], [db, yh, l.c + e], [da, yh, l.c + e]], [0, -1, 0]); }
       else { b.wallX(fm, da, l.c - e, l.c + e, Y, yh, 1); b.wallX(fm, db, l.c - e, l.c + e, Y, yh, -1); b.poly(fm, [[l.c - e, yh, da], [l.c - e, yh, db], [l.c + e, yh, db], [l.c + e, yh, da]], [0, -1, 0]); }
       const prof = steelDoor ? [[0, 0], [0.03, 0], [0.03, 0.07], [0, 0.07]] : PR.arch, aw = prof[prof.length - 1][1];
+      // 1st class / suites / public rooms: moulded door head (cornice) over the architrave, fine 2
+      const rt = d.room?.type, head = !steelDoor && kitFine() >= 2 && top - (yh + aw) > 0.25 && (st.grand || d.room?.cls === 'first' || rt === 'suite' || PUBLIC_TYPES.has(rt));
       for (const sd of [-1, 1]) {
         const c = l.c + sd * T2, A = X ? [1, 0, 0] : [0, 0, 1], O = X ? [0, 0, sd] : [sd, 0, 0];
         const P = (a, y) => (X ? [a, y, c] : [c, y, a]);
         b.sweep(fm, prof, P(da, Y), [0, 1, 0], O, [-A[0], 0, -A[2]], yh + aw - Y, [false, true]);
         b.sweep(fm, prof, P(db, Y), [0, 1, 0], O, A, yh + aw - Y, [false, true]);
         b.sweep(fm, prof, P(da - aw, yh), A, O, [0, 1, 0], db - da + 2 * aw, [true, true]);
+        if (head && (!d.label || sd === (d.sgn || 1))) b.sweep(fm, PR.head, P(da - aw - 0.025, yh + aw), A, O, [0, 1, 0], db - da + 2 * aw + 0.05, [true, true]);
         if (!steelDoor) for (const a of [da - aw, db]) { const p = P(a, Y), q = X ? [a + aw, Y + 0.16, c + sd * 0.024] : [c + sd * 0.024, Y + 0.16, a + aw]; b.box(fm, Math.min(p[0], q[0]), Y, Math.min(p[2], q[2]), Math.max(p[0], q[0]), Y + 0.16, Math.max(p[2], q[2])); }
       }
       // threshold strip (steppable)
@@ -710,6 +843,11 @@ export class FurnishCtx {
     this.rng = rngOf(hash(plan.deck + ':' + r.id)); this.opts = {}; this.cls = r.cls;
     /** second random stream for decorative extras (does not disturb the furniture layout drawn from rng) */
     this.drng = rngOf(hash('deco:' + plan.deck + ':' + r.id));
+    /** third stream for lived-in clutter (fine detail) – leaves rng / drng and with them the existing layout untouched */
+    this.crng = rngOf(hash('clutter:' + plan.deck + ':' + r.id));
+    /** kit fine-detail level at build time (TIER.fine) */
+    this.fine = kitFine();
+    this.clutterTris = 0; this.mounted = [];
     const s = r.safe, doors = r.doorsAll ?? [];
     const main = doors.find((d) => d.own) ?? doors[0];
     const side = r.facing ?? main?.side ?? r.open[0] ?? (r.hullSide === 'stbd' ? 'port' : r.hullSide === 'port' ? 'stbd' : 'aft');
@@ -773,10 +911,12 @@ export class FurnishCtx {
     if (!opts.force && !this.free(u, v, eu, ev)) return false;
     const p = this.at(u, v), q = this._rect(u, v, eu, ev);
     const collide = opts.collide ?? (fp.h > 0.45 && Math.min(fp.w, fp.d) >= 0.4 && Math.max(fp.w, fp.d) >= 0.75);
-    P.place(this.plan.zone(p.x), prop, p.x, this.y + (opts.y ?? 0), p.z, this.rot(dir), { collide: false });
+    // opts.merge: geometry goes into the deck batch (no extra meshes) – for small clutter repeated in hundreds of rooms
+    if (opts.merge) this.clutterTris += this.plan.batch.prop(prop, p.x, this.y + (opts.y ?? 0), p.z, this.rot(dir));
+    else P.place(this.plan.zone(p.x), prop, p.x, this.y + (opts.y ?? 0), p.z, this.rot(dir), { collide: false });
     if (collide) this.world.addCollider(q.x0, this.y, q.z0, q.x1, this.y + Math.max(0.5, Math.min(fp.h, 2)), q.z1);
-    if (!opts.ghost) this.occupied.push(q);
-    this.count++;
+    if (!opts.ghost) { q.h = fp.h + (opts.y ?? 0); this.occupied.push(q); }
+    if (!opts.clutter) this.count++;
     this.last = { u, v, dir, fp, x: p.x, z: p.z };
     return true;
   }
@@ -788,16 +928,44 @@ export class FurnishCtx {
    */
   attach(prop, dx = 0, dz = 0, opts = {}) {
     const L = this.last; if (!L) return false;
-    const d = DIRS[L.dir] ?? DIRS.in, F = [d[0] * this.U[0] + d[1] * this.V[0], d[0] * this.U[1] + d[1] * this.V[1]], Zw = [-F[1], F[0]];
-    const x = L.x + F[0] * dx + Zw[0] * dz, z = L.z + F[1] * dx + Zw[1] * dz;
+    const { x, z } = this._relXZ(dx, dz);
     const u = (x - this.o[0]) * this.U[0] + (z - this.o[1]) * this.U[1], v = (x - this.o[0]) * this.V[0] + (z - this.o[1]) * this.V[1];
     const fp = prop.userData.fp ?? { w: 0.3, d: 0.3 }, r = Math.max(fp.w, fp.d) / 2;
     if (u - r < 0 || u + r > this.W || v - r < 0 || v + r > this.D || Math.abs(z) + r > deckHalfWidth(this.deck, x) - 0.02) return false;
     this._zones ??= this._doorZones();
     const q = { x0: x - r, x1: x + r, z0: z - r, z1: z + r };
     if (!opts.y && this._zones.some((o) => overlap(o, q, 0.005))) return false;
-    P.place(this.plan.zone(x), prop, x, this.y + (opts.y ?? 0), z, this.rot(L.dir) + (opts.turn ?? 0));
+    if (opts.merge) this.clutterTris += this.plan.batch.prop(prop, x, this.y + (opts.y ?? 0), z, this.rot(L.dir) + (opts.turn ?? 0));
+    else P.place(this.plan.zone(x), prop, x, this.y + (opts.y ?? 0), z, this.rot(L.dir) + (opts.turn ?? 0));
     return true;
+  }
+
+  /** attach() merged into the deck batch (no extra meshes): small clutter on / at the prop placed last. */
+  stow(prop, dx = 0, dz = 0, opts = {}) { return this.attach(prop, dx, dz, { ...opts, merge: true }); }
+
+  /** world x/z of a point dx along the front / dz along the width of the prop placed last */
+  _relXZ(dx, dz) {
+    const L = this.last, d = DIRS[L.dir] ?? DIRS.in, F = [d[0] * this.U[0] + d[1] * this.V[0], d[0] * this.U[1] + d[1] * this.V[1]];
+    return { x: L.x + F[0] * dx - F[1] * dz, z: L.z + F[1] * dx + F[0] * dz };
+  }
+  /** world point [x, y, z] relative to the prop placed last (y above the floor) */
+  rel(dx, dz, y = 0) { const p = this._relXZ(dx, dz); return [p.x, this.y + y, p.z]; }
+  /**
+   * Small batched box relative to the prop placed last: dx0..dx1 along its front, dz0..dz1 along its width, y0..y1 above
+   * the floor (books, soap, folded clothes …). No collider, no reservation. faces as Batch.box (default without bottom).
+   */
+  lbox(mat, dx0, dz0, dx1, dz1, y0, y1, faces = 'xXYzZ') {
+    if (!this.last) return;
+    const b = this.plan.batch, t0 = b.tris, p = this.rel(dx0, dz0, y0), q = this.rel(dx1, dz1, y1);
+    b.box(matOf(mat), p[0], p[1], p[2], q[0], q[1], q[2], faces);
+    this.clutterTris += b.tris - t0;
+  }
+  /** run fn(batch, rel) drawing clutter straight into the deck batch (counted as clutter, see lbox) */
+  bits(fn) {
+    if (!this.last) return;
+    const b = this.plan.batch, t0 = b.tris;
+    fn(b, (dx, dz, y) => this.rel(dx, dz, y));
+    this.clutterTris += b.tris - t0;
   }
 
   /**
@@ -826,11 +994,16 @@ export class FurnishCtx {
   }
 
   /** Mount a wall prop (sconce, mirror, clock: origin = mounting point) on a wall at position `pos` along it, height hgt. */
-  mount(prop, wall, pos, hgt = 1.7) {
+  mount(prop, wall, pos, hgt = 1.7, opts = {}) {
     const [u, v, dir] = wall === 'left' ? [0.01, pos, 'right'] : wall === 'right' ? [this.W - 0.01, pos, 'left'] : wall === 'near' ? [pos, 0.01, 'in'] : [pos, this.D - 0.01, 'out'];
     const p = this.at(u, v);
     if (Math.abs(p.z) > deckHalfWidth(this.deck, p.x)) return false;
-    P.place(this.plan.zone(p.x), prop, p.x, this.y + hgt, p.z, this.rot(dir));
+    if (opts.merge) this.clutterTris += this.plan.batch.prop(prop, p.x, this.y + hgt, p.z, this.rot(dir));
+    else P.place(this.plan.zone(p.x), prop, p.x, this.y + hgt, p.z, this.rot(dir));
+    // remembered for the wall fittings (switches, grilles): wall strip and height range (coats hang ~0.9 m below the hooks)
+    const fp = prop.userData.fp ?? { w: 0.5, h: 0.5 }, side = wall === 'left' || wall === 'right';
+    const q = this._rect(u, v, side ? 0.3 : fp.w, side ? fp.w : 0.3);
+    this.mounted.push({ ...q, y0: hgt - (prop.userData.prop === 'coatHooks' ? 1.0 : fp.h / 2 + 0.05), y1: hgt + fp.h / 2 + 0.05 });
     return true;
   }
 

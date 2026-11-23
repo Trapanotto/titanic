@@ -7,6 +7,10 @@ import { mats as M } from '../core/materials.js';
 import { tiledBoxGeometry } from '../core/geo.js';
 import { kitMats as K, AT } from './batch.js';
 import * as G from './geom.js';
+import { TIER } from '../core/tier.js';
+
+/** fine modelling level 0..3 (docs/CONTRACT.md "Detail levels"); read at build time only */
+export const FINE = () => TIER.fine ?? 3;
 
 const geo = new Map();
 export function cached(key, make) { let g = geo.get(key); if (!g) geo.set(key, (g = make())); return g; }
@@ -19,6 +23,23 @@ const S = (n, min) => Math.min(n, Math.max(min, Math.round(n * DETAIL.q)));
 /** segment floor by radius: big round parts stay smooth, small ones get cheap */
 const MINSEG = (r) => (r > 0.3 ? 16 : r > 0.15 ? 12 : r > 0.07 ? 8 : r > 0.03 ? 6 : 5);
 export const TAU = Math.PI * 2;
+
+/** frame moulding profiles (rows for G.frameMould) by moulding width b */
+export const MOULD = {
+  bead: (b) => [{ o: 0, y: 0 }, { o: -b * 0.5, y: b * 0.55 }, { o: -b, y: 0 }],
+  bolection: (b) => [{ o: 0, y: 0 }, { o: -b * 0.2, y: b * 0.5 }, { o: -b * 0.45, y: b * 0.8 }, { o: -b * 0.75, y: b * 0.45 }, { o: -b, y: 0 }],
+  frame: (b) => [{ o: 0, y: 0 }, { o: 0, y: b * 0.5 }, { o: -b * 0.3, y: b * 0.8 }, { o: -b * 0.65, y: b * 0.55 }, { o: -b, y: b * 0.3 }, { o: -b, y: 0 }],
+};
+/** slab edge profiles (rows for G.mouldedSlab) by slab thickness t; o = 0 is the nominal outline */
+export const EDGE = {
+  thumb: (t) => [{ o: -0.006, y: 0 }, { o: 0, y: t * 0.35 }, { o: 0, y: t * 0.65 }, { o: -0.006, y: t }],
+  ovolo: (t) => [{ o: -0.012, y: 0 }, { o: -0.004, y: t * 0.2 }, { o: 0, y: t * 0.45 }, { o: -0.002, y: t * 0.8 }, { o: -0.008, y: t }],
+  ogee: (t) => [{ o: -0.016, y: 0 }, { o: -0.012, y: t * 0.15 }, { o: -0.004, y: t * 0.3 }, { o: 0, y: t * 0.55 }, { o: 0, y: t * 0.75 }, { o: -0.003, y: t * 0.9 }, { o: -0.009, y: t }],
+  // crown moulding of a carcass top: widest at the top, coved back below
+  crown: (t) => [{ o: -0.03, y: 0 }, { o: -0.026, y: t * 0.2 }, { o: -0.018, y: t * 0.35 }, { o: -0.008, y: t * 0.55 }, { o: -0.002, y: t * 0.72 }, { o: 0, y: t * 0.8 }, { o: 0, y: t }],
+  // plinth / skirting: widest at the bottom
+  plinth: (t) => [{ o: 0, y: 0 }, { o: 0, y: t * 0.55 }, { o: -0.006, y: t * 0.7 }, { o: -0.014, y: t * 0.85 }, { o: -0.018, y: t }],
+};
 
 /** Builder used inside prop definitions. Sizes: sx (depth, local x), sy (height), sz (width, local z); y = bottom. */
 export class PB {
@@ -71,6 +92,14 @@ export class PB {
   }
   /** raised & fielded panel facing +x, centre (y, z) at x */
   fp(mat, w, h, x, y, z, t = 0.012, e = 0.035) { return this._add(cached(`fp${r3(w)}_${r3(h)}_${r3(t)}_${r3(e)}`, () => G.fielded(w, h, t, e)), mat, x, y, z); }
+  /** moulded frame facing +x: outer w (z) × h (y), moulding width bw, back plane at x, centre (y, z); kind: MOULD key */
+  mf(mat, w, h, x, y, z, bw = 0.02, kind = 'bead') {
+    return this._add(cached(`mf${r3(w)}_${r3(h)}_${r3(bw)}_${kind}`, () => G.frameMould(w, h, MOULD[kind](bw))), mat, x, y, z);
+  }
+  /** slab d (x) × w (z) × t with a moulded edge (EDGE key), bottom at y; rc corner radius, n corner steps */
+  ms(mat, d, t, w, x = 0, y = 0, z = 0, kind = 'ovolo', rc = 0.01, n = 1) {
+    return this._add(cached(`ms${r3(d)}_${r3(t)}_${r3(w)}_${kind}_${r3(rc)}_${n}`, () => G.mouldedSlab(d, w, EDGE[kind](t), { rc, n, bottom: true })), mat, x, y, z);
+  }
   loft(mat, pts, radii, seg = 8, caps = true) { return this._add(G.loft(pts, radii, S(seg, 3), caps), mat, 0, 0, 0); }
   tube(mat, pts, r, tseg = 16, rseg = 6, closed = false) { return this._add(G.tube(pts, r, S(tseg, 6), S(rseg, 3), closed), mat, 0, 0, 0); }
   /** extruded outline in the yz plane (a = z, b = y), thickness along x, centred at x */
@@ -142,6 +171,9 @@ function optKey(v) {
   return '{' + Object.keys(v).map((k) => k + ':' + optKey(v[k])).join(',') + '}';
 }
 
+/** Optional usage hook for tools (prop statistics, tools/ scripts): use(name, key, opts, template). Null in the app. */
+export const PROP_HOOK = { use: null };
+
 /** Define a prop: fp = [w, d, h] or fn(opts) → [w, d, h]; build(p: PB, opts). */
 export function def(name, fp, build) {
   const fn = (o = {}) => {
@@ -153,6 +185,7 @@ export function def(name, fp, build) {
       t = { parts: bakeTemplate(p.g), fp: typeof fp === 'function' ? fp(o) : fp };
       templates.set(key, t);
     }
+    if (PROP_HOOK.use) PROP_HOOK.use(name, key, o, t);
     const g = new THREE.Group();
     for (const part of t.parts) g.add(new THREE.Mesh(part.geo, part.mat));
     g.userData.fp = { w: t.fp[0], d: t.fp[1], h: t.fp[2] };
@@ -189,13 +222,28 @@ export function rngOf(seed) { let a = (seed * 2654435761) >>> 0; return () => { 
 
 /** turned leg (lathe): r = max radius, base on y */
 export function turnedLeg(p, mat, h, x, z, r = 0.025, y = 0, seg = 8) {
-  p.lathe(mat, [[0, 0], [r * 0.75, 0], [r * 0.5, h * 0.08], [r * 0.5, h * 0.42], [r * 0.85, h * 0.56], [r * 0.6, h * 0.66], [r, h * 0.78], [r, h], [0, h]], x, y, z, seg);
+  // fine ≥ 2: foot bead, vase, collar rings and a block-like top instead of the plain baluster
+  const prof = FINE() >= 2
+    ? [[0, 0], [r * 0.72, 0], [r * 0.8, h * 0.03], [r * 0.48, h * 0.08], [r * 0.5, h * 0.36], [r * 0.64, h * 0.44], [r * 0.5, h * 0.5], [r * 0.9, h * 0.56], [r * 0.62, h * 0.63], [r * 0.95, h * 0.74], [r, h * 0.78], [r, h], [0, h]]
+    : [[0, 0], [r * 0.75, 0], [r * 0.5, h * 0.08], [r * 0.5, h * 0.42], [r * 0.85, h * 0.56], [r * 0.6, h * 0.66], [r, h * 0.78], [r, h], [0, h]];
+  p.lathe(mat, prof, x, y, z, seg);
 }
-/** tapered square leg */
-export function taperLeg(p, mat, h, x, z, top = 0.045, bot = 0.03, y = 0) { p.fr(mat, bot, bot, top, top, h, x, y, z); }
-/** cabriole leg: knee pointing to (kx, kz) (unit), foot on y */
+/** tapered square leg (fine ≥ 2: with a spade foot) */
+export function taperLeg(p, mat, h, x, z, top = 0.045, bot = 0.03, y = 0) {
+  if (FINE() >= 2) {
+    const fh = Math.min(0.06, h * 0.09);
+    p.fr(mat, bot * 1.12, bot * 1.12, bot * 1.3, bot * 1.3, fh, x, y, z);
+    p.fr(mat, bot, bot, top, top, h - fh, x, y + fh, z, { bottom: false });
+  } else p.fr(mat, bot, bot, top, top, h, x, y, z);
+}
+/** cabriole leg: knee pointing to (kx, kz) (unit), foot on y (fine ≥ 2: pad foot, fuller knee) */
 export function cabriole(p, mat, h, x, z, kx, kz, r = 0.028, y = 0, seg = 5) {
   const k = (t, o) => [x + kx * o, y + h * t, z + kz * o];
+  if (FINE() >= 2) {
+    p.loft(mat, [k(0, 0.03), k(0.04, 0.03), k(0.1, 0.02), k(0.45, -0.012), k(0.72, 0.008), k(0.86, 0.024), k(1, 0.025)],
+      [r * 1.05, r * 0.9, r * 0.5, r * 0.55, r * 0.85, r * 1.05, r * 0.95], seg + 2);
+    return;
+  }
   p.loft(mat, [k(0, 0.025), k(0.1, 0.02), k(0.45, -0.012), k(0.8, 0.02), k(1, 0.025)],
     [r * 0.8, r * 0.55, r * 0.55, r * 1.0, r * 0.95], seg);
 }
@@ -211,19 +259,27 @@ export function knob(p, x, y, z, r = 0.014, mat = M.brass) { p.latheX(mat, [[0, 
 export function keyplate(p, x, y, z, mat = M.brass) { p.b(mat, 0.004, 0.034, 0.018, x + 0.002, y - 0.017, z); }
 /** drawer front facing +x, centre (y, z) at front plane x */
 export function drawer(p, mat, w, h, x, y, z, handles = 2, key = true) {
-  p.b(mat, 0.022, h - 0.008, w - 0.008, x - 0.011, y - h / 2 + 0.004, z);
+  const f = FINE();
+  if (f >= 1) p.bb(mat, 0.022, h - 0.008, w - 0.008, x - 0.011, y - h / 2 + 0.004, z, 0.004);
+  else p.b(mat, 0.022, h - 0.008, w - 0.008, x - 0.011, y - h / 2 + 0.004, z);
+  if (f >= 3 && w > 0.2) p.mf(mat, w - 0.02, h - 0.02, x, y, z, 0.008, 'bead'); // cock bead round the front
   if (handles === 2) { bail(p, x, y + 0.01, z - w * 0.27); bail(p, x, y + 0.01, z + w * 0.27); } else if (handles === 1) knob(p, x, y, z);
   if (key) keyplate(p, x, y + (h > 0.12 ? 0.0 : 0.005), z);
 }
 /** panelled cabinet door facing +x: frame + raised field (+ optional mirror instead of field) */
 export function cabDoor(p, mat, w, h, x, y0, z, { mirror = false, panels = 1, knobAt = null, glass = false } = {}) {
-  p.b(mat, 0.022, h, w, x - 0.011, y0, z);
+  const f = FINE();
+  if (f >= 1) p.bb(mat, 0.022, h, w, x - 0.011, y0, z, 0.004); else p.b(mat, 0.022, h, w, x - 0.011, y0, z);
   const fh = (h - 0.12 - (panels - 1) * 0.08) / panels;
   for (let i = 0; i < panels; i++) {
     const yc = y0 + 0.06 + fh / 2 + i * (fh + 0.08);
     if (mirror && i === panels - 1) { p.bb(M.gold, 0.006, fh + 0.02, w - 0.1, x + 0.001, yc - fh / 2 - 0.01, z, 0.003); p.b(M.mirror, 0.004, fh - 0.02, w - 0.14, x + 0.005, yc - fh / 2 + 0.01, z); }
     else if (glass) { p.b(M.glass, 0.004, fh, w - 0.12, x - 0.004, yc - fh / 2, z); }
-    else p.fp(mat, w - 0.12, fh, x, yc, z, 0.01, Math.min(0.04, w * 0.12));
+    else {
+      p.fp(mat, w - 0.12, fh, x, yc, z, 0.01, Math.min(0.04, w * 0.12));
+      // applied moulding framing the raised field
+      if (f >= 2 && w > 0.2) p.mf(mat, w - 0.11, fh + 0.01, x, yc, z, 0.014, f >= 3 ? 'bolection' : 'bead');
+    }
   }
   if (knobAt !== null) { knob(p, x + 0.004, y0 + h * 0.5, z + knobAt, 0.011); keyplate(p, x + 0.004, y0 + h * 0.5 - 0.05, z + knobAt); }
 }
@@ -242,7 +298,7 @@ export function slabWithHoles(p, mat, d, t, w, x, y, z, holes, bevel = 0.006) {
 /** mattress (piped, slightly puffed) bottom at y, length along z */
 export function mattress(p, w, l, h, x, y, z, mat = M.linen) { p.pil(mat, w, h, l, x, y, z, 0.22, 0.12, 3, 14, 0.006); }
 /** pillow bottom at y */
-export function pillowAt(p, w, l, h, x, y, z, mat = M.linen) { p.pil(mat, w, h, l, x, y, z, 0.6, 0.45, 3, 10); }
+export function pillowAt(p, w, l, h, x, y, z, mat = M.linen) { p.pil(mat, w, h, l, x, y, z, 0.6, 0.45, 3, 10, h * 0.18); } // head dent (no extra triangles)
 /**
  * Blanket over a mattress (top at y): covers the foot end from zFoot to zFold (z along the bed), hangs over the sides by
  * `drop`, turned-down sheet at the fold.
@@ -257,10 +313,30 @@ export function blanket(p, mat, w, x, y, zFold, zFoot, drop = 0.13, sheet = M.li
   p.b(sheet, w + 0.03, 0.008, 0.16, x, y + 0.012, zFold - s * 0.08);
 }
 /** chair / sofa cushion (bottom at y) */
-export function cushion(p, mat, sx, sy, sz, x, y, z) { p.pil(mat, sx, sy, sz, x, y, z, 0.35, 0.18, 3, 12, 0.008); }
-/** vertical tufted back facing +x, centre at (x, y, z) */
+export function cushion(p, mat, sx, sy, sz, x, y, z, pipe = null) {
+  p.pil(mat, sx, sy, sz, x, y, z, 0.35, 0.18, 3, 12, 0.008);
+  if (FINE() >= 2) piping(p, pipe ?? mat, sx, sz, x, y + sy * 0.5, z, Math.min(sx, sz) * 0.09);
+}
+/** piping cord (welt) round a cushion / seat edge: rounded rectangle d (x) × w (z) at height y */
+export function piping(p, mat, d, w, x, y, z, rc = 0.03, r = 0.006) {
+  const g = cached(`pipe${r3(d)}_${r3(w)}_${r3(rc)}_${r3(r)}`, () => G.revolve([{ o: -r * 0.4, y: -r }, { o: r * 0.6, y: 0 }, { o: -r * 0.4, y: r }], { perim: G.rectLoop(d, w, rc, 2) }));
+  return p.add(g, mat, x, y, z);
+}
+/** vertical tufted back facing +x, centre at (x, y, z) (fine 3: finer surface and covered buttons) */
 export function tuftBack(p, mat, w, h, x, y, z, nz = 4, ny = 2, depth = 0.016, puff = 0.03) {
-  const g = cached(`tb${r3(w)}_${r3(h)}_${nz}_${ny}_${r3(depth)}_${r3(puff)}`, () => G.tufted(w, h, nz, ny, depth, puff, w > 1 ? 1.5 : 2));
+  const f = FINE(), res = (w > 1 ? 1.5 : 2) + (f >= 3 ? 1 : 0);
+  // one geometry (buttons merged in), so callers can still rotate the returned mesh
+  const g = cached(`tb${r3(w)}_${r3(h)}_${nz}_${ny}_${r3(depth)}_${r3(puff)}_${res}_${f >= 3}`, () => {
+    const t = G.tufted(w, h, nz, ny, depth, puff, res);
+    if (f < 3) return t;
+    const parts = [t];
+    for (const [bz, by] of t.userData.buttons) {
+      const ez = Math.min(1, (w / 2 - Math.abs(bz)) / (w * 0.12)), ey = Math.min(1, (h / 2 - Math.abs(by)) / (h * 0.12));
+      const bx = Math.max(0, puff * Math.sqrt(Math.max(0, ez * ey)) - depth * Math.min(ez, ey));
+      parts.push(G.lathe([[0, 0], [0.008, 0.001], [0.006, 0.005], [0, 0.006]], 5).rotateZ(-Math.PI / 2).translate(bx - 0.002, by, bz));
+    }
+    return G.mergeAll(parts);
+  });
   return p.add(g, mat, x, y, z);
 }
 /** horizontal tufted seat top (facing +y), centre (x, y, z), w along z, d along x */
@@ -297,6 +373,10 @@ const TUMBLER_LO = [[0, 0], [0.032, 0], [0.036, 0.1], [0.03, 0.006], [0, 0.006]]
 export function tableLampOn(p, x, y, z, shade = M.lampGlow) {
   p.lathe(M.brass, [[0, 0], [0.055, 0], [0.04, 0.016], [0.01, 0.04], [0.015, 0.07], [0.008, 0.09], [0.008, 0.2], [0, 0.2]], x, y, z, 10);
   p.rev(shade, [{ o: 0.095, y: 0, m: 0.004 }, { o: 0.05, y: 0.11, m: 0.003 }, { o: 0.045, y: 0.115 }], { seg: 16, k: 8, capTop: true }, x, y + 0.15, z);
+  if (FINE() >= 2) { // gilt shade rim and a small finial on the shade top
+    p.t(M.brass, 0.096, 0.003, x, y + 0.151, z, 'y', 16, 3);
+    p.lathe(M.brass, [[0, 0], [0.01, 0], [0.012, 0.01], [0.004, 0.02], [0, 0.028]], x, y + 0.264, z, 6);
+  }
 }
 /** folded towel hanging over a rail (along z) at x, y */
 export function towelOn(p, x, y, z, w = 0.3, drop = 0.22) {
@@ -318,6 +398,70 @@ export function bookRow(p, x, y, z0, z1, d = 0.2, hmax = 0.26, seed = 1, lean = 
     if (r() < 0.05) z += 0.05 + r() * 0.08;
   }
 }
+// ------------------------------------------------------------ small clutter (all standing on y, centred at x, z)
+
+const SAUCER = [[0, 0], [0.04, 0], [0.068, 0.008], [0.074, 0.013], [0.066, 0.012], [0.04, 0.006], [0, 0.006]];
+/** cup on its saucer; handle towards angle a (0 = +x, π/2 = −z) */
+export function cupSaucer(p, x, y, z, a = 0, mat = M.porcelain) {
+  p.lathe(mat, SAUCER, x, y, z, 10);
+  p.lathe(mat, SHAPES.CUP, x, y + 0.006, z, 8);
+  const h = p.t(mat, 0.017, 0.0045, x + Math.cos(a) * 0.047, y + 0.046, z - Math.sin(a) * 0.047, 'z', 10, 3); h.rotation.y = a;
+}
+/** teapot (s = scale; spout towards +x) */
+export function teapotOn(p, x, y, z, mat = M.porcelain, s = 1) {
+  p.lathe(mat, [[0, 0], [0.045 * s, 0], [0.068 * s, 0.025 * s], [0.075 * s, 0.055 * s], [0.066 * s, 0.09 * s], [0.04 * s, 0.11 * s], [0, 0.112 * s]], x, y, z, 10);
+  p.lathe(mat, [[0, 0], [0.012 * s, 0], [0.016 * s, 0.012 * s], [0.005 * s, 0.022 * s], [0, 0.03 * s]], x, y + 0.108 * s, z, 6);
+  p.loft(mat, [[x + 0.058 * s, y + 0.035 * s, z], [x + 0.09 * s, y + 0.06 * s, z], [x + 0.112 * s, y + 0.1 * s, z]], [0.016 * s, 0.009 * s, 0.006 * s], 5);
+  p.t(mat, 0.03 * s, 0.006 * s, x - 0.074 * s, y + 0.065 * s, z, 'z', 10, 3);
+}
+/** jug / creamer (spout towards +x) */
+export function jugOn(p, x, y, z, mat = M.porcelain, s = 1) {
+  p.lathe(mat, [[0, 0], [0.03 * s, 0], [0.036 * s, 0.03 * s], [0.03 * s, 0.07 * s], [0.034 * s, 0.09 * s], [0.03 * s, 0.09 * s], [0, 0.012 * s]], x, y, z, 8);
+  p.loft(mat, [[x + 0.026 * s, y + 0.082 * s, z], [x + 0.045 * s, y + 0.092 * s, z]], [0.008 * s, 0.004 * s], 4);
+  p.t(mat, 0.022 * s, 0.004 * s, x - 0.036 * s, y + 0.055 * s, z, 'z', 8, 3);
+}
+const FLW = [AT.flowerRed, AT.pink, AT.flowerYellow, AT.flowerWhite, AT.rose];
+/** vase (v: colour) with a posy of flowers (flowers = 0: empty vase) */
+export function vaseOn(p, x, y, z, v = 0, h = 0.2, flowers = 5) {
+  const cell = [AT.cobalt, AT.china, AT.milk, AT.blueGlass, AT.clearGlass][v % 5];
+  p.alathe(cell, [[0, 0], [0.032, 0], [0.036, 0.008], [0.05, h * 0.35], [0.046, h * 0.6], [0.024, h * 0.86], [0.022, h * 0.92], [0.034, h], [0.028, h], [0, h * 0.9]], x, y, z, 8);
+  if (!flowers) return;
+  const r = rngOf(v * 7 + flowers);
+  for (let i = 0; i < flowers; i++) {
+    const a = (i / flowers) * TAU + r() * 0.5, d = i === 0 ? 0 : 0.035 + r() * 0.035, fy = y + h + 0.07 + (i === 0 ? 0.05 : r() * 0.04);
+    const fx = x + Math.cos(a) * d, fz = z - Math.sin(a) * d;
+    p.loft(M.plant, [[x + Math.cos(a) * 0.006, y + h * 0.8, z - Math.sin(a) * 0.006], [fx, fy - 0.012, fz]], 0.0025, 3, false);
+    const c = FLW[(v + i) % FLW.length];
+    p.add(cached(`flw${c}`, () => G.atlasCell(new THREE.SphereGeometry(0.022, 6, 4), c)), K.atlas, fx, fy, fz).scale.set(1, 0.7, 1);
+  }
+  for (let i = 0; i < 3; i++) { // a few leaves hanging over the rim
+    const a = (i / 3) * TAU + 0.4, lx = x + Math.cos(a) * 0.05, lz = z - Math.sin(a) * 0.05;
+    p.loft(M.plant, [[x + Math.cos(a) * 0.02, y + h, z - Math.sin(a) * 0.02], [lx, y + h + 0.02, lz], [x + Math.cos(a) * 0.075, y + h - 0.03, z - Math.sin(a) * 0.075]], [[0.003, 0.012], [0.004, 0.016], [0.001, 0.004]], 3, false);
+  }
+}
+/** soap bar (on a dish / basin rim) */
+export function soapOn(p, x, y, z, a = 0) { p.pil(M.paintCream, 0.07, 0.022, 0.045, x, y, z, 0.5, 0.3, 2, 8).rotation.y = a; }
+/** tooth-brush mug with a brush */
+export function toothMug(p, x, y, z) {
+  p.lathe(M.porcelain, [[0, 0], [0.03, 0], [0.033, 0.09], [0.03, 0.09], [0.027, 0.008], [0, 0.008]], x, y, z, 8);
+  const b = p.bb(M.paintCream, 0.012, 0.16, 0.008, x + 0.012, y + 0.01, z, 0.002); b.rotation.z = -0.2;
+}
+/** hair brush lying on a surface, handle towards angle a */
+export function hairBrush(p, x, y, z, a = 0, mat = M.woodDark) {
+  const m1 = p.pil(mat, 0.13, 0.025, 0.06, x, y, z, 0.4, 0.45, 2, 8); m1.rotation.y = a;
+  const m2 = p.bb(mat, 0.1, 0.016, 0.026, x + Math.cos(a) * 0.1, y + 0.004, z - Math.sin(a) * 0.1, 0.006); m2.rotation.y = a;
+}
+/** hand mirror lying face up (silver / brass back), handle towards angle a */
+export function handMirror(p, x, y, z, a = 0, mat = M.chrome) {
+  p.lathe(mat, [[0, 0], [0.065, 0], [0.068, 0.008], [0.06, 0.012], [0, 0.012]], x, y, z, 12);
+  p.dial(M.mirror, 0.058, x, y + 0.0125, z, 'y', 12);
+  const h = p.bb(mat, 0.11, 0.012, 0.022, x + Math.cos(a) * 0.12, y, z - Math.sin(a) * 0.12, 0.005); h.rotation.y = a;
+}
+/** folded blanket(s): n layers d (x) × w (z), each th thick, bottom at y */
+export function foldedBlanket(p, mat, d, w, n, x, y, z, th = 0.035, rot = 0) {
+  for (let i = 0; i < n; i++) p.pil(mat, d - i * 0.01, th, w - i * 0.008, x, y + i * th * 0.9, z, 0.3, 0.12, 2, 8).rotation.y = rot + (i % 2 ? 0.03 : -0.02);
+}
+
 /** newspaper / letters on a surface */
 export function papers(p, x, y, z, a = 0, n = 2) {
   for (let i = 0; i < n; i++) { const m = p.ab(AT.paper, 0.28 - i * 0.04, 0.004, 0.36 - i * 0.05, x + i * 0.02, y + i * 0.004, z - i * 0.03); m.rotation.y = a + i * 0.25; }

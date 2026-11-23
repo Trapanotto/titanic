@@ -10,7 +10,9 @@ import {
   range, oven, servingCounter, kettle, butcherBlock, sink, shelves, sackPile, barrel, crate, tableRect, basinSmall,
   chairDining, bench, locker, mirrorWall,
 } from '../interior/kit.js';
-import { InstField, G, boxG, rng, rotOf, leadedWindow, wctx, tapestryMat, panelRun, strapCeiling, ceilingOrnaments, addMesh } from './d-util.js';
+import { InstField, G, boxG, rng, rotOf, leadedWindow, wctx, tapestryMat, panelRun, strapCeiling, ceilingOrnaments, addMesh, corbel } from './d-util.js';
+import { vase } from './d-saloon.js';
+import { fineLv, cgPlateRack, cgJugBasin, cgBottles, cgMenuBoard, cgMopBucket, hangFree as hangFreeD } from './f-util.js';
 
 const NX = Math.PI, TAU = Math.PI * 2, M = mats, K = kitMats;
 const atl = (g, c) => G.atlasCell(g, c);
@@ -161,6 +163,11 @@ export function furnishReception(ctx) {
   ceilingOrnaments(f, M.paintWhite, M.gold);
   strapCeiling(plan, f, { x0: x0 + 0.05, x1: x1 - 0.05, z0: -HW, z1: HW, xs: [34.0, 39.0, 42.65], zs: [-8.4, -3.3, 3.3, 8.4], unit: 1.3, beamW: 0.28, beamD: 0.18,
     avoid: [{ x0: cas.x0 - 0.05, x1: cas.x1 + 0.05, z0: cas.z0 - 0.05, z1: cas.z1 + 0.05 }, { x0: stair.x0 - 0.1, x1: stair.x1, z0: -3.1, z1: 3.1 }, { x0: RECEPTION.liftX0 - 0.15, x1, z0: -2.6, z1: 2.6 }] });
+  const fl = fineLv();
+  if (fl >= 1) { // carved consoles under the beam ends at the end walls
+    const yb = TOP - 0.004 - 0.18;
+    for (const z of [-8.4, -3.3, 3.3, 8.4]) { if (Math.abs(z) > 3) corbel(b, M.paintWhite, x0 + 0.05, z, [1, 0], yb, 0.2, 0.24, 0.2); if (Math.abs(z) > 2.7) corbel(b, M.paintWhite, x1 - 0.05, z, [-1, 0], yb, 0.2, 0.24, 0.2); }
+  }
   // bronze electroliers between the kit chandeliers
   for (const x of [36.2, 41.8]) for (const s of [-1, 1]) { const l = bronzeLight(); l.position.set(x, TOP, s * 8.4); plan.zone(x).add(l); world.addLamp({ x, y: TOP - 0.5, z: s * 8.4, color: 0xffd9a0, intensity: 0.6 }); }
   const archTris = b.tris - t0;
@@ -196,6 +203,7 @@ export function furnishReception(ctx) {
       if (q < 0.45) place(plan.zone(x), teaSet({ v: q < 0.2 ? 1 : 0 }), x + 0.05, Y + 0.69, zz, D() * TAU);
       else if (q < 0.75) place(plan.zone(x), newspaper(), x, Y + 0.69, zz, D() * TAU);
       else if (q < 0.9) place(plan.zone(x), bookPile({ v: Math.floor(D() * 3) }), x, Y + 0.69, zz, D() * TAU);
+      else if (fl >= 0) place(plan.zone(x), vase({ v: groups % 3 }), x, Y + 0.69, zz, groups * 1.7);
     }
   }
   f.flush();
@@ -330,8 +338,7 @@ export function furnishGalley(ctx) {
     w.put(workTable({ w: 1.8, v: s }), -23.6, s * 7.6, 'fwd');
     w.put(workTable({ w: 1.6, v: 2 + s }), -23.6, s * 4.4, 'fwd');
     w.put(butcherBlock(), -22.2, s * 7.6, 'fwd');
-    w.put(sink({ w: 1.2 }), -17.4, s * 12.05, s > 0 ? 'port' : 'stbd');
-    w.put(sink({ w: 1.2 }), -22.8, s * 12.05, s > 0 ? 'port' : 'stbd');
+    for (const x of [-17.4, -22.8]) if (w.put(sink({ w: 1.2 }), x, s * 12.05, s > 0 ? 'port' : 'stbd') && fineLv() >= 1) ctx.attach(cgPlateRack({ w: 1.2 }), -0.295, 0, { y: 1.85 });
     w.put(kettle(), -18.3, s * 11.8, 'fwd');
     // utensil rails on the bulkheads above the work tables
     for (const z of [4.4, 7.6]) w.mount(utensilRail({ w: 1.6 }), -23.93, s * z, 'fwd', 1.3);
@@ -357,6 +364,17 @@ export function furnishGalley(ctx) {
   for (let z = -10.8; z <= 10.8; z += 2.4) b.box(iron, -16.17, Y + 2.35, z - 0.015, -16.13, Y + h, z + 0.015, 'xXzZ'); // pipe hangers
 }
 
+/** Pantry of the dining saloons: the kit's pantry with plate racks over the counter and the sink, copper pans, notices. */
+export function furnishPantry(ctx) {
+  const fl = fineLv();
+  for (let k = 0; k < 4; k++) if (!ctx.fit(shelves({ kind: 'crockery', w: 1.5 }), ['far:lo'])) break;
+  const cw = Math.min(2.4, Math.max(1.2, ctx.D - 1.4));
+  if (ctx.fit(servingCounter({ w: cw, items: true }), ['right:hi', 'left:hi']) && fl >= 1) {
+    ctx.attach(cgPlateRack({ w: Math.min(1.6, cw) }), -0.365, 0, { y: 1.8 });
+  }
+  if (ctx.fit(sink({ w: 1.0 }), ['left:hi', 'right:lo', 'near:hi']) && fl >= 1) ctx.attach(cgPlateRack({ w: 1.0 }), -0.295, 0, { y: 1.85 });
+  if (fl >= 0) { hangFreeD(ctx, cgMenuBoard(), ['near', 'left', 'right'], 1.55); if (fl >= 1) ctx.fit(cgMopBucket(), ['near:lo', 'left:lo', 'right:lo'], { collide: false }); }
+}
 /** Bakery: bread ovens along the far wall, dough troughs, bread racks, flour sacks. */
 export function furnishBakery(ctx) {
   ctx.fit(oven({ w: 1.4 }), ['far:lo', 'far:hi']); ctx.fit(oven({ w: 1.4 }), ['far:hi', 'far:mid']);
@@ -499,7 +517,10 @@ export function furnishWard(ctx, nBeds = 4) {
     if (r() < 0.6) place(plan.zone(x), bookPile({ v: Math.floor(r() * 3) }), x + 0.25, Y + 0.6, zb + 0.3, r() * TAU);
   }
   ctx.fit(medCabinet({ w: 1.2 }), ['left:mid', 'right:mid', 'far:lo']);
-  if (ctx.put(tableRect({ w: 1.0, d: 0.6, mat: 'paintWhite', cloth: true }), ctx.W / 2 + 0.6, 1.4, 'in')) ctx.put(chairDining({ cls: 'plain', mat: 'paintWhite' }), ctx.W / 2 + 0.6, 0.85, 'in', { collide: false });
+  if (ctx.put(tableRect({ w: 1.0, d: 0.6, mat: 'paintWhite', cloth: true }), ctx.W / 2 + 0.6, 1.4, 'in')) {
+    if (fineLv() >= 0) { ctx.attach(cgJugBasin(), 0.02, -0.25, { y: 0.755 }); ctx.attach(cgBottles({ v: 1, n: 3 }), -0.12, 0.25, { y: 0.755 }); }
+    ctx.put(chairDining({ cls: 'plain', mat: 'paintWhite' }), ctx.W / 2 + 0.6, 0.85, 'in', { collide: false });
+  }
   ctx.fit(wardScreen(), ['right:lo', 'left:lo'], { collide: false });
   return { beds };
 }

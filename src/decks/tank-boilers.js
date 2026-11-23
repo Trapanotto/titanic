@@ -4,14 +4,18 @@
 // a glowing fire bed and flames), ash-pit doors, smokebox with strap-hinged doors, uptakes, water-gauge glasses with
 // brass cocks, pressure gauges, main stop valve with lagged branch, safety valves, manhole. Static per room: breeching
 // with flanges and rivets, lagged header and steam mains, bunkers with chutes and coal, tool racks, ash ejectors,
-// stoking indicators, caged lamps, ladders and gratings, watertight door gearing.
+// stoking indicators, caged lamps, ladders and gratings, watertight door gearing, feed main with drops to the feed
+// check valves, blow-down cocks; by detail level (TIER.fine): swept pipe bends, end-plate rivet rings, leaning fire irons,
+// spare fire bars, instanced rivets on the bunker stiffeners and plate bolts on the stokehold floor.
 import * as THREE from 'three';
 import { mats } from '../core/materials.js';
-import { kitMats, coalPile, wheelbarrow, ladder, place } from '../interior/kit.js';
+import { TIER } from '../core/tier.js';
+import { Batch, kitMats, coalPile, wheelbarrow, ladder, place } from '../interior/kit.js';
 import {
   DECK, Y, CEIL, TBatch, tube, tubeBetween, pipeRun, cageLamp, floorHW, hullIn,
-  stamp, M4, M4dir, gcache, latheAt, nut, rivet, rivetLine, rivetArcX, gratingMat,
+  stamp, M4, M4dir, gcache, latheAt, nut, rivet, rivetLine, rivetArcX, gratingMat, roundPath, sweepTube, RivetSet,
 } from './tank-lib.js';
+let RV = null; // rivet heads on the bunker plating (InstancedMesh), alive while buildBoilerRooms runs
 
 const R = 2.4;                 // boiler radius (diameter 4.8 m)
 const YC = 2.65;               // boiler axis above the tank top
@@ -51,10 +55,12 @@ const LUMP = [new THREE.OctahedronGeometry(1, 0), new THREE.TetrahedronGeometry(
 function rnd(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 /** handwheel (rim, 4 spokes, hub) with its axis along y at p (rx/rz tilt) */
 function handwheel(b, mat, x, y, z, r, d = [0, 1, 0]) {
-  const base = M4dir([x, y, z], d), L = (m) => new THREE.Matrix4().multiplyMatrices(base, m);
-  stamp(b, mat, TOR(r, r * 0.09, 18, 4), L(M4(0, 0, 0, Math.PI / 2, 0, 0)));
-  for (let k = 0; k < 2; k++) stamp(b, mat, BX(2 * r, r * 0.08, r * 0.08), L(M4(0, 0, 0, 0, (k * Math.PI) / 2, 0)));
-  stamp(b, mats.iron, CYL(r * 0.18, r * 0.18, r * 0.25, 8), base);
+  const f = TIER.fine, base = M4dir([x, y, z], d), L = (m) => new THREE.Matrix4().multiplyMatrices(base, m);
+  stamp(b, mat, f === 0 ? TOR(r, r * 0.09, 12, 3) : TOR(r, r * 0.09, 18, 4), L(M4(0, 0, 0, Math.PI / 2, 0, 0)));
+  const ns = f >= 2 && r > 0.2 ? 3 : 2; // big wheels get six spokes
+  for (let k = 0; k < ns; k++) stamp(b, mat, BX(2 * r, r * 0.08, r * 0.08), L(M4(0, 0, 0, 0, (k * Math.PI) / ns, 0)));
+  stamp(b, mats.iron, CYL(r * 0.18, r * 0.18, r * 0.25, f === 0 ? 6 : 8), base);
+  if (f >= 2) { const l = Math.hypot(d[0], d[1], d[2]) || 1, h = r * 0.125; nut(b, [x + (d[0] / l) * h, y + (d[1] / l) * h, z + (d[2] / l) * h], d, Math.max(0.008, r * 0.07)); }
 }
 /** lagged pipe (canvas lagging with iron bands) p→q */
 function lagged(b, p, q, r, bands = 0.5) {
@@ -64,6 +70,28 @@ function lagged(b, p, q, r, bands = 0.5) {
     const t = (i - 0.5) / n, c = [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t], d = [(q[0] - p[0]) / L * 0.018, (q[1] - p[1]) / L * 0.018, (q[2] - p[2]) / L * 0.018];
     tubeBetween(b, mats.iron, [c[0] - d[0], c[1] - d[1], c[2] - d[2]], [c[0] + d[0], c[1] + d[1], c[2] + d[2]], r + 0.006, { seg: 10 });
   }
+}
+/**
+ * lagged pipe through points: from detail level 1 the corners are swept bends (radius 2.2 r) in a cast casing, bands on the
+ * straight legs only; level 0: straight lagged legs meeting in short cast elbow drums (as before).
+ */
+function laggedRun(b, pts, r, bands = 0.6) {
+  const f = TIER.fine;
+  if (f === 0) {
+    for (let i = 0; i < pts.length - 1; i++) lagged(b, pts[i], pts[i + 1], r, bands);
+    for (let i = 1; i < pts.length - 1; i++) latheAt(b, mats.iron, [[r + 0.01, -0.25], [r + 0.04, -0.22], [r + 0.04, 0.22], [r + 0.01, 0.25]], 'y', pts[i], 12);
+    return;
+  }
+  const { path, joints, bends } = roundPath(pts, r * 2.2, f === 1 ? 2 : 4);
+  // straight legs: lagging with bands; bends: cast bend slightly proud of the lagging, flanged to the legs
+  let i = 0;
+  for (const [i0, i1] of bends) {
+    if (i0 > i) lagged(b, path[i], path[i0], r, bands);
+    sweepTube(b, mats.iron, path.slice(i0, i1 + 1), r + 0.025, 10);
+    i = i1;
+  }
+  if (i < path.length - 1) lagged(b, path[i], path[path.length - 1], r, bands);
+  for (const j of joints) flange(b, j.p, j.d, r + 0.07);
 }
 /** bolted pipe flange pair at c, axis d (unit) */
 function flange(b, c, d, r) {
@@ -117,9 +145,9 @@ function saddle(b, x) {
   }
 }
 
-function shellTemplate(len, se) {
+async function shellTemplate(world, len, se) {
   const b = new TBatch(), h = len / 2, top = YC + R, VIS = 1.8;
-  tube(b, mats.steelDark, 'x', [YC, 0], R, -h + 0.06, h - 0.06, { seg: 40, caps: false });
+  tube(b, mats.steelDark, 'x', [YC, 0], R, -h + 0.06, h - 0.06, { seg: TIER.fine >= 3 ? 56 : 40, caps: false });
   if (se) { endPlate(b, -h, -1); for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; nut(b, [-h - 0.06, YC + Math.cos(a) * 1.2, Math.sin(a) * 1.2], [-1, 0, 0], 0.035); } }
   const nr = se ? 2 : 3, rl = len / nr;
   // circumferential butt straps with double rows of rivets either side of the joint
@@ -128,6 +156,7 @@ function shellTemplate(len, se) {
     tube(b, mats.steelDark, 'x', [YC, 0], R + 0.018, x - 0.17, x + 0.17, { seg: 40, caps: false });
     for (const s of [-1, 1]) b.ring(mats.steelDark, [x + s * 0.17, YC, 0], [s, 0, 0], R, R + 0.018, 40);
     for (const dx of [-0.125, -0.06, 0.06, 0.125]) rivetArcX(b, x + dx, YC, 0, R + 0.018, -VIS, VIS, 0.13);
+    await world.tick();
   }
   for (const s of [-1, 1]) rivetArcX(b, s * (h - 0.11), YC, 0, R, -VIS, VIS, 0.12);
   // longitudinal butt straps (staggered), riveted
@@ -139,9 +168,11 @@ function shellTemplate(len, se) {
       const y = YC + (rr + 0.01) * c - o * s, z = (rr + 0.01) * s + o * c;
       rivetLine(b, [xa + 0.04, y, z], [xb - 0.04, y, z], [0, c, s], 0.1);
     }
+    await world.tick();
   }
   for (const x of se ? [-h + 0.5, h - 0.5] : [-h + 0.6, 0, h - 0.6]) saddle(b, x);
 
+  await world.tick();
   // main stop valve (cast chest, bolted flange, bonnet, spindle, handwheel) and lagged branch to the header
   const vy = top - 0.08;
   latheAt(b, mats.iron, [[0, 0], [0.27, 0], [0.27, 0.06], [0.2, 0.08], [0.24, 0.2], [0.24, 0.36], [0.2, 0.44], [0.26, 0.46], [0.26, 0.52], [0.12, 0.54], [0.1, 0.74], [0.13, 0.77], [0.13, 0.82], [0, 0.84]], 'y', [0, vy, 0], 16);
@@ -153,6 +184,7 @@ function shellTemplate(len, se) {
   lagged(b, [-0.27, vy + 0.28, 0], [HX + 0.17, vy + 0.28, 0], 0.17);
   latheAt(b, mats.iron, [[0.17, 0], [0.2, 0.02], [0.2, 0.36], [0.17, 0.38]], 'y', [HX, vy + 0.1, 0], 12); // elbow casing
   lagged(b, [HX, vy + 0.48, 0], [HX, HEADER - 0.2, 0], 0.17, 0.45);
+  await world.tick();
   // twin spring safety valves (Cockburn) on a cast chest, easing lever, waste-steam pipe
   const sx = se ? 0.9 : 1.6;
   box(b, mats.iron, 0.86, 0.06, 0.66, sx, top - 0.03, 0);
@@ -174,6 +206,7 @@ function shellTemplate(len, se) {
     latheAt(b, mats.iron, [[0, 0], [0.15, 0], [0.15, 0.04], [0.12, 0.05], [0.14, 0.18], [0.11, 0.26], [0.07, 0.3], [0.06, 0.45], [0, 0.46]], 'y', [-2.45, top - 0.06, 0.55], 12);
     handwheel(b, mats.rust, -2.45, top + 0.48, 0.55, 0.16);
   }
+  await world.tick();
   // feed check valves on both sides of the front quarter
   for (const s of [-1, 1]) {
     const a = s * 0.95, c = Math.cos(a), sn = Math.sin(a), fx = h - 0.95, p = [fx, YC + (R + 0.02) * c, (R + 0.02) * sn];
@@ -207,7 +240,7 @@ function fireDoor(b, m) {
   void P;
 }
 
-function endTemplate(id, open, o = {}) {
+async function endTemplate(id, open, o = {}) {
   const b = new TBatch(), n = [1, 0, 0];
   endPlate(b, 0, 1, true);
   // stay nuts over the free areas of the end plate
@@ -218,6 +251,22 @@ function endTemplate(id, open, o = {}) {
     if (Math.abs(z) > 1.85 && y > 2.6 && y < 4.0) continue;
     nut(b, [dishT(r), y, z], n, 0.032);
   }
+  if (TIER.fine >= 1) {
+    // blow-down (scum) cock low on the front plate with its drain pipe to the bilge
+    latheAt(b, mats.iron, [[0, 0], [0.07, 0], [0.07, 0.03], [0.05, 0.05], [0.06, 0.14], [0.04, 0.18], [0, 0.19]], 'x', [0.05, 0.55, 0.55], 8);
+    handwheel(b, mats.rust, 0.26, 0.55, 0.55, 0.075, [1, 0, 0]);
+    tube(b, mats.iron, 'y', [0.13, 0.55], 0.025, 0.0, 0.5, { seg: 6, caps: false });
+  }
+  if (TIER.fine >= 2) {
+    // rivets of the flanged end plate round the shell (outside the smokebox)
+    const rr = 2.22, nr = Math.round((2 * Math.PI * rr) / (TIER.fine >= 3 ? 0.1 : 0.15));
+    for (let k = 0; k < nr; k++) {
+      const a = (k / nr) * Math.PI * 2, y = YC + rr * Math.cos(a), z = rr * Math.sin(a);
+      if ((y > SB.y0 - 0.03 && Math.abs(z) < SB.hw + 0.04) || y < 0.32) continue;
+      rivet(b, [0.044, y, z], n);
+    }
+  }
+  if (o.tick) await o.tick();
   // furnaces
   FZ.forEach((zf, i) => {
     const isOpen = open.includes(i);
@@ -255,6 +304,7 @@ function endTemplate(id, open, o = {}) {
       box(b, mats.fire, 0.004, 0.012, 0.36, 0.111, FY - 0.075, zf); // glow under the door
     }
   });
+  if (o.tick) await o.tick();
   // smokebox: casing, three doors with strap hinges and dogs (variant: middle door open, tube plate visible)
   const { x1: sx1, y0: sy0, y1: sy1, hw } = SB, ym = (sy0 + sy1) / 2;
   b.box(mats.steelDark, 0, sy0, -hw, sx1, sy1, hw); // closed: its upper corners stand clear of the round end plate
@@ -354,6 +404,33 @@ function ashEjectorTemplate() {
   for (const y of [1.2, 2.3, 3.3]) flange(b, [-0.3, y, 0], [0, 1, 0], 0.14);
   return { id: 'ashEjector', parts: b.parts() };
 }
+/** slice bar leaning against a boiler front between two furnaces (origin = end plate at floor level, front +x):
+ *  flattened chisel blade on the plates, long round bar, loop handle resting on the end plate under the smokebox */
+function sliceBarTemplate() {
+  const b = new TBatch(), p = [0.56, 0.02, 0], q = [0.085, 1.98, 0], a = Math.atan2(q[0] - p[0], q[1] - p[1]);
+  tubeBetween(b, mats.iron, p, q, 0.016, { seg: 6, caps: false });
+  box(b, mats.iron, 0.02, 0.18, 0.07, 0.585, 0.09, 0, 0, 0, -a);
+  stamp(b, mats.iron, TOR(0.055, 0.011, 8, 3), M4(0.07, 2.04, 0, 0, Math.PI / 2, -a));
+  return { id: 'sliceBar', parts: b.parts() };
+}
+/** fire rake: bar with a cross head resting on the plates (same lean as the slice bar) */
+function rakeTemplate() {
+  const b = new TBatch(), p = [0.62, 0.08, 0], q = [0.09, 1.95, 0];
+  tubeBetween(b, mats.iron, p, q, 0.015, { seg: 6, caps: false });
+  box(b, mats.rust, 0.04, 0.13, 0.36, 0.64, 0.065, 0, 0, 0, -0.3);
+  box(b, mats.iron, 0.05, 0.05, 0.05, 0.62, 0.1, 0);
+  stamp(b, mats.iron, TOR(0.05, 0.01, 8, 3), M4(0.075, 2.0, 0, 0, Math.PI / 2, -Math.atan2(q[0] - p[0], q[1] - p[1])));
+  return { id: 'rake', parts: b.parts() };
+}
+/** stack of spare cast-iron fire bars (three crossed layers), origin floor centre */
+function fireBarsTemplate() {
+  const b = new TBatch();
+  for (let l = 0; l < 3; l++) for (let k = 0; k < 4; k++) {
+    const o = -0.21 + k * 0.14, y = 0.05 + l * 0.1;
+    if (l % 2) box(b, mats.rust, 0.06, 0.1, 0.9, o, y, 0.02 * l); else box(b, mats.iron, 0.9, 0.1, 0.06, 0.02 * l, y, o);
+  }
+  return { id: 'fireBars', parts: b.parts() };
+}
 /** cluster of loose coal lumps (origin floor centre, ~1.2 × 0.8 m) */
 function lumpsTemplate(seed) {
   const b = new TBatch(), r = rnd(seed);
@@ -365,27 +442,36 @@ function lumpsTemplate(seed) {
 }
 
 let T = null;
-function templates() {
+/** shared templates (built once, step by step so that no single slice gets long) */
+async function templates(world) {
   if (T) return T;
-  T = {
-    shellDE: shellTemplate(LDE, false), shellSE: shellTemplate(LSE, true),
-    ends: [endTemplate('end0', []), endTemplate('end1', [1], { ash: true }), endTemplate('end2', [0]), endTemplate('end3', [0, 2], { ash: true, smoke: true })],
-    shovel: shovelTemplate(), rack: toolRackTemplate(), ejector: ashEjectorTemplate(), lumps: [lumpsTemplate(3), lumpsTemplate(7), lumpsTemplate(11)],
-  };
+  const t = {};
+  t.shellDE = await shellTemplate(world, LDE, false); await world.tick();
+  t.shellSE = await shellTemplate(world, LSE, true); await world.tick();
+  t.ends = [];
+  for (const [id, open, o] of [['end0', []], ['end1', [1], { ash: true }], ['end2', [0]], ['end3', [0, 2], { ash: true, smoke: true }]]) { t.ends.push(await endTemplate(id, open, { ...o, tick: () => world.tick() })); await world.tick(); }
+  t.shovel = shovelTemplate(); t.rack = toolRackTemplate(); t.ejector = ashEjectorTemplate();
+  await world.tick();
+  t.lumps = [lumpsTemplate(3), lumpsTemplate(7), lumpsTemplate(11)];
+  if (TIER.fine >= 2) { t.slice = sliceBarTemplate(); t.rake = rakeTemplate(); t.bars = fireBarsTemplate(); }
+  T = t;
   return T;
 }
 
 // ------------------------------------------------------------------------------------------------ build
 
 /**
- * Builds all six boiler rooms into batch `b` (static geometry) and instancer `inst`.
+ * Builds all six boiler rooms (static geometry in one batch per room, flushed per room) and the instances into `inst`.
  */
-export function buildBoilerRooms(world, b, inst) {
-  const t = templates();
+export async function buildBoilerRooms(world, inst) {
+  const t = await templates(world);
+  RV = TIER.fine >= 2 ? new RivetSet(world) : null;
   let endNo = 0;
   const glow = (x, z, dir) => world.addLamp({ x: x + dir * 1.1, y: Y + 1.3, z, color: 0xff7a30, intensity: 0.9 });
 
   for (const r of BOILER_ROOMS) {
+    await world.tick();
+    const b = new Batch(world, DECK);
     const zs = boilerZs(r.cnt), zo = zs[zs.length - 1], E = boilerEnds(r);
     const len = r.de ? LDE : LSE;
     // ---- boilers
@@ -400,8 +486,14 @@ export function buildBoilerRooms(world, b, inst) {
         const dir = rot ? -1 : 1;
         world.addCollider(Math.min(x, x + dir * 0.8), Y + 2.2, z - 2.0, Math.max(x, x + dir * 0.8), Y + 6.4, z + 2.0); // smokebox (high)
         if (k) for (const fi of k === 1 ? [1] : k === 2 ? [0] : [0, 2]) glow(x, z + FZ[fi] * (rot ? -1 : 1), dir);
+        // fire irons leaning against the boiler front in the gaps between the furnaces (no colliders: clutter)
+        if (t.slice) {
+          const lr = rnd(endNo * 13 + r.n);
+          for (const g of [-0.7, 0.7]) if (lr() < 0.55) inst.add(lr() < 0.6 ? t.slice : t.rake, x, Y, z + g * dir, rot);
+        }
       }
     }
+    await world.tick();
     // ---- breeching (collecting flue) over the boiler row with flanged, riveted sections; trunk to the funnel casing
     const cx0 = r.de ? r.xc - 2.3 : r.xc - 0.9, cx1 = r.de ? r.xc + 2.3 : r.xc + 1.3; // covers the mouths of the uptakes
     const cz = zo + 1.6, cy0 = Y + 7.2, cy1 = Y + 9.2;
@@ -416,6 +508,7 @@ export function buildBoilerRooms(world, b, inst) {
       const dz = Math.sign(zz) * 0.02, xd = r.xc + (k - 0.5) * 1.2;
       b.box(mats.iron, xd - 0.3, cy0 + 0.5, zz, xd + 0.3, cy0 + 1.1, zz + dz);
       for (const y of [cy0 + 0.6, cy0 + 1.0]) b.box(mats.brass, xd + 0.22, y - 0.02, zz + dz, xd + 0.28, y + 0.02, zz + 3 * dz);
+      if (TIER.fine >= 2) for (const xx of [xd - 0.26, xd + 0.26]) for (const y of [cy0 + 0.55, cy0 + 1.05]) nut(b, [xx, y, zz + dz], [0, 0, Math.sign(zz)], 0.018);
     }
     const tr = r.trunk;
     if (tr.to === r.xc) b.box(mats.steelDark, cx0 + 0.3, cy1, -2.8, cx1 - 0.3, CEIL, 2.8, 'xXzZ');
@@ -424,29 +517,32 @@ export function buildBoilerRooms(world, b, inst) {
       b.box(mats.steelDark, xa, ty0, tr.z0, xb, CEIL, tr.z1, 'xXyzZ');
       for (let x = xa + 1; x < xb - 0.2; x += 2.0) b.box(mats.iron, x - 0.04, ty0 - 0.03, tr.z0 - 0.03, x + 0.04, CEIL, tr.z1 + 0.03, 'xXyzZ');
     }
-    // ---- steam: lagged header under the breeching (fed by the branches of the boilers), lagged pipes to the mains
+    await world.tick();
+    // ---- steam: lagged header under the breeching (fed by the branches of the boilers), lagged pipes (swept bends) to the mains
     const hx = r.xc + HX, hy = Y + HEADER;
     lagged(b, [hx, hy, -zo - 0.4], [hx, hy, zo + 0.4], 0.2, 0.6);
     for (const z of zs) flange(b, [hx, hy, z + 0.6], [0, 0, 1], 0.26);
     for (const s of [-1, 1]) {
       const zm = s * mainZ(hx), zr = s * Math.min(zo + 2.0, Math.abs(zm) - 0.3);
-      lagged(b, [hx, hy, s * (zo + 0.4)], [hx, hy, zr], 0.2, 0.6);
-      lagged(b, [hx, hy, zr], [hx, MAIN_Y, zr], 0.2, 0.6);
-      lagged(b, [hx, MAIN_Y, zr], [hx, MAIN_Y, zm], 0.2, 0.6);
-      for (const p of [[hx, hy, zr], [hx, MAIN_Y, zr]]) latheAt(b, mats.iron, [[0.21, -0.25], [0.24, -0.22], [0.24, 0.22], [0.21, 0.25]], 'y', p, 12);
+      laggedRun(b, [[hx, hy, s * (zo + 0.4)], [hx, hy, zr], [hx, MAIN_Y, zr], [hx, MAIN_Y, zm]], 0.2, 0.6);
     }
-    // ---- feed main across each stokehold with drops to the boiler fronts
+    await world.tick();
     // ---- bunkers
-    buildBunkers(world, b, r, zo, E, t, inst);
+    await buildBunkers(world, b, r, zo, E, t, inst);
     // ---- stokehold furniture, lamps, ladders, vents, telegraphs
-    stokeholds(world, b, r, zo, E, t, inst);
+    await stokeholds(world, b, r, zo, E, t, inst);
+    await world.tick();
+    b.flush();
   }
   // ---- lagged steam mains along both sides (from boiler room 6 to the engine room bulkhead), banded, with hangers
   for (const s of [-1, 1]) {
+    await world.tick();
+    const b = new Batch(world, DECK);
     const pts = [];
     for (let x = 64.4; x > -22; x -= 3) pts.push([x, MAIN_Y, s * mainZ(x)]);
     pts.push([-22, MAIN_Y, s * mainZ(-22)]);
     for (let i = 0; i < pts.length - 1; i++) lagged(b, pts[i], pts[i + 1], 0.24, 0.75);
+    await world.tick();
     for (const p of pts) {
       flange(b, p, [1, 0, 0], 0.32);
       for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; nut(b, [p[0] + 0.03, p[1] + Math.sin(a) * 0.28, p[2] + Math.cos(a) * 0.28], [1, 0, 0], 0.018); }
@@ -454,13 +550,16 @@ export function buildBoilerRooms(world, b, inst) {
       b.box(mats.iron, p[0] - 0.05, p[1] - 0.29, p[2] - 0.3, p[0] + 0.05, p[1] - 0.25, p[2] + 0.3);   // stirrup
       for (const zz of [-0.28, 0.28]) b.box(mats.iron, p[0] - 0.02, p[1] - 0.27, p[2] + zz - 0.02, p[0] + 0.02, p[1] + 0.3, p[2] + zz + 0.02, 'xXzZ');
     }
+    await world.tick();
+    b.flush();
   }
+  if (RV) { await RV.flushAsync(); RV = null; }
 }
 
 /** z of the steam main at station x (close to the ship's side) */
 export function mainZ(x) { return Math.min(12.6, hullIn(x, MAIN_Y) - 0.7); }
 
-function buildBunkers(world, b, r, zo, E, t, inst) {
+async function buildBunkers(world, b, r, zo, E, t, inst) {
   const parts = [];
   parts.push({ x0: r.x1 - BUNKER, x1: r.x1, face: -1 });
   if (r.de) parts.push({ x0: r.x0, x1: r.x0 + BUNKER, face: 1, stbdOnly: !!r.stairAft });
@@ -471,6 +570,7 @@ function buildBunkers(world, b, r, zo, E, t, inst) {
       const za = 1.0, zb = hw;
       const z0 = s < 0 ? -zb : za, z1 = s < 0 ? -za : zb;
       bunkerBox(world, b, p.x0, p.x1, z0, z1, p.face, s, r, inst, t);
+      await world.tick();
     }
     // wing bunkers along the ship's sides in the stokehold corners
     const end = p.face < 0 ? E.fwd : E.aft;
@@ -503,7 +603,11 @@ function bunkerBox(world, b, x0, x1, z0, z1, face, s, r, inst, t) {
   for (let z = z0 + 0.6; z < z1 - 0.3; z += 1.2) {
     b.box(mats.steelDark, xf, Y, z - 0.04, xf + face * 0.07, BTOP, z + 0.04, (face > 0 ? 'X' : 'x') + 'zZ');
     b.box(mats.steelDark, xf + face * 0.07, Y, z - 0.03, xf + face * 0.1, BTOP, z + 0.03, (face > 0 ? 'X' : 'x') + 'zZ');
+    // rivets of the stiffener's attached leg (level 2: every 0.2 m, level 3: every 0.13 m)
+    if (RV) RV.line([xf + face * 0.002, Y + 0.25, z + 0.075], [xf + face * 0.002, BTOP - 0.25, z + 0.075], [face, 0, 0], TIER.fine >= 3 ? 0.13 : 0.2, mats.steel);
   }
+  // vertical butt seams between the plates (level 3)
+  if (RV && TIER.fine >= 3) for (let z = z0 + 1.2; z < z1 - 0.6; z += 2.4) for (const dz of [-0.03, 0.03]) RV.line([xf + face * 0.002, Y + 0.2, z + dz], [xf + face * 0.002, BTOP - 0.2, z + dz], [face, 0, 0], 0.11, mats.steel);
   for (const y of [Y + 2.45, Y + 5.0]) rivetLine(b, [xf + face * 0.003, y, z0 + 0.1], [xf + face * 0.003, y, z1 - 0.1], [face, 0, 0], 0.11, mats.steel);
   b.box(mats.iron, Math.min(xf, xf + face * 0.08), BTOP - 0.12, z0, Math.max(xf, xf + face * 0.08), BTOP, z1);
   // bunker doors (sliding coal doors at floor level) with chutes; some raised with coal spilling out
@@ -559,18 +663,46 @@ export function wtGear(world, b, x) {
   b.box(kitMats.notice, e + 0.001, Y + 1.5, 0.75, e + 0.003, Y + 1.8, 0.98, 'X');
 }
 
-function stokeholds(world, b, r, zo, E, t, inst) {
+async function stokeholds(world, b, r, zo, E, t, inst) {
   const holds = [];
   holds.push({ xa: E.fwd + 0.75, xb: r.x1 - BUNKER, dir: 1, end: E.fwd });
   if (r.de) holds.push({ xa: r.x0 + (r.stairAft ? 2.45 : BUNKER), xb: E.aft - 0.75, dir: -1, end: E.aft });
   const zone = (x) => world.zone(DECK, x);
-  holds.forEach((h, hi) => {
+  for (let hi = 0; hi < holds.length; hi++) {
+    const h = holds[hi];
+    await world.tick();
     const xm = (h.xa + h.xb) / 2, wallX = h.dir > 0 ? h.xb : h.xa; // bunker face
     const noPort = !!(r.stairAft && h.dir < 0);                        // access stair instead of a port bunker
     const ps = noPort ? 1 : -1;
     const rot = h.dir > 0 ? Math.PI : 0;                                // templates facing away from the bunker face
     // floor-plate seams of the stokehold
-    for (let z = -zo - 1.8; z <= zo + 1.8; z += 1.22) b.box(mats.steelDark, h.xa, Y, z - 0.006, h.xb, Y + 0.004, z + 0.006, 'Y');
+    for (let z = -zo - 1.8; z <= zo + 1.8; z += 1.22) {
+      b.box(mats.steelDark, h.xa, Y, z - 0.006, h.xb, Y + 0.004, z + 0.006, 'Y');
+      // countersunk bolts holding the plates down to the bearers, both sides of each seam (level 2+)
+      if (RV) for (let x = h.xa + 0.2; x < h.xb - 0.1; x += TIER.fine >= 3 ? 0.4 : 0.6) for (const dz of [-0.05, 0.05]) RV.add([x, Y - 0.004, z + dz], [0, 1, 0], mats.steelDark);
+    }
+    // feed main across the boiler fronts (in front of the uptakes) with a drop to each feed check valve, a stop valve
+    // per boiler from level 2, and the down-pipe to the feed pumps at the ship's side
+    {
+      const fx = h.end + h.dir * 0.82, fy = Y + 5.7, dx = h.end + h.dir * 0.25, zs = boilerZs(r.cnt), fine = TIER.fine;
+      const zE = floorHW(fx) - 0.22; // down-pipe in the strip along the hull that the lining colliders keep clear
+      pipeRun(b, mats.iron, [[fx, fy, -zE], [fx, fy, zE], [fx, Y + 0.6, zE]], 0.07, { seg: 8 });
+      for (const z of zs) {
+        for (const g of [-2.09, 2.09]) pipeRun(b, mats.copper, [[fx, fy, z + g], [dx, fy, z + g], [dx, Y + 4.15, z + g]], 0.04, { seg: 6, flange: mats.brass });
+        // the shell template carries its feed check valves at the forward end only: aft ends get theirs here
+        if (h.dir < 0) for (const sg of [-1, 1]) {
+          const a = sg * 0.95, c = Math.cos(a), sn = Math.sin(a), px = h.end + 0.95, py = Y + YC + (R + 0.02) * c, pz = z + (R + 0.02) * sn;
+          stamp(b, mats.iron, latheGeoC([[0, 0], [0.12, 0], [0.12, 0.04], [0.09, 0.06], [0.1, 0.2], [0.06, 0.26], [0.05, 0.36], [0, 0.37]]), M4(px, py, pz, a, 0, 0));
+          handwheel(b, mats.rust, px, py + c * 0.38, pz + sn * 0.38, 0.12, [0, c, sn]);
+          tubeBetween(b, mats.copper, [px - 0.12, py + c * 0.15, pz + sn * 0.15], [h.end - 0.25, py + c * 0.15, pz + sn * 0.15], 0.04, { seg: 8 });
+        }
+        if (fine >= 2) {
+          latheAt(b, mats.iron, [[0.07, -0.16], [0.11, -0.14], [0.11, 0.14], [0.07, 0.16]], 'z', [fx, fy, z], 10);
+          tube(b, mats.chrome, 'x', [fy, z], 0.015, Math.min(fx, fx + h.dir * 0.32), Math.max(fx, fx + h.dir * 0.32), { seg: 5 });
+          handwheel(b, mats.rust, fx + h.dir * 0.32, fy, z, 0.12, [h.dir, 0, 0]);
+        }
+      }
+    }
     // ash ejector against the bunker face, outboard
     const ez = ps * Math.min(zo + 1.2, floorHW(wallX) - 1.2);
     inst.add(t.ejector, wallX - h.dir * 0.32, Y, ez, rot);
@@ -582,6 +714,8 @@ function stokeholds(world, b, r, zo, E, t, inst) {
       inst.add(t.shovel, wallX - h.dir * 0.1, Y, z + 0.34, rot + 0.25);
     }
     for (const z of [-4.6, 4.6]) if (!(noPort && z < 0) && Math.abs(z) < zo + 1.5) inst.add(t.rack, wallX - h.dir * 0.002, Y, z, rot);
+    // spare fire bars stacked on the plates under the racks
+    if (t.bars) for (const z of [-5.2, 5.2]) if (!(noPort && z < 0) && Math.abs(z) < zo + 1.5) inst.add(t.bars, wallX - h.dir * 0.52, Y, z, rot);
     const wbz = ((r.n + hi) % 2 ? 1 : -1) * 4.4;
     place(zone(xm), wheelbarrow(), xm, Y, wbz, h.dir > 0 ? 0.4 : Math.PI - 0.4, { collide: true, world });
     const lr = rnd(r.n * 17 + hi * 5);
@@ -593,6 +727,7 @@ function stokeholds(world, b, r, zo, E, t, inst) {
     tube(b, mats.steelDark, 'y', [xm + 0.4, -zo + 0.8], 0.17, Y, Y + 0.32, { seg: 10, caps: 'lo' });
     b.disc(kitMats.water, [xm + 0.4, Y + 0.28, -zo + 0.8], [0, 1, 0], 0.16, 10);
     stamp(b, mats.iron, TOR(0.16, 0.008, 8, 3, Math.PI), M4(xm + 0.4, Y + 0.32, -zo + 0.8, 0, 0.3, 0));
+    await world.tick();
     // stoking indicator (dial in a cast case, red / green lamps, alarm bell, conduit) next to the watertight door
     const tx = wallX - h.dir * 0.12, tz = 1.6, n = [-h.dir, 0, 0];
     b.box(mats.steelDark, Math.min(tx, wallX), Y + 1.9, tz - 0.27, Math.max(tx, wallX), Y + 2.62, tz + 0.27);
@@ -616,6 +751,7 @@ function stokeholds(world, b, r, zo, E, t, inst) {
     tubeBetween(b, mats.paintWhite, [vx, Y + 5.2, vz], [vx, Y + 4.6, vz], 0.5, { r1: 0.85, seg: 14, caps: false });
     tube(b, mats.iron, 'y', [vx, vz], 0.87, Y + 4.55, Y + 4.62, { seg: 14, caps: false });
     for (let y = Y + 5.6; y < CEIL - 0.2; y += 1.2) b.box(mats.iron, vx - 0.47, y, vz - 0.47, vx + 0.47, y + 0.05, vz + 0.47, 'xXzZ');
+    await world.tick();
     // lamps: caged lamps on the bunker face + pendants over the stokehold
     for (const z of [-zo, -zo / 2, zo / 2, zo]) {
       const zz = z + (z > 0 ? -0.6 : 0.6);
@@ -632,7 +768,7 @@ function stokeholds(world, b, r, zo, E, t, inst) {
       b.disc(kitMats.gaugeFace, [wallX - h.dir * 0.052, Y + 2.35, gz], n, 0.13, 16, true);
       tube(b, mats.copper, 'y', [wallX - h.dir * 0.05, gz], 0.008, Y + 2.51, Y + 3.3, { seg: 4, caps: false });
     }
-  });
+  }
   // lamps along the side walkways beside the boilers
   const E2 = boilerEnds(r);
   for (const s of [-1, 1]) cageLamp(b, world, (E2.fwd + E2.aft) / 2, Y + 3.2, s * (floorHW(r.xc) - 0.12), { dir: s > 0 ? '-z' : '+z', intensity: 0.7 });

@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { mats as M } from '../core/materials.js';
 import { DECK_Y } from '../core/constants.js';
+import { TIER } from '../core/tier.js';
 import { kitMats as K, matOf, Batch, AT } from './batch.js';
 import * as G from './geom.js';
 import { def, cached, drawer, papers } from './props-core.js';
@@ -252,14 +253,51 @@ export const machineBlock = def('machineBlock', (o) => [o.w ?? 1.6, o.d ?? 1.0, 
 const unitCyl = () => cached('unit10', () => new THREE.CylinderGeometry(1, 1, 1, 10, 1, true));
 const unitFlange = () => cached('flange', () => G.lathe([[0, -0.5], [1, -0.5], [1, 0.5], [0, 0.5]], 12));
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3();
+const _p = new THREE.Vector3(), _q = new THREE.Vector3(), _c = new THREE.Vector3(), _bx = new THREE.Vector3(), _by = new THREE.Vector3(), _bz = new THREE.Vector3();
+/** unit bend (torus arc, bend radius 1, tube radius k) over angle th, starting at (1,0,0) with tangent +y; quantised + cached */
+function bendGeo(k, th) {
+  const fine = TIER.fine, kq = Math.round(k * 40) / 40, tq = Math.round(th * 200) / 200;
+  return cached(`pbend${fine}_${kq}_${tq}`, () => new THREE.TorusGeometry(1, kq, 10, fine >= 2 ? 8 : fine === 1 ? 5 : 3, tq));
+}
 /**
  * Pipe run through world points [[x,y,z],...]; adds meshes (shared geometry) to `parent`: straight runs, bolted flanges at
- * the joints and every ~2.5 m, elbow spheres. Returns parent.
+ * the joints and every ~2.5 m, and a swept bend (torus arc, bend radius ≈ 1.6 r) at every corner. Returns parent.
  */
 export function pipe(parent, mat, pts, r = 0.05) {
   const m = matOf(mat, M.steelDark);
+  // corner rounding: trim length t at each corner (bend radius 1.6 r, at most 40 % of the shorter leg)
+  const n = pts.length, trim = new Array(n).fill(0), bends = [];
+  for (let i = 1; i < n - 1; i++) {
+    _a.fromArray(pts[i - 1]); _p.fromArray(pts[i]); _b.fromArray(pts[i + 1]);
+    const l1 = _p.distanceTo(_a), l2 = _b.distanceTo(_p);
+    if (l1 < 1e-4 || l2 < 1e-4) continue;
+    _bx.subVectors(_p, _a).divideScalar(l1); _by.subVectors(_b, _p).divideScalar(l2);
+    const th = Math.acos(Math.max(-1, Math.min(1, _bx.dot(_by))));
+    if (th < 0.08 || th > 3.0) continue;
+    const t = Math.min(1.6 * r * Math.tan(th / 2), 0.4 * l1, 0.4 * l2), rb = t / Math.tan(th / 2);
+    if (rb < r * 1.05) continue; // too tight for a bend: keep the plain corner
+    trim[i] = t;
+    bends.push({ i, th, rb, d1: _bx.clone(), d2: _by.clone() });
+  }
+  for (const bd of bends) {
+    // centre: from the bend start A = P - d1 t, along nm = (d2 - d1 cos th) / sin th
+    _p.fromArray(pts[bd.i]);
+    const t = trim[bd.i], cs = Math.cos(bd.th), sn = Math.sin(bd.th);
+    _bz.copy(bd.d2).addScaledVector(bd.d1, -cs).divideScalar(sn);                 // nm
+    _a.copy(_p).addScaledVector(bd.d1, -t);                                        // A
+    _c.copy(_a).addScaledVector(_bz, bd.rb);                                       // C
+    _bx.copy(_bz).negate(); _by.copy(bd.d1); _q.crossVectors(_bx, _by);           // local x, y, z of the torus arc
+    const mesh = new THREE.Mesh(bendGeo(r / bd.rb, bd.th), m);
+    const mat4 = new THREE.Matrix4().makeBasis(_bx, _by, _q).scale(new THREE.Vector3(bd.rb, bd.rb, bd.rb)).setPosition(_c);
+    mat4.decompose(mesh.position, mesh.quaternion, mesh.scale);
+    parent.add(mesh);
+  }
   for (let i = 0; i < pts.length - 1; i++) {
     _a.fromArray(pts[i]); _b.fromArray(pts[i + 1]);
+    const len0 = _a.distanceTo(_b); if (len0 < 1e-4) continue;
+    _d.subVectors(_b, _a).normalize();
+    if (trim[i]) _a.addScaledVector(_d, trim[i]);
+    if (trim[i + 1]) _b.addScaledVector(_d, -trim[i + 1]);
     const len = _a.distanceTo(_b); if (len < 1e-4) continue;
     _d.subVectors(_b, _a).normalize();
     const q = new THREE.Quaternion().setFromUnitVectors(_up, _d);
@@ -272,7 +310,7 @@ export function pipe(parent, mat, pts, r = 0.05) {
       if (len < 0.5 && k > 0 && k <= nf) continue;
       const f = new THREE.Mesh(unitFlange(), m); f.scale.set(r * 1.6, Math.max(0.02, r * 0.5), r * 1.6); f.position.copy(_a).lerp(_b, t); f.quaternion.copy(q); parent.add(f);
     }
-    if (i > 0) { const j = new THREE.Mesh(cached('shi', () => new THREE.SphereGeometry(1, 14, 10)), m); j.scale.setScalar(r * 1.12); j.position.fromArray(pts[i]); parent.add(j); }
+    if (i > 0 && !trim[i]) { const j = new THREE.Mesh(cached('shi8', () => new THREE.SphereGeometry(1, 10, 6)), m); j.scale.setScalar(r * 1.12); j.position.fromArray(pts[i]); parent.add(j); } // plain corner: elbow ball
   }
   return parent;
 }

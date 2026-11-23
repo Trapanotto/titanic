@@ -4,7 +4,7 @@
 // the hold stair 'holdAft'. Watertight bulkheads with doors separate the holds.
 import { buildDeckShell, bulkhead, createDeckPlan } from '../interior/kit.js';
 import { shortcuts } from './f-util.js';
-import { cargoHold, renaultHold, mailHold } from './orlop-car.js';
+import { cargoHold, renaultHold, mailHold, holdBattens } from './orlop-car.js';
 import { baggageRoom, produceRoom, dairyRoom, wineCellar, dryStore } from './g-hero.js';
 
 const deck = 'orlop';
@@ -71,6 +71,12 @@ export async function build(world) {
     info: { title: 'Elektrikerlager', text: 'Die Titanic hatte rund 10 000 Glühlampen, 150 Elektromotoren und Hunderte Heizkörper an Bord. Ersatzteile, Kabel und Lampen für die Elektriker lagerten in diesem Store. Die vier Hauptgeneratoren lieferten zusammen 1,6 Megawatt Strom.' } });
 
   const res = await plan.finishAsync();
+  await world.tick();
+  // spar ceiling (cargo battens) on the hull sides of the cargo holds
+  await holdBattens(world, [
+    { x0: 66, x1: 82, sides: [-1] }, { x0: 82, x1: 96, sides: [-1, 1] }, { x0: 96, x1: 106, sides: [-1, 1] },
+    { x0: -80, x1: -58, sides: [1] }, { x0: -100, x1: -80, sides: [1] }, { x0: -112, x1: -100, sides: [-1] },
+  ]);
   await world.tick();
   console.info(`[orlop] ${res.rooms.length} rooms, ${res.walls} wall pieces, ${res.doors} doors, ${res.problems.length} problems`);
   return {};

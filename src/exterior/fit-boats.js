@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mats } from '../core/materials.js';
 import { BY, RY, mk, Wires, gridGeo, edge, edgeSlope } from './fit-util.js';
 import { merge, boxG, cylG, sphG } from './inst.js';
+import { TIER } from '../core/tier.js';
 
 // Lifeboats: 14 standard boats (30 ft), 2 emergency cutters (25 ft) and 4 Engelhardt collapsibles under Welin davits.
 
@@ -10,7 +11,8 @@ const TYPES = {
   cutter: { L: 7.68, B: 2.2, D: 0.95 },
   coll: { L: 8.36, B: 2.44, D: 0.5 },
 };
-const NS = 32, NJ = 9;
+// sections along the boat / clinker strakes per side, by TIER.fine (Harland & Wolff 30 ft boats had 11-12 strakes)
+const detail = () => { const f = TIER.fine; return { f, NS: f <= 1 ? 20 : 32, NJ: [6, 7, 11, 12][f] ?? 9 }; };
 
 // Collision volumes of the boat stations (boat + davits) as built by the previous, simpler model.
 // Kept verbatim so the walkable area of the boat deck is unchanged. [x0, x1, z0, z1, y1], y0 = boat deck.
@@ -62,7 +64,8 @@ function sweep(pts, rFn, rs = 6) {
 const geoCache = new Map();
 /** Merged geometries per material for one boat type ({mat: geometry}). Keel at local y = 0. */
 function boatGeos(type, covered) {
-  const key = type + (covered ? 'c' : 'o');
+  const { f, NS, NJ } = detail();
+  const key = type + (covered ? 'c' : 'o') + f;
   let G = geoCache.get(key);
   if (G) return G;
   const T = TYPES[type];
@@ -122,7 +125,7 @@ function boatGeos(type, covered) {
     for (const sg of [1, -1]) for (let k = 0; k < 11; k++) {
       const t0 = -0.84 + k * 0.153, t1 = t0 + 0.153;
       const a = sect(T, t0, 0.8), b = sect(T, t1, 0.8);
-      w.sag(a[0], a[1], sg * (a[2] + 0.05), b[0], b[1], sg * (b[2] + 0.05), 0.15, 5, 0.012);
+      w.sag(a[0], a[1], sg * (a[2] + 0.05), b[0], b[1], sg * (b[2] + 0.05), 0.15, f <= 1 ? 3 : 5, 0.012);
       const c = sect(T, t0, 0.97); // becket through the gunwale
       parts.iron.push(cylG([a[0], a[1] + 0.01, sg * (a[2] + 0.05)], [c[0], c[4] - 0.04, sg * (c[3] + 0.03)], 0.012, 4));
     }
@@ -213,7 +216,8 @@ function makeBoat(type, covered) {
 // ---------- Welin quadrant davit ----------
 const davitCache = new Map();
 function davitGeos(out) {
-  let D = davitCache.get(out);
+  const f = TIER.fine, lo = f <= 1;
+  let D = davitCache.get(out + '_' + f);
   if (D) return D;
   const W = [], I = [], S = [], R = [], Br = [];
   // base: deck plate, two cheek plates with a curved head, bolts
@@ -229,11 +233,12 @@ function davitGeos(out) {
   for (let k = 0; k < 6; k++) S.push(cylG([k % 2 ? 0.17 : -0.17, 0.06, 0.4 + (k >> 1) * 0.5], [k % 2 ? 0.17 : -0.17, 0.09, 0.4 + (k >> 1) * 0.5], 0.025, 6));
   // toothed quadrant (gear sector) rolling on the rack of the base
   const qa0 = out ? -0.15 : 0.55;
-  const quad = new THREE.CylinderGeometry(0.62, 0.62, 0.07, 14, 1, false, qa0, Math.PI / 2);
+  const quad = new THREE.CylinderGeometry(0.62, 0.62, 0.07, lo ? 8 : 14, 1, false, qa0, Math.PI / 2);
   quad.rotateZ(Math.PI / 2); quad.translate(0, 0.42, 0.98);
   W.push(quad);
-  for (let k = 0; k <= 12; k++) {
-    const a = qa0 + (k / 12) * (Math.PI / 2), r = 0.65;
+  const nt = lo ? 6 : 12;
+  for (let k = 0; k <= nt; k++) {
+    const a = qa0 + (k / nt) * (Math.PI / 2), r = 0.65;
     const tooth = boxG(0.08, 0.06, 0.05, 0, 0, 0); tooth.rotateX(Math.PI / 2 - a); tooth.translate(0, 0.42 + Math.sin(a) * r, 0.98 + Math.cos(a) * r);
     I.push(tooth);
   }
@@ -243,7 +248,7 @@ function davitGeos(out) {
   const armPts = out
     ? [[0, 0.42, 1.22], [0, 1.0, 1.32], [0, 1.6, 1.48], [0, 2.2, 1.75], [0, 2.75, 2.15], [0, 3.2, 2.6], [0, 3.55, 3.0], [0, 3.8, 3.3], [0, 3.9, 3.45]]
     : [[0, 0.42, 1.22], [0, 1.0, 1.28], [0, 1.6, 1.27], [0, 2.2, 1.17], [0, 2.75, 0.92], [0, 3.2, 0.6], [0, 3.55, 0.22], [0, 3.72, -0.02], [0, 3.74, -0.14]];
-  W.push(sweep(armPts, (f) => 0.1 - 0.04 * f, 8));
+  W.push(sweep(armPts, (t) => 0.1 - 0.04 * t, f >= 3 ? 12 : 8));
   const head = armPts[armPts.length - 1];
   // arm head: cap, span-wire eye, guy eyes
   W.push(sphG(0.075, head[0], head[1], head[2], 8, 6));
@@ -251,7 +256,8 @@ function davitGeos(out) {
   // screw spindle with nut, bearing and crank handle
   const sp0 = [0, 0.62, 0.34], sp1 = out ? [0, 1.5, 1.42] : [0, 1.75, 1.2];
   I.push(cylG(sp0, sp1, 0.03, 6));
-  for (let k = 1; k < 10; k++) { const f = k / 10; I.push(cylG([0, sp0[1] + (sp1[1] - sp0[1]) * f, sp0[2] + (sp1[2] - sp0[2]) * f], [0, sp0[1] + (sp1[1] - sp0[1]) * (f + 0.02), sp0[2] + (sp1[2] - sp0[2]) * (f + 0.02)], 0.04, 6)); }
+  const nc = lo ? 5 : 10;
+  for (let k = 1; k < nc; k++) { const f = k / nc; I.push(cylG([0, sp0[1] + (sp1[1] - sp0[1]) * f, sp0[2] + (sp1[2] - sp0[2]) * f], [0, sp0[1] + (sp1[1] - sp0[1]) * (f + 0.02), sp0[2] + (sp1[2] - sp0[2]) * (f + 0.02)], 0.04, 6)); }
   S.push(boxG(0.16, 0.16, 0.2, sp1[0], sp1[1], sp1[2]));
   W.push(boxG(0.3, 0.45, 0.12, 0, 0.28, 0.4));
   S.push(boxG(0.14, 0.14, 0.12, 0, 0.6, 0.34));
@@ -261,14 +267,14 @@ function davitGeos(out) {
   Br.push(cylG([0.3, 0.58, 0.05], [0.3, 0.58, -0.08], 0.025, 6));
   // cleat for the hauling part + fall reel on the base
   I.push(boxG(0.06, 0.06, 0.4, 0.22, 0.42, 0.62)); I.push(boxG(0.05, 0.12, 0.05, 0.22, 0.36, 0.55)); I.push(boxG(0.05, 0.12, 0.05, 0.22, 0.36, 0.7));
-  for (let k = 0; k < 3; k++) R.push(new THREE.TorusGeometry(0.21 - k * 0.02, 0.035, 5, 12).rotateX(Math.PI / 2).translate(0, (out ? 0.035 : 0.08) + k * 0.06, out ? -0.25 : 0.25)); // coil on the plate / on deck
+  for (let k = 0; k < 3; k++) R.push(new THREE.TorusGeometry(0.21 - k * 0.02, 0.035, lo ? 4 : 5, lo ? 8 : 12).rotateX(Math.PI / 2).translate(0, (out ? 0.035 : 0.08) + k * 0.06, out ? -0.25 : 0.25)); // coil on the plate / on deck
   // upper (double) block with hook at the arm head
   const by = head[1] - 0.42;
   for (const s of [-1, 1]) W.push(boxG(0.025, 0.3, 0.17, s * 0.06, by, head[2]));
   I.push(cylG([-0.05, by, head[2]], [0.05, by, head[2]], 0.08, 10));
   I.push(cylG([0, by + 0.15, head[2]], [0, head[1] - 0.06, head[2]], 0.02, 5));
   D = { paintWhite: merge(W), iron: merge(I), steelDark: merge(S), rope: merge(R), brass: merge(Br), head, by };
-  davitCache.set(out, D);
+  davitCache.set(out + '_' + f, D);
   return D;
 }
 function addDavit(g, xd, out) {

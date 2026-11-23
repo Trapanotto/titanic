@@ -6,6 +6,7 @@ import { BY, RY, LOW_ROOF_Y, cyl, vcyl, ball, mk, gridGeo, edge, edgeSlope, roof
 import { Inst, merge, boxG, cylG, sphG, latheGeo } from './inst.js';
 import { Batch } from './structure-batch.js';
 import { strokeText } from './structure-font.js';
+import { TIER } from '../core/tier.js';
 
 // Deck gear of the boat deck, house roofs and A-deck promenade:
 // ventilators, fan housings, tanks, skylights, compass platform, benches, deck chairs, life rings, lamps.
@@ -17,8 +18,9 @@ const TAU = Math.PI * 2;
 // the flare therefore happens in a straight bell section after the bend.
 let COWL = null;
 function cowlGeos() {
-  if (COWL) return COWL;
-  const Rb = 1.45, K = 12, M = 6, N = 20, BELL = 0.75, RE = 1.78;
+  const lo = TIER.fine <= 1;
+  if (COWL && COWL.lo === lo) return COWL;
+  const Rb = 1.45, K = lo ? 7 : 12, M = lo ? 4 : 6, N = lo ? 12 : 20, BELL = 0.75, RE = 1.78;
   const rad = (i) => (i <= K ? 1 + 0.12 * (i / K) : 1.12 + (RE - 1.12) * Math.pow((i - K) / M, 1.6));
   const ring = (i, j, k = 1) => {
     const al = (j / N) * TAU, rr = rad(i) * k, c = Math.cos(al) * rr, s = Math.sin(al) * rr;
@@ -28,21 +30,22 @@ function cowlGeos() {
   const outer = gridGeo(K + M + 1, N + 1, (i, j) => ring(i, j));
   const inner = gridGeo(M + 3, N + 1, (i, j) => ring(i + K - 2, j, 0.97), true);
   // rolled bead round the mouth (closed tube joining the outer and the inner skin)
-  const lip = gridGeo(7, N + 1, (i, j) => {
-    const a = (i / 6) * Math.PI, rr = RE * (0.985 + 0.015 * Math.cos(a)) + 0.035 * Math.sin(a), al = (j / N) * TAU, dx = 0.035 * Math.sin(a) - 0.01;
+  const LR = lo ? 4 : 6;
+  const lip = gridGeo(LR + 1, N + 1, (i, j) => {
+    const a = (i / LR) * Math.PI, rr = RE * (0.985 + 0.015 * Math.cos(a)) + 0.035 * Math.sin(a), al = (j / N) * TAU, dx = 0.035 * Math.sin(a) - 0.01;
     return [Rb + BELL + dx, Rb - Math.cos(al) * rr, Math.sin(al) * rr];
   });
   // dark throat closing the bore where the bell starts
   const mouth = new THREE.CircleGeometry(rad(K) * 0.97, N).rotateY(Math.PI / 2).translate(Rb + 0.03, Rb, 0);
-  COWL = { outer: merge([outer, lip]), inner, mouth };
+  COWL = { lo, outer: merge([outer, lip]), inner, mouth };
   return COWL;
 }
 export function cowl(parent, x, y, z, r, h, yaw = 0, mat = mats.paintWhite) {
-  const G = cowlGeos();
-  parent.add(vcyl(mat, x, y - 0.04, z, h + 0.04, r, 16));
-  parent.add(vcyl(mat, x, y - 0.04, z, 0.14, r * 1.35, 16, r * 1.2));                     // deck collar
-  parent.add(vcyl(mat, x, y + h * 0.55 - 0.03, z, 0.06, r * 1.06, 16));                    // band
-  parent.add(vcyl(mat, x, y + h - 0.12, z, 0.12, r * 1.1, 16));                            // swivel joint
+  const G = cowlGeos(), cs = TIER.fine <= 1 ? 10 : 16;
+  parent.add(vcyl(mat, x, y - 0.04, z, h + 0.04, r, cs));
+  parent.add(vcyl(mat, x, y - 0.04, z, 0.14, r * 1.35, cs, r * 1.2));                     // deck collar
+  parent.add(vcyl(mat, x, y + h * 0.55 - 0.03, z, 0.06, r * 1.06, cs));                    // band
+  parent.add(vcyl(mat, x, y + h - 0.12, z, 0.12, r * 1.1, cs));                            // swivel joint
   const head = mk(G.outer, mat, x, y + h, z, true); head.scale.setScalar(r); head.rotation.y = yaw; parent.add(head);
   for (const [g, m] of [[G.inner, mats.hullRed], [G.mouth, mats.iron]]) { const q = mk(g, m, x, y + h, z); q.scale.setScalar(r); q.rotation.y = yaw; parent.add(q); }
   // turning handles (bent bars on both sides)
@@ -56,10 +59,11 @@ export function cowl(parent, x, y, z, r, h, yaw = 0, mat = mats.paintWhite) {
 
 /** Mushroom vent: pipe, domed cap with a drip lip, gauze band. */
 export function mushroom(parent, x, y, z, r = 0.22, h = 0.9, mat = mats.paintWhite) {
-  parent.add(vcyl(mat, x, y - 0.03, z, h, r, 14));
-  parent.add(vcyl(mat, x, y - 0.03, z, 0.08, r * 1.3, 14));
-  parent.add(vcyl(mats.iron, x, y + h - 0.03, z, 0.1, r * 1.02, 14));
-  const cap = mk(latheGeo('mush', [[0.5, 0.02], [0.9, 0.0], [0.98, 0.02], [0.95, 0.1], [0.8, 0.2], [0.5, 0.27], [0.001, 0.3]], 14), mat, x, y + h + 0.04, z);
+  const ms = TIER.fine <= 1 ? 8 : 14;
+  parent.add(vcyl(mat, x, y - 0.03, z, h, r, ms));
+  parent.add(vcyl(mat, x, y - 0.03, z, 0.08, r * 1.3, ms));
+  parent.add(vcyl(mats.iron, x, y + h - 0.03, z, 0.1, r * 1.02, ms));
+  const cap = mk(latheGeo('mush', [[0.5, 0.02], [0.9, 0.0], [0.98, 0.02], [0.95, 0.1], [0.8, 0.2], [0.5, 0.27], [0.001, 0.3]], ms), mat, x, y + h + 0.04, z);
   cap.scale.set(r * 1.9, 0.6, r * 1.9);
   parent.add(cap);
 }
@@ -68,20 +72,20 @@ export function mushroom(parent, x, y, z, r = 0.22, h = 0.9, mat = mats.paintWhi
 function sirocco(parent, x, y, z, s, yawQuarter = false) {
   const g = new THREE.Group(); g.position.set(x, y, z); if (yawQuarter) g.rotation.y = Math.PI / 2;
   parent.add(g);
-  const W = mats.paintWhite;
+  const W = mats.paintWhite, lo = TIER.fine <= 1, S1 = lo ? 14 : 24, S2 = lo ? 10 : 16;
   g.add(box(mats.steelDark, 2.0, 0.1, 1.9, 0, 0.05, 0));
-  g.add(cyl(W, 0, 1.0, -0.33, 0, 1.0, 0.33, 0.86, 24));                       // scroll casing
-  for (const fz of [-0.34, 0.34]) g.add(cyl(W, 0, 1.0, fz - 0.03, 0, 1.0, fz + 0.03, 0.91, 24)); // rim flanges
+  g.add(cyl(W, 0, 1.0, -0.33, 0, 1.0, 0.33, 0.86, S1));                       // scroll casing
+  for (const fz of [-0.34, 0.34]) g.add(cyl(W, 0, 1.0, fz - 0.03, 0, 1.0, fz + 0.03, 0.91, S1)); // rim flanges
   g.add(box(W, 0.9, 0.85, 0.66, 0.5, 1.55, 0));                                // tangential discharge
   g.add(box(W, 0.9, 0.5, 0.66, 0.5, 0.35, 0));
   g.add(box(W, 1.0, 0.08, 0.76, 0.5, 1.98, 0));
   // louvres on the discharge trunk
   for (let k = 0; k < 6; k++) { const b = box(W, 0.04, 0.08, 0.6, 0.97, 1.25 + k * 0.1, 0); b.rotation.z = -0.5; g.add(b); }
-  g.add(cyl(W, 0, 1.0, s * 0.33, 0, 1.0, s * 0.62, 0.5, 16, 0.62)); // inlet bell
-  g.add(cyl(mats.iron, 0, 1.0, s * 0.6, 0, 1.0, s * 0.63, 0.56, 16));
+  g.add(cyl(W, 0, 1.0, s * 0.33, 0, 1.0, s * 0.62, 0.5, S2, 0.62)); // inlet bell
+  g.add(cyl(mats.iron, 0, 1.0, s * 0.6, 0, 1.0, s * 0.63, 0.56, S2));
   for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI; g.add(cyl(mats.iron, Math.cos(a) * 0.55, 1.0 + Math.sin(a) * 0.55, s * 0.64, -Math.cos(a) * 0.55, 1.0 - Math.sin(a) * 0.55, s * 0.64, 0.01, 3)); } // guard
-  g.add(cyl(mats.steelDark, 0, 1.0, -s * 0.33, 0, 1.0, -s * 0.95, 0.3, 14));      // electric motor
-  for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU; g.add(cyl(mats.steelDark, Math.cos(a) * 0.31, 1.0 + Math.sin(a) * 0.31, -s * 0.4, Math.cos(a) * 0.31, 1.0 + Math.sin(a) * 0.31, -s * 0.9, 0.02, 3)); } // cooling ribs
+  g.add(cyl(mats.steelDark, 0, 1.0, -s * 0.33, 0, 1.0, -s * 0.95, 0.3, S2));      // electric motor
+  if (!lo) for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU; g.add(cyl(mats.steelDark, Math.cos(a) * 0.31, 1.0 + Math.sin(a) * 0.31, -s * 0.4, Math.cos(a) * 0.31, 1.0 + Math.sin(a) * 0.31, -s * 0.9, 0.02, 3)); } // cooling ribs
   g.add(cyl(mats.steelDark, 0, 1.0, -s * 0.95, 0, 1.0, -s * 1.02, 0.2, 12));
   g.add(box(mats.steelDark, 0.5, 0.7, 0.5, 0, 0.4, -s * 0.66));
   g.add(box(mats.brass, 0.18, 0.1, 0.01, 0.2, 0.55, -s * 0.915));                 // maker's plate
@@ -185,12 +189,15 @@ function chairGeos() {
     parts.push(beamZY(0.06, 0.028, s * 0.285, ARM0, ARM1, 0.08));        // arm rest from back stile to front leg
   }
   for (const [z, y] of [TOP, [0.14, 0.06], [0.9, 0.06], [1.5, 0.08], FOOT]) parts.push(boxG(0.575, 0.035, 0.035, 0, y, z)); // cross bars
+  // fine 0/1: one board per section instead of the slats
+  const lo = TIER.fine <= 1;
   const slats = (a, b, n, lift) => {
-    const ang = Math.atan2(-(b[1] - a[1]), b[0] - a[0]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), w = (L / n) * 0.72;
+    if (lo) n = 1;
+    const ang = Math.atan2(-(b[1] - a[1]), b[0] - a[0]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), w = (L / n) * (lo ? 0.94 : 0.72);
     for (let k = 0; k < n; k++) { const q = lerp(a, b, (k + 0.5) / n); sling.push(boxG(0.505, 0.014, w, 0, 0, 0, ang).translate(0, q[1] + lift, q[0])); }
   };
   slats(HIP, TOP, 8, 0.0); slats(HIP, KNEE, 6, 0.028); slats(KNEE, FOOT, 7, 0.028);
-  rug.push(rugGeo(KNEE, FOOT));
+  rug.push(rugGeo(KNEE, FOOT, lo ? 6 : 10));
   return { wood: merge(parts), sling: merge(sling), rug: merge(rug) };
 }
 
@@ -199,7 +206,7 @@ function chairGeos() {
  * rails), whose top layer rolls over the foot bar and hangs down with a slight sag and a wavy hem.
  * Built as one closed tube: path in the side plane [z, y] (underside of the rug), cross-section loop across x.
  */
-function rugGeo(KNEE, FOOT) {
+function rugGeo(KNEE, FOOT, J = 10) {
   const len = Math.hypot(FOOT[0] - KNEE[0], FOOT[1] - KNEE[1]);
   const tz = (FOOT[0] - KNEE[0]) / len, ty = (FOOT[1] - KNEE[1]) / len;     // direction of the leg rest
   const top = (z) => KNEE[1] + ((z - KNEE[0]) * ty) / tz + 0.036;            // top of the leg-rest slats
@@ -223,7 +230,6 @@ function rugGeo(KNEE, FOOT) {
     const y = cy - (cy - yEnd) * f, z = cz + ra + 0.025 * Math.sin(Math.PI * f * 0.9);
     path.push([z, y, 1, 0, f === 1 ? 0 : 0.022, 0.3 + 0.025 * f, 0.5]);
   }
-  const J = 10;
   return gridGeo(path.length, J + 1, (i, j) => {
     const [z, y, nz, ny, th, W, droop] = path[i];
     const th2 = (j / J) * TAU, x = W * Math.cos(th2), s = Math.sin(th2);
@@ -239,7 +245,8 @@ function rugGeo(KNEE, FOOT) {
 // ---------- life ring with "S.S. TITANIC" and its holder ----------
 let RING = null;
 function ringGeos() {
-  if (RING) return RING;
+  const lo = TIER.fine <= 1;
+  if (RING && RING.lo === lo) return RING;
   const R = 0.29, r = 0.065;
   const bt = new Batch();
   // text over the upper half of the front face, u = arc length, v = radial offset
@@ -248,7 +255,8 @@ function ringGeos() {
   strokeText(bt, mats.iron, 'S.S. TITANIC', { S, N, u0: -0.43, v0: -0.03, h: 0.06, track: 0.12, width: 0.86, depth: 0.004, stroke: 0.011, sides: false });
   const grp = new THREE.Group(); bt.flush(grp);
   RING = {
-    ring: new THREE.TorusGeometry(R, r, 8, 24),
+    lo,
+    ring: new THREE.TorusGeometry(R, r, lo ? 6 : 8, lo ? 14 : 24),
     band: new THREE.TorusGeometry(R + 0.001, r + 0.003, 8, 4, 0.3),
     text: grp.children[0].geometry,
     holder: merge([boxG(0.5, 0.06, 0.03, 0, 0.3, -0.09), cylG([-0.18, 0.3, -0.08], [-0.18, 0.25, 0.0], 0.012, 4), cylG([0.18, 0.3, -0.08], [0.18, 0.25, 0.0], 0.012, 4), boxG(0.05, 0.62, 0.03, 0, 0, -0.09)]),

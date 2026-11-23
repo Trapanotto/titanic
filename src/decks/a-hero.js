@@ -14,8 +14,38 @@ import { AT } from '../interior/batch.js';
 import * as G from '../interior/geom.js';
 import {
   detailer, wput, iput, fput, beginInst, reserve, reserveExtDoors, group, wx, wz, aWindows, extDoorSpans, deckMats, statue, ROT, PR,
-  drapes, hangLamp,
+  drapes, hangLamp, festoon, modillion, ornRun,
 } from './boat-util.js';
+import { bcCandelabrum, bcUrn, bcScuttle, bcVase, bcFernStand, bcNewsRack, bcSmokerSet } from './bc-props.js';
+import { TIER } from '../core/tier.js';
+
+/** fine-detail gate (docs/CONTRACT.md "Detail levels") */
+const fine = (n) => TIER.fine >= n;
+/** mantel garniture (pair) and coal scuttle for a kit fireplace at world x, z facing `face` (+1 fwd / −1 aft) */
+function hearth(d, x, face, pair, scuttle) {
+  if (pair) for (const s of [-1, 1]) d.mount(pair(), x - face * 0.02, s * 0.62, 0, 1.295);
+  if (scuttle) d.mount(bcScuttle(), x + face * 0.2, -face * 0.7, face > 0 ? 0 : Math.PI, 0.04); // opposite the fire irons
+}
+/**
+ * Modillion cornice: carved brackets under the cornice along wall w from a..e, left out at pilasters (pil, width pw) and
+ * skip intervals. o: { mat, leaf, off, drop (cornice height above the brackets), pil, pw, skip }
+ */
+function modRun(ctx, d, w, a, e, o = {}) {
+  const pw = o.pw ?? 0.3, skip = [...(o.pil ?? []).map((q) => [q - pw / 2 - 0.1, q + pw / 2 + 0.1]), ...(o.skip ?? [])], I = ctx.inst;
+  ornRun(w, a + 0.12, e - 0.12, o.pitch ?? 0.3, () => modillion({ mat: o.mat ?? 'oak', leaf: o.leaf }), (pr, x, z, r, y) => { ctx.plan.prop(pr, x, z, r, { y, collide: false }); I?.take(pr); }, d.Y + d.H - (o.drop ?? 0.16), o.off ?? 0, skip);
+}
+/** carved festoon on the frieze tablet of each boiserie panel (dress() orn callback) */
+function festoonOrn(ctx, d, w, mat, skipNear) {
+  return (ac, u0, u1, pw, off) => {
+    const c = w.c + w.n * (off + 0.012), x = w.axis === 'x' ? ac : c, z = w.axis === 'x' ? c : ac;
+    if (pw < 0.35 || (skipNear && skipNear(x, z))) return;
+    const pr = festoon({ w: Math.round(Math.min(0.6, pw - 0.12) * 20) / 20, mat, drop: 0.07 });
+    ctx.plan.prop(pr, x, z, d.wrot(w), { y: d.Y + d.H - 0.255, collide: false }); ctx.inst?.take(pr);
+  };
+}
+const both = (f, g) => (g ? (...a) => { f(...a); g(...a); } : f);
+/** small things on table tops (world x, z; table top height y): list of [prop, x, z, rot] */
+function onTables(d, list, y = 0.75) { for (const [pr, x, z, r] of list) d.mount(pr, x, z, r ?? 0, y); }
 
 const HW = 10.15; // inner face of the A-deck house side walls
 const K = kitMats;
@@ -247,8 +277,10 @@ export function furnishHallFwd(ctx) {
   d.pilasters(fw, [-9.95, -7.05, -5.35, -2.55, 2.55, 5.35, 7.05, 9.95], { h: H, w: 0.3 });
   d.sconces(fw, [-8.5, -4.0, 4.0, 8.5], 1.9);
   for (const s of [-1, 1]) {
-    group(ctx, 39.6, s * 6.4, { r: 0.4, n: 4, kind: 'wicker', tmat: 'oak', a0: Math.PI / 4 });
-    group(ctx, 44.6, s * 6.4, { r: 0.4, n: 4, kind: 'uph', mat: 'fabricGreen', tmat: 'oak', a0: Math.PI / 4 });
+    const g1 = group(ctx, 39.6, s * 6.4, { r: 0.4, n: 4, kind: 'wicker', tmat: 'oak', a0: Math.PI / 4 });
+    const g2 = group(ctx, 44.6, s * 6.4, { r: 0.4, n: 4, kind: 'uph', mat: 'fabricGreen', tmat: 'oak', a0: Math.PI / 4 });
+    if (g1 && fine(1)) onTables(d, [[bcVase({ v: s > 0 ? 1 : 3 }), 39.6, s * 6.4]]);
+    if (g2 && fine(2)) onTables(d, [[newspaper(), 44.65, s * 6.35, 0.4 * s]]);
     for (const x of [39.4, 44.6]) wput(ctx, settee({ mat: 'fabricGreen', w: 1.7 }), x, s * 9.75, s < 0 ? 'stbd' : 'port');
     wput(ctx, pottedPalm(), 38.0, s * 9.6, 'fwd', { collide: false });
     wput(ctx, pottedPalm(), 47.0, s * 9.6, 'aft', { collide: false });
@@ -256,6 +288,14 @@ export function furnishHallFwd(ctx) {
   }
   const sp = imperialPlan(STAIRS.find((q) => q.id === 'grandFwd'));
   for (const x of [sp.x0 + 0.7, sp.xf + 0.45]) for (const s of [-1, 1]) d.put(column({ h: H, r: 0.16, mat: 'oak', capital: 'gold' }), x, s * (sp.hw + 0.6), 0, true);
+  if (fine(1)) {
+    beginInst(ctx);
+    const M1 = { mat: 'oak', leaf: fine(3) ? 'gold' : undefined };
+    for (const [a, e] of [[-10.1, -4.55], [4.55, 10.1]]) modRun(ctx, d, aw, a, e, { ...M1, pil: [-9.95, -7.4, -4.75, 4.75, 7.4, 9.95] });
+    for (const [a, e] of [[-10.1, -2.6], [2.6, 10.1]]) modRun(ctx, d, fw, a, e, { ...M1, pil: [-9.95, -7.05, -5.35, -2.55, 2.55, 5.35, 7.05, 9.95] });
+    for (const s of [-1, 1]) modRun(ctx, d, wx(s * HW, -s), 37.55, 45.4, { ...M1, off: 0.03 });
+    ctx.inst.flush(); ctx.inst = null;
+  }
 }
 
 // ============================================================================================== Lounge (Louis XV)
@@ -264,7 +304,7 @@ export function furnishLounge(ctx) {
   const d = detailer(ctx), H = d.H, Y = d.Y, M = deckMats(), I = beginInst(ctx), rnd = ctx.drng;
   const X0 = 2.05, X1 = 18.95;
   // --- boiserie: carved English oak, arched panel heads with gilt rocaille, bolection mouldings with gilt beads
-  const B = (w, extra = {}) => ({ mat: 'oak', frame: 'gold', pitch: 0.85, arch: true, orn: rocailles(d, ctx, w), ...extra });
+  const B = (w, extra = {}) => ({ mat: 'oak', frame: 'gold', pitch: 0.85, arch: true, orn: both(rocailles(d, ctx, w), fine(2) && festoonOrn(ctx, d, w, 'gold')), ...extra });
   for (const s of [-1, 1]) {
     const w = wx(s * HW, -s), wins = winsIn(s, X0, X1);
     d.lineExterior(w, X0, X1, { wall: 'oak', wainscot: 'oak', dado: 'gold', wins, doors: [] });
@@ -296,6 +336,8 @@ export function furnishLounge(ctx) {
   d.pilasters(ca, [-1.05, 1.05], { h: H, w: 0.22, mat: 'oak', off: 0.1 });
   const rc2 = rocaille(); d.wmount(rc2, ca, 0, 2.38, 0.105); rc2.scale.setScalar(1.3);
   statue(ctx.plan.zone(8), 8.24, Y + 1.295, 0, ROT.aft, 0.62);
+  if (fine(1)) hearth(d, 8.29, -1, bcUrn, fine(2) && bcScuttle);
+  if (fine(2)) for (const [w, list] of [[aw, [-4.5, 4.5]], [fw, [-1.5, 3.9]]]) for (const z of list) { const r = rocaille(); d.wmount(r, w, z, 2.36, 0.03); r.scale.setScalar(1.35); } // carved overdoor cartouches
   for (const z of [-1.3, 1.3]) wput(ctx, bookcase({ mat: 'oak', w: 1.6, seed: z > 0 ? 7 : 3 }), 15.7, z, 'fwd');
   d.dress(cf, -3.02, 3.02, B(cf, { clad: 'oak', cladSkip: [], skip: [[-2.15, 2.15]] }));
   for (const s of [-1, 1]) {
@@ -303,6 +345,15 @@ export function furnishLounge(ctx) {
     d.dress(cs, 8.45, 15.55, B(cs, { clad: 'oak', cladSkip: [], skip: [[8.4, 8.85], [11.75, 12.25], [15.15, 15.6]] }));
     d.pilasters(cs, [8.65, 12, 15.35], { h: H, w: 0.3, mat: 'oak', off: 0.012 });
     d.sconces(cs, [10.3, 13.7], 1.95, 0.02);
+  }
+  if (fine(1)) { // carved modillion cornice (gilt acanthus on the brackets from level 3)
+    const M1 = { mat: 'oak', leaf: fine(3) ? 'gold' : undefined };
+    for (const s of [-1, 1]) modRun(ctx, d, wx(s * HW, -s), X0, X1, { ...M1, off: 0.03, pw: 0.24, pil: winsIn(s, X0, X1).flatMap(([p, q]) => [p - 0.3, q + 0.3]) });
+    modRun(ctx, d, aw, -10.1, 10.1, { ...M1, pil: [-9.95, -5.65, -3.35, 3.35, 5.65, 9.95], skip: [[-0.95, 0.95]] });
+    modRun(ctx, d, fw, -10.1, 10.1, { ...M1, pil: [-9.95, -2.45, -0.55, 3.05, 4.75, 9.95] });
+    modRun(ctx, d, ca, -3.02, 3.02, { ...M1, off: 0.012, skip: [[-1.3, 1.3]] });
+    modRun(ctx, d, cf, -3.02, 3.02, { ...M1, off: 0.012 });
+    for (const s of [-1, 1]) modRun(ctx, d, wx(s * 3, s), 8.45, 15.55, { ...M1, off: 0.012, pil: [8.65, 12, 15.35] });
   }
   // --- furniture: hearth group, bergères round tea tables, card tables, settees
   wput(ctx, sofa({ mat: 'fabricGold', w: 1.8 }), 5.65, 0, 'aft');
@@ -372,15 +423,28 @@ export function furnishReading(ctx) {
   wput(ctx, fireplace({ mat: 'marble', mirror: true, clock: true }), 30.24, 0, 'aft');
   d.glow(30.0, 0, 0.4, 0xff8a3a, 0.7);
   wput(ctx, tableRound({ r: 0.33, mat: 'mahogany', items: true }), 28.7, 0, 'fwd');
+  if (fine(1)) hearth(d, 30.24, -1, bcCandelabrum, null);
+  if (fine(2)) {
+    for (const [x, v, r] of [[27.15, 1, 0.3], [29.25, 4, -0.2]]) d.mount(bookPile({ v }), x, -9.86, r, 0.47);
+  }
   for (const s of [-1, 1]) fput(ctx, armchair({ kind: 'uph', mat: M.fabricRose }), 28.75, s * 1.05, faceDir(0.35, -s), 0.7);
   // writing desks (blotters, inkwells, letter racks, shaded lamps) along the aft and inboard walls
   for (const z of [-9.25, -7.95, -6.65, -5.35, -4.05]) if (wput(ctx, writingDesk(), 19.37, z, 'fwd')) iput(ctx, chairDining({ cls: 'first', seat: M.fabricRose }), 20.05, z, 'aft', { collide: false, turn: (rnd() - 0.5) * 0.3 });
   for (const x of [22.7, 23.9, 25.9, 27.1]) if (wput(ctx, writingDesk(), x, 2.63, 'port')) iput(ctx, chairDining({ cls: 'first', seat: M.fabricRose }), x, 1.95, 'stbd', { collide: false, turn: (rnd() - 0.5) * 0.3 });
   for (const [x, z] of [[19.4, -6.6], [19.4, -4.0], [24.8, 2.4]]) d.glow(x + 0.3, z, 1.0, 0xffd9a0, 0.35);
-  for (const [x, z, v] of [[22.6, -6.1, 1], [26.6, -6.0, 0], [22.6, -2.4, 2], [26.2, -2.6, 1]]) group(ctx, x, z, { r: 0.4, table: tableRound({ r: 0.4, mat: 'mahogany', items: v === 1 }), n: 3, dist: 0.95, a0: 0.5 + v, chair: () => armchair({ kind: 'uph', mat: M.fabricRose }), sq: 0.6 });
+  const okT = [];
+  for (const [x, z, v] of [[22.6, -6.1, 1], [26.6, -6.0, 0], [22.6, -2.4, 2], [26.2, -2.6, 1]]) okT.push(group(ctx, x, z, { r: 0.4, table: tableRound({ r: 0.4, mat: 'mahogany', items: v === 1 }), n: 3, dist: 0.95, a0: 0.5 + v, chair: () => armchair({ kind: 'uph', mat: M.fabricRose }), sq: 0.6 }));
+  if (fine(2)) onTables(d, [[bcVase({ v: 2 }), 26.6, -6.0], [bcVase({ v: 0 }), 22.6, -2.4]].filter((_, i) => okT[i + 1]));
   wput(ctx, sofa({ mat: M.fabricRose, w: 1.7 }), 21.0, -9.7, 'stbd');
   wput(ctx, bookcase({ mat: 'mahogany', w: 1.4, seed: 11 }), 30.25, -6.6, 'aft');
   for (const [x, z] of [[19.6, 2.4], [30.0, 2.45], [19.6, -9.6], [25.0, -9.4]]) wput(ctx, pottedPalm(), x, z, 'fwd', { collide: false });
+  if (fine(1)) {
+    const M1 = { mat: W, pw: 0.26 };
+    modRun(ctx, d, pw, 19.05, 25.2, { ...M1, off: 0.03, skip: holes });
+    modRun(ctx, d, aw, -10.1, 2.95, { ...M1, pil: [-9.95, -6.2, -2.4, 2.8] });
+    modRun(ctx, d, fw, -8.6, 2.95, { ...M1, skip: [[-0.85, 0.85]] });
+    modRun(ctx, d, sw, 19.1, 30.4, { ...M1, pil: [19.25, 24.8, 30.25] });
+  }
   // ceiling: delicate white mouldings, roses, bowl lights; chandelier in the middle
   d.ceiling(19.1, 30.4, -10.1, 2.9, { mat: 'plaster', pitchX: 2.85, pitchZ: 3.25, depth: 0.1, w: 0.18, cell: (cx, cz, i, j) => { if ((i + j) % 2 === 0) d.lamp(cx, cz, 'bowl'); else d.mount(ceilingRose({ r: 0.32 }), cx, cz, 0, H); } });
   I.flush();
@@ -419,7 +483,7 @@ function revolvingDoor(ctx, d, x, z) {
 export function furnishSmoking(ctx) {
   const d = detailer(ctx), H = d.H, M = deckMats(), I = beginInst(ctx), rnd = ctx.drng;
   const X0 = -35.95, X1 = -13.55, MAH = 'mahogany', FR = 'woodDark';
-  const B = (w, extra = {}) => ({ mat: MAH, frame: FR, pitch: 0.78, stile: 0.11, orn: inlay(d, w, M), ...extra });
+  const B = (w, extra = {}) => ({ mat: MAH, frame: FR, pitch: 0.78, stile: 0.11, orn: both(inlay(d, w, M), fine(2) && festoonOrn(ctx, d, w, FR)), ...extra });
   // --- side walls: mahogany boiserie with mother-of-pearl inlay; stained-glass windows in arched recesses between pilasters
   for (const s of [-1, 1]) {
     const w = wx(s * HW, -s), wins = winsIn(s, X0, X1);
@@ -435,6 +499,7 @@ export function furnishSmoking(ctx) {
   const cf = wz(-24, 1);
   d.dress(cf, -3.02, 3.02, B(cf, { clad: MAH, skip: [[-1.45, 1.45]], cladSkip: [] }));
   wput(ctx, fireplace({ mat: 'marble', mirror: false, clock: true }), -23.79, 0, 'fwd');
+  if (fine(1)) hearth(d, -23.79, 1, bcCandelabrum, bcScuttle); // the only real coal fire on board
   d.glow(-23.5, 0, 0.4, 0xff8a3a, 1.0);
   d.wbox(MAH, cf, -1.32, 1.32, 1.31, H - 0.14, 0.09, 0.012);
   framed(d, cf, M.plymouth, -0.9, 0.9, 1.5, 2.36, 0.102);
@@ -455,6 +520,14 @@ export function furnishSmoking(ctx) {
   d.sconces(aw, [-9.0, -4.0, 4.4, 9.2], 1.9);
   revolvingDoor(ctx, d, -36, 6.5);
   reserve(ctx, -36, 5.1, -34.6, 7.9);
+  if (fine(1)) { // carved mahogany modillion cornice
+    const M1 = { mat: FR };
+    for (const s of [-1, 1]) modRun(ctx, d, wx(s * HW, -s), X0, X1, { ...M1, off: 0.03, pw: 0.22, pil: winsIn(s, X0, X1).flatMap(([p, q]) => [p - 0.24, q + 0.24]) });
+    modRun(ctx, d, cf, -3.02, 3.02, { ...M1, off: 0.012, skip: [[-1.5, 1.5]] });
+    for (const s of [-1, 1]) modRun(ctx, d, wx(s * 3, s), X0, -23.95, { ...M1, off: 0.012, pil: [-35.8, -32.8, -29.0, -25.2, -24.2] });
+    modRun(ctx, d, aw, -10.1, -3.05, M1); modRun(ctx, d, aw, 3.05, 10.1, { ...M1, skip: [[5.1, 7.9]] });
+    modRun(ctx, d, fw, -10.1, 10.1, { ...M1, pil: [-9.95, -5.6, -2.0, 2.0, 5.6, 9.95] });
+  }
   // bar counter with bottles in the starboard forward corner (serving the room from the bar pantry)
   wput(ctx, backBar({ w: 2.4 }), -13.76, 7.2, 'aft');
   wput(ctx, barCounter({ w: 2.4 }), -15.05, 7.2, 'aft');
@@ -484,6 +557,10 @@ export function furnishSmoking(ctx) {
     bead: 'gold', pitchX: 2.6, pitchZ: 2.9, depth: 0.15, skip: [{ x0: -36, x1: -23.95, z0: -3.05, z1: 3.05 }],
     cell: (cx, cz, i, j) => { if ((i + j) % 2 === 0) d.lamp(cx, cz, 'bowl'); else d.mount(ceilingRose({ r: 0.3 }), cx, cz, 0, H); },
   });
+  if (fine(2)) { // newspaper stands at the forward wall and beside the bar
+    let n = 0;
+    for (const [x, z] of [[-13.78, -9.3], [-13.78, 9.35], [-13.78, -5.0]]) if (n < 2 && wput(ctx, bcNewsRack(), x, z, 'aft', { collide: true })) n++;
+  }
   d.world.addInfo({
     title: 'Gemälde „Plymouth Harbour“', x: -22.5, y: d.Y + 1.5, z: 0, radius: 2.5,
     text: 'Über dem Kamin des Rauchsalons hing das Ölgemälde „Plymouth Harbour“ (auch „The Approach to the New World“) des Marinemalers Norman Wilkinson. Auf der Olympic hing an gleicher Stelle sein Bild „Der Hafen von Plymouth“; das Original der Titanic ging mit dem Schiff unter. Der Kamin war der einzige echte, mit Kohle beheizte Kamin an Bord.',
@@ -531,6 +608,7 @@ export function furnishVerandah(ctx) {
     i++;
   }
   for (const [x, z] of [[-47.0, 9.6], [-36.6, 9.6], [-47.0, 3.55], [-41.3, 9.6]]) wput(ctx, pottedPalm(), x, s * z, 'fwd', { collide: false });
+  if (fine(2)) for (const [x, z, v] of [[-44.2, 9.55, 3], [-38.9, 9.55, 5]]) wput(ctx, bcFernStand({ mat: 'wicker', v }), x, s * z, 'fwd', { collide: false });
   // trellis canopy ribs under the ceiling and hanging lanterns
   for (const x of [-45.0, -41.7, -38.4]) { d.box('trellis', x - 0.03, s * 3.1, x + 0.03, s * 10.1, H - 0.2, H - 0.02); d.box('paintWhite', x - 0.04, s * 3.1, x + 0.04, s * 10.1, H - 0.24, H - 0.2); }
   for (const x of [-46.2, -43.3, -40.3, -37.6]) for (const z of [4.9, 8.0]) { d.mount(hangLamp(), x, s * z, 0, H); if (z < 6) d.world.addLamp({ x, y: d.Y + H - 0.55, z: s * z, intensity: 0.6 }); }
@@ -552,11 +630,21 @@ export function furnishHallAft(ctx) {
   d.sconces(aw, [-7.3, 8.4], 1.9);
   d.sconces(fw, [-1.5, 1.5], 1.9);
   d.wmount(clockWall(), fw, 0, 2.2, 0.06);
+  if (fine(1)) {
+    beginInst(ctx);
+    const M1 = { mat: 'oak', leaf: fine(3) ? 'gold' : undefined };
+    modRun(ctx, d, aw, -10.1, 10.1, { ...M1, pil: [-9.95, -4.5, -3.1, 3.1, 4.5, 9.95], skip: [[-2.95, 2.95]] });
+    modRun(ctx, d, fw, -10.1, 10.1, { ...M1, pil: [-9.95, -5.4, -3.6, 3.6, 5.4, 9.95], skip: [[-0.45, 0.45]] });
+    for (const s of [-1, 1]) modRun(ctx, d, wx(s * HW, -s), -6.45, 1.95, { ...M1, off: 0.03 });
+    ctx.inst.flush(); ctx.inst = null;
+  }
   const sp = imperialPlan(STAIRS.find((q) => q.id === 'grandAft'));
   for (const s of [-1, 1]) d.put(column({ h: H, r: 0.15, mat: 'oak', capital: 'gold' }), sp.xf + 0.45, s * (sp.hw + 0.55), 0, true);
   for (const s of [-1, 1]) {
-    group(ctx, -4.6, s * 7.2, { r: 0.4, n: 3, kind: 'uph', mat: 'fabricGreen', tmat: 'oak', a0: s > 0 ? Math.PI : 0 });
-    group(ctx, 0.3, s * 7.2, { r: 0.4, n: 3, kind: 'wicker', tmat: 'oak', a0: s > 0 ? Math.PI : 0 });
+    const g1 = group(ctx, -4.6, s * 7.2, { r: 0.4, n: 3, kind: 'uph', mat: 'fabricGreen', tmat: 'oak', a0: s > 0 ? Math.PI : 0 });
+    const g2 = group(ctx, 0.3, s * 7.2, { r: 0.4, n: 3, kind: 'wicker', tmat: 'oak', a0: s > 0 ? Math.PI : 0 });
+    if (g2 && fine(1)) onTables(d, [[bcVase({ v: s > 0 ? 2 : 0 }), 0.3, s * 7.2]]);
+    if (g1 && fine(2)) onTables(d, [[newspaper(), -4.55, s * 7.15, -0.5 * s]]);
     wput(ctx, pottedPalm(), 1.4, s * 9.6, 'aft', { collide: false });
     wput(ctx, pottedPalm(), -5.9, s * 9.6, 'fwd', { collide: false });
   }

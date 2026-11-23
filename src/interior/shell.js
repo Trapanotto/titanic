@@ -2,7 +2,7 @@
 import { mats } from '../core/materials.js';
 import { DECK_Y, DECK_SEGMENTS, ZONE_LEN, SLAB, SHIP, ceilingY, hullHalfWidth } from '../core/constants.js';
 import {
-  Batch, kitMats, matOf, hookNight, shellHalfWidth, deckRanges, casingsOn, rectMinus, HULL_DECKS, LINING_INSET,
+  Batch, kitMats, matOf, hookNight, shellHalfWidth, deckRanges, casingsOn, rectMinus, HULL_DECKS, LINING_INSET, kitFine,
 } from './batch.js';
 import { stairHoles } from './stairs.js';
 import { porthole } from './props-decor.js';
@@ -54,6 +54,30 @@ function surface(b, y, down, xa, xb, half, holes, regions, defMat) {
   }
 }
 
+/** Riveted transverse frames on a bare steel hull lining (side s = ±1); fine ≥ 2 every frame (3 ft), else every other. */
+function hullFrames(b, s, xa, xb, Y, H, nb, flare, half, hullW, fine, ph) {
+  const pitch = fine >= 2 ? 0.915 : 1.83, d = 0.075, t = 0.03, F = mats.steelDark;
+  for (let x = Math.ceil((xa + 0.25) / pitch) * pitch; x < xb - 0.25; x += pitch) {
+    if (half(x) < 1) continue;
+    if (ph) { const k = Math.round((x - ph.phase) / ph.pitch); if (Math.abs(x - (ph.phase + k * ph.pitch)) < ph.r + 0.15) continue; }
+    for (let k = 0; k < nb; k++) {
+      const y0 = Y + (H * k) / nb, y1 = Y + (H * (k + 1)) / nb;
+      const w0 = flare && k > 0 ? hullW(x, y0) : half(x), w1 = flare ? hullW(x, y1) : half(x);
+      const i0 = s * (w0 - d), i1 = s * (w1 - d);
+      b.poly(F, [[x - t, y0, i0], [x + t, y0, i0], [x + t, y1, i1], [x - t, y1, i1]], [0, 0, -s], undefined, x);
+      for (const e of [-1, 1]) b.poly(F, [[x + e * t, y0, s * w0], [x + e * t, y0, i0], [x + e * t, y1, i1], [x + e * t, y1, s * w1]], [e, 0, 0], undefined, x);
+      if (fine >= 3) for (let yy = y0 + 0.09; yy < y1 - 0.05; yy += 0.17) { const f = (yy - y0) / (y1 - y0); b.stud(F, [x, yy, i0 + (i1 - i0) * f], [0, 0, -s], [1, 0, 0], 0.008, 0.008); }
+    }
+  }
+}
+
+/** Bottom flange (fine ≥ 2) and rivet rows (fine ≥ 3) of a transverse deck beam at x spanning z0..z1. */
+function beamDetail(b, m, x, yc, z0, z1, fine) {
+  b.box(m, x - 0.085, yc - 0.152, z0 + 0.02, x + 0.085, yc - 0.14, z1 - 0.02, 'xXyzZ');
+  if (fine < 3 || m !== mats.steelDark) return;
+  for (let z = z0 + 0.12; z < z1 - 0.1; z += 0.3) for (const dx of [-0.055, 0.055]) b.stud(m, [x + dx, yc - 0.152, z], [0, -1, 0], [1, 0, 0], 0.008, 0.007);
+}
+
 /**
  * Builds floor, ceiling, hull lining (decks C and below), end bulkheads and casings of a deck (or an x-range of it).
  * See docs/KIT.md for the options.
@@ -77,6 +101,7 @@ export function buildDeckShell(world, deck, opts = {}) {
   const upper = Object.keys(DECK_Y).find((d) => d !== 'roof' && Math.abs(DECK_Y[d] - SLAB - yc) < 0.06);
   const holesC = opts.ceilingHoles ?? (upper ? stairHoles(upper) : []);
   const X0 = opts.x0 ?? -Infinity, X1 = opts.x1 ?? Infinity;
+  const fine = kitFine();
 
   let ceilMat = null, beamMat = null;
   if (ceilStyle === 'steel') { ceilMat = mats.steel; beamMat = mats.steelDark; }
@@ -108,6 +133,7 @@ export function buildDeckShell(world, deck, opts = {}) {
           if (h < 0.3) continue;
           for (const r of rectMinus({ x0: x - 0.05, x1: x + 0.05, z0: -h, z1: h }, holesC.map((q) => ({ ...q, x0: q.x0 - 0.1, x1: q.x1 + 0.1 })))) {
             if (r.x1 - r.x0 > 0.09) b.box(beamMat, r.x0, yc - 0.14, r.z0, r.x1, yc, r.z1, 'xXyzZ'); // ends closed (beams cut at stair wells)
+            if (r.x1 - r.x0 > 0.09 && fine >= 2 && r.z1 - r.z0 > 0.3) beamDetail(b, beamMat, x, yc, r.z0, r.z1, fine);
           }
         }
       }
@@ -126,6 +152,7 @@ export function buildDeckShell(world, deck, opts = {}) {
               b.poly(liningMat, [[a, y0, s * w(a, y0)], [c, y0, s * w(c, y0)], [c, y1, s * w(c, y1)], [a, y1, s * w(a, y1)]], [0, 0, -s]);
             }
           }
+          if (fine >= 1 && (opts.frames ?? (liningMat === mats.steel || liningMat === mats.steelDark))) hullFrames(b, s, xa, xb, Y, H, nb, flare, half, hullW, fine, wantPorts ? ph : null);
           if (wantPorts) {
             for (let x = Math.ceil((xa + 0.6 - ph.phase) / ph.pitch) * ph.pitch + ph.phase; x < xb - 0.6; x += ph.pitch) {
               const h = half(x), d = (half(x + 0.25) - half(x - 0.25)) / 0.5, l = Math.hypot(d, 1);
@@ -133,7 +160,9 @@ export function buildDeckShell(world, deck, opts = {}) {
               const n = [d / l, 0, -s / l], c = [x, Y + ph.y, s * h];
               // brass porthole with hinged-up deadlight and dogs (shared template), registered for curtains (rooms.js)
               place(world.zone(deck, x), porthole({ r: ph.r }), c[0], c[1], c[2], faceDir(n[0], n[2]));
-              ((world._kitPorts ??= {})[deck] ??= []).push({ x, y: c[1], z: c[2], n, r: ph.r });
+              // (once per position: decks are rebuilt by the streaming, the curtains must not pile up)
+              const list = ((world._kitPorts ??= {})[deck] ??= []), key = Math.round(x * 100) + ':' + s;
+              if (!list.some((q) => q.key === key)) list.push({ x, y: c[1], z: c[2], n, r: ph.r, key });
             }
           }
         }

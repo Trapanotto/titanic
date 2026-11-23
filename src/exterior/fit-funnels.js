@@ -3,9 +3,10 @@ import { mats } from '../core/materials.js';
 import { box } from '../core/geo.js';
 import { FUNNELS, BOAT_HOUSES, BOAT_LOW_ROOFS } from '../core/constants.js';
 import { BY, RY, LOW_ROOF_Y, cyl, ball, mk, Wires, roofAt } from './fit-util.js';
+import { TIER } from '../core/tier.js';
 import { Inst, latheGeo, rivetGeo, bottleScrewGeo as TB_GEO, rodGeo as ROD_GEO, shackleGeo as SHACKLE_GEO } from './inst.js';
 
-const SEG = 64;
+let SEG = 64; // sides of the elliptical shells, set per build from TIER.fine
 const TAU = Math.PI * 2;
 
 let _hoop = null;
@@ -58,6 +59,7 @@ function stayAnchor(x, s) {
 }
 
 export function buildFunnels(world, parent) {
+  SEG = TIER.fine === 0 ? 40 : 64; // (fine >= 1 keeps 64: the rivet heads sit on the true ellipse)
   const root = new THREE.Group(); root.name = 'funnels';
   parent.add(root);
   world.markForBake(root);
@@ -117,10 +119,10 @@ export function buildFunnels(world, parent) {
     const bands = [0.2, 0.345, 0.49, 0.635].map((f) => f * L);
     for (const ly of bands) {
       add(shell(a, b, rake, [{ ly: ly - 0.09, off: 0 }, { ly: ly - 0.075, off: 0.03 }, { ly: ly + 0.075, off: 0.03 }, { ly: ly + 0.09, off: 0 }]), mats.funnelBuff);
-      for (const dy of [-0.04, 0.04]) for (let i = 0; i < 80; i++) rivetXf.push([g.matrix, a + 0.03, b + 0.03, ((i + (dy > 0 ? 0.5 : 0)) / 80) * TAU, ly + dy]);
+      if (TIER.fine > 0) for (const dy of [-0.04, 0.04]) for (let i = 0; i < 80; i++) rivetXf.push([g.matrix, a + 0.03, b + 0.03, ((i + (dy > 0 ? 0.5 : 0)) / 80) * TAU, ly + dy]);
     }
     // vertical plate seams (rivet rows) on the buff part
-    for (let k = 0; k < 8; k++) {
+    if (TIER.fine > 0) for (let k = 0; k < 8; k++) {
       const th = ((k + 0.5) / 8) * TAU;
       for (let ly = cut + 1.2; ly < LB - 0.2; ly += 0.22) {
         const lyy = ly + (k % 2) * 0.11;
@@ -259,19 +261,21 @@ export function buildFunnels(world, parent) {
 
   // rivets (one instanced mesh for all funnels)
   const rg = rivetGeo(0.026);
-  const rivets = new THREE.InstancedMesh(rg, mats.funnelBuff, rivetXf.length);
-  rivets.name = 'funnelRivets';
-  rivetXf.forEach(([gm, A, B, th, ly], i) => {
-    const c = Math.cos(th), s = Math.sin(th);
-    _p.set(A * c, ly, B * s);
-    _n.set(c / A, 0, s / B).normalize();
-    _q.setFromUnitVectors(UP, _n);
-    _m.compose(_p, _q, _s).premultiply(gm);
-    rivets.setMatrixAt(i, _m);
-  });
-  rivets.instanceMatrix.needsUpdate = true;
-  rivets.computeBoundingSphere?.();
-  root.add(rivets);
+  if (rivetXf.length) { // none on phones (fine 0): tiny instances are dropped there anyway
+    const rivets = new THREE.InstancedMesh(rg, mats.funnelBuff, rivetXf.length);
+    rivets.name = 'funnelRivets';
+    rivetXf.forEach(([gm, A, B, th, ly], i) => {
+      const c = Math.cos(th), s = Math.sin(th);
+      _p.set(A * c, ly, B * s);
+      _n.set(c / A, 0, s / B).normalize();
+      _q.setFromUnitVectors(UP, _n);
+      _m.compose(_p, _q, _s).premultiply(gm);
+      rivets.setMatrixAt(i, _m);
+    });
+    rivets.instanceMatrix.needsUpdate = true;
+    rivets.computeBoundingSphere?.();
+    root.add(rivets);
+  }
   root.add(stays.build('funnelStays'));
   tb.build(root, 'funnelStayFittings');
 

@@ -3,7 +3,9 @@ import * as THREE from 'three';
 import { mats as M } from '../core/materials.js';
 import { kitMats as K, matOf, AT } from './batch.js';
 import * as G from './geom.js';
-import { def, rngOf, tableLampOn, cabDoor, drawer, SHAPES } from './props-core.js';
+import {
+  def, rngOf, tableLampOn, cabDoor, drawer, SHAPES, FINE, TAU, cupSaucer, teapotOn, jugOn, vaseOn, foldedBlanket, bookRow, papers,
+} from './props-core.js';
 import { lifeJackets } from './props-furniture.js';
 
 const ROSE = (r) => [[0, 0], [r, 0], [r * 0.95, -0.012], [r * 0.7, -0.022], [r * 0.4, -0.03], [r * 0.25, -0.045], [0, -0.05]];
@@ -31,7 +33,11 @@ export const fireplace = def('fireplace', [1.7, 0.42, 2.3], (p, o) => {
   const gar = []; for (let i = 0; i <= 10; i++) { const t = i / 10; gar.push([0.015, 1.18 - 0.08 * Math.sin(Math.PI * t), -0.42 + 0.84 * t]); }
   p.loft(o.mat === 'oak' ? M.gold : M.woodDark, gar.map(([x, y, z]) => [x, y, z]), gar.map((_, i) => 0.012 + 0.012 * Math.sin((Math.PI * i) / 10)), 6);
   p.t(M.gold, 0.04, 0.01, 0.02, 1.1, 0, 'x', 12, 4);
-  p.bb(m, 0.36, 0.035, 1.66, -0.03, 1.22, 0, 0.012); p.bb(m, 0.4, 0.04, 1.7, -0.01, 1.255, 0, 0.014);
+  p.bb(m, 0.36, 0.035, 1.66, -0.03, 1.22, 0, 0.012);
+  if (FINE() >= 2) { // moulded mantel shelf, a pair of vases
+    p.ms(m, 0.4, 0.04, 1.7, -0.01, 1.255, 0, 'ogee', 0.02);
+    for (const s of [-1, 1]) vaseOn(p, 0.02, 1.295, s * 0.36, 1, 0.17, FINE() >= 3 ? 4 : 0);
+  } else p.bb(m, 0.4, 0.04, 1.7, -0.01, 1.255, 0, 0.014);
   // cast-iron grate insert with arched opening, tiled slips, coal fire
   const ins = new THREE.Shape([new THREE.Vector2(-0.52, 0.04), new THREE.Vector2(0.52, 0.04), new THREE.Vector2(0.52, 0.98), new THREE.Vector2(-0.52, 0.98)]);
   const hole = new THREE.Path(); hole.moveTo(-0.3, 0.06); hole.lineTo(0.3, 0.06); hole.lineTo(0.3, 0.62); hole.quadraticCurveTo(0, 0.86, -0.3, 0.62); hole.lineTo(-0.3, 0.06); ins.holes.push(hole);
@@ -262,7 +268,7 @@ export const clockWall = def('clockWall', [0.4, 0.08, 0.4], (p) => {
 export const mirrorWall = def('mirrorWall', (o) => [o.w ?? 0.8, 0.05, o.h ?? 1.1], (p, o) => {
   const w = o.w ?? 0.8, h = o.h ?? 1.1, f = matOf(o.frame, M.gold);
   p.b(M.woodDark, 0.015, h - 0.04, w - 0.04, 0.008, -h / 2 + 0.02, 0);
-  for (const [sy, sz, y, z] of [[0.06, w, -h / 2, 0], [0.06, w, h / 2 - 0.06, 0], [h - 0.12, 0.06, -h / 2 + 0.06, -w / 2 + 0.03], [h - 0.12, 0.06, -h / 2 + 0.06, w / 2 - 0.03]]) p.bb(f, 0.035, sy, sz, 0.0175, y, z, 0.012);
+  p.mf(f, w, h, 0, 0, 0, 0.06, 'frame'); // one moulded frame instead of four bars (fewer triangles)
   p.b(M.mirror, 0.006, h - 0.12, w - 0.12, 0.016, -h / 2 + 0.06, 0);
   for (const sy of [-1, 1]) for (const sz of [-1, 1]) p.t(f, 0.025, 0.007, 0.036, sy * (h / 2 - 0.03), sz * (w / 2 - 0.03), 'x', 10, 4);
   p.extX(f, [[-0.15, 0], [0.15, 0], [0.06, 0.05], [0, 0.09], [-0.06, 0.05]], 0.03, 0.017, h / 2, 0, 0.004);
@@ -271,11 +277,11 @@ export const mirrorWall = def('mirrorWall', (o) => [o.w ?? 0.8, 0.05, o.h ?? 1.1
 /** framed oil painting (v = 0..3) – origin = centre on the wall, faces +x */
 export const picture = def('picture', (o) => [o.w ?? 0.6, 0.05, o.h ?? 0.45], (p, o) => {
   const w = o.w ?? 0.6, h = o.h ?? 0.45, v = (o.v ?? 0) % 4, f = matOf(o.frame, M.gold);
-  for (const [sy, sz, y, z] of [[0.05, w, -h / 2, 0], [0.05, w, h / 2 - 0.05, 0], [h - 0.1, 0.05, -h / 2 + 0.05, -w / 2 + 0.025], [h - 0.1, 0.05, -h / 2 + 0.05, w / 2 - 0.025]]) p.b(f, 0.035, sy, sz, 0.0175, y, z);
+  p.mf(f, w, h, 0, 0, 0, 0.05, 'frame'); // moulded gilt frame (fewer triangles than four bars)
   p.b(M.woodDark, 0.012, h - 0.09, w - 0.09, 0.008, -h / 2 + 0.045, 0);
   const u0 = (v % 2) / 2, v0 = 0.5 - Math.floor(v / 2) / 2, cg = new THREE.PlaneGeometry(w - 0.09, h - 0.09);
   const uv = cg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * 0.5, v0 + uv.getY(i) * 0.5);
-  p.add(cg, K.paintings, 0.02, 0, 0, 0, Math.PI / 2, 0);
+  p.add(cg, K.paintings, 0.0145, 0, 0, 0, Math.PI / 2, 0); // just behind the frame's inner lip
   p.c(M.brass, 0.002, 0.25, 0.005, h / 2, 0, 4);
 });
 
@@ -285,7 +291,11 @@ export const coatHooks = def('coatHooks', (o) => [0.15 + 0.25 * (o.n ?? 3), 0.2,
   p.bb(matOf(o.mat, M.mahogany), 0.025, 0.1, w, 0.0125, -0.05, 0, 0.006);
   for (let i = 0; i < n; i++) {
     const z = -w / 2 + 0.2 + i * 0.25;
-    p.b(M.brass, 0.07, 0.012, 0.012, 0.06, -0.006, z); p.b(M.brass, 0.012, 0.04, 0.012, 0.09, 0.0, z);
+    if (FINE() >= 1) { // cast double hook: lower coat hook and upper hat hook, ball ends
+      p.loft(M.brass, [[0.01, -0.03, z], [0.05, -0.034, z], [0.08, -0.02, z], [0.088, 0.012, z]], 0.006, 4);
+      p.loft(M.brass, [[0.01, -0.02, z], [0.06, 0.0, z], [0.1, 0.05, z]], 0.005, 4);
+      if (FINE() >= 3) { p.s(M.brass, 0.009, 0.088, 0.014, z); p.s(M.brass, 0.008, 0.101, 0.052, z); }
+    } else { p.b(M.brass, 0.07, 0.012, 0.012, 0.06, -0.006, z); p.b(M.brass, 0.012, 0.04, 0.012, 0.09, 0.0, z); }
     const k = r();
     if (k < 0.45) { p.ag([AT.coat, AT.navy, AT.greyCloth, AT.khaki][Math.floor(r() * 4)], G.pillow(0.12, 0.85, 0.42, 0.45, 0.35, 3, 8), 0.08, -0.9, z); }
     else if (k < 0.7) { p.ag(AT.hat, G.lathe([[0, 0], [0.13, 0], [0.085, 0.012], [0.08, 0.1], [0, 0.11]], 8), 0.11, 0.02, z); }
@@ -301,7 +311,11 @@ export const hatBox = def('hatBox', [0.42, 0.42, 0.32], (p, o) => {
 
 /** pair of slippers */
 export const slippers = def('slippers', [0.3, 0.3, 0.08], (p, o) => {
-  for (const s of [-1, 1]) { const m = p.ag(o.v % 2 ? AT.red : AT.navy, G.pillow(0.27, 0.07, 0.1, 0.5, 0.6, 3, 10, 0.02), 0, 0, s * 0.065); m.rotation.y = s * 0.12; }
+  const F = FINE();
+  for (const s of [-1, 1]) {
+    const m = p.ag(o.v % 2 ? AT.red : AT.navy, G.pillow(0.27, 0.07, 0.1, 0.5, 0.6, 3, 10, 0.02), 0, F >= 2 ? 0.008 : 0, s * 0.065); m.rotation.y = s * 0.12;
+    if (F >= 2) { const so = p.ag(AT.tea, G.pillow(0.28, 0.01, 0.105, 0.3, 0.6, 2, 10), 0, 0, s * 0.065); so.rotation.y = s * 0.12; } // leather sole
+  }
 });
 
 /** framed notice (White Star regulations) – origin = centre on the wall/door, faces +x */
@@ -418,6 +432,11 @@ function trunkAt(p, w, d, h, x, y, z, m, r) {
   for (const s of [-1, 1]) { p.bb(M.leather, d + 0.02, h + 0.02, 0.05, x, y - 0.01, z + s * w * 0.38, 0.006); p.b(M.brass, 0.01, 0.05, 0.06, x + d / 2 + 0.01, y + h * 0.75, z + s * w * 0.38); }
   for (const sx of [-1, 1]) for (const sy of [0, 1]) for (const sz of [-1, 1]) p.b(M.brass, 0.05, 0.05, 0.05, x + sx * (d / 2 - 0.02), y + sy * (h - 0.05), z + sz * (w / 2 - 0.02));
   p.b(M.brass, 0.012, 0.08, 0.1, x + d / 2 + 0.006, y + h * 0.6, z);
+  if (FINE() >= 2) { // lid seam, side clasps, studs along the lid band
+    p.b(M.woodDark, d + 0.004, 0.006, w + 0.004, x, y + h * 0.83, z);
+    for (const s of [-1, 1]) p.bb(M.brass, 0.014, 0.06, 0.04, x + d / 2 + 0.007, y + h * 0.76, z + s * w * 0.3, 0.004);
+    if (FINE() >= 3) for (let i = -3; i <= 3; i++) if (i) p.s(M.brass, 0.007, x + d / 2 + 0.008, y + h * 0.7 + 0.0175, z + i * w * 0.12);
+  }
   for (const s of [-1, 1]) p.loft(M.leather, [[x, y + h * 0.55, z + s * (w / 2 + 0.002)], [x, y + h * 0.6, z + s * (w / 2 + 0.03)], [x + 0.06, y + h * 0.6, z + s * (w / 2 + 0.03)], [x + 0.06, y + h * 0.55, z + s * (w / 2 + 0.002)]], 0.012, 4);
   if (r) for (let i = 0; i < 2; i++) { const l = p.ab([AT.label, AT.labelRed, AT.labelBlue, AT.yellow][Math.floor(r() * 4)], 0.003, 0.08 + r() * 0.05, 0.1 + r() * 0.05, x + d / 2 + 0.012, y + 0.1 + r() * (h - 0.3), z - w * 0.1 + r() * w * 0.25); l.rotation.x = (r() - 0.5) * 0.6; }
 }
@@ -427,6 +446,9 @@ function suitcaseAt(p, x, y, z, m, cell = null, rot = 0) {
   p.loft(M.leather, [[x, y + 0.42, z - 0.07], [x, y + 0.47, z - 0.05], [x, y + 0.47, z + 0.05], [x, y + 0.42, z + 0.07]], 0.01, 4);
   for (const s of [-1, 1]) p.b(M.brass, 0.21, 0.025, 0.03, x, y + 0.36, z + s * 0.2);
   if (cell !== null) p.ab(cell, 0.004, 0.08, 0.12, x + 0.101, y + 0.15, z + 0.1);
+  if (FINE() >= 2) { // handle mounts and two brass locks on the top edge
+    for (const s of [-1, 1]) { p.bb(M.brass, 0.03, 0.012, 0.025, x, y + 0.418, z + s * 0.07, 0.004); p.bb(M.brass, 0.012, 0.035, 0.04, x + 0.1, y + 0.37, z + s * 0.2, 0.003); }
+  }
 }
 
 export const trunk = def('trunk', (o) => (o.big ? [1.05, 0.6, 0.65] : [0.85, 0.5, 0.5]), (p, o) => {
@@ -586,7 +608,7 @@ export const barCounter = def('barCounter', (o) => [o.w ?? 3, 0.65, 1.12], (p, o
   const n = Math.max(2, Math.round(w / 0.6));
   for (let i = 0; i < n; i++) { const z = -w / 2 + (w / n) * (i + 0.5); p.fp(m, w / n - 0.12, 0.62, 0.275, 0.55, z, 0.01, 0.045); }
   for (let i = 0; i <= n; i++) p.bb(m, 0.04, 0.82, 0.05, 0.285, 0.14, -w / 2 + (w / n) * i, 0.008);
-  p.bb(M.woodDark, 0.72, 0.06, w + 0.06, 0.02, 1.05, 0, 0.02);
+  if (FINE() >= 2) p.ms(M.woodDark, 0.72, 0.06, w + 0.06, 0.02, 1.05, 0, 'ogee', 0.03); else p.bb(M.woodDark, 0.72, 0.06, w + 0.06, 0.02, 1.05, 0, 0.02);
   p.cz(M.brass, 0.022, w, 0.38, 0.18, 0, 10);
   const nb = Math.max(2, Math.round(w / 1.0));
   for (let i = 0; i <= nb; i++) { const z = -w / 2 + 0.1 + ((w - 0.2) * i) / nb; p.loft(M.brass, [[0.27, 0.3, z], [0.33, 0.24, z], [0.38, 0.18, z]], 0.012, 6); }
@@ -605,7 +627,8 @@ export const backBar = def('backBar', (o) => [o.w ?? 3, 0.4, 2.1], (p, o) => {
     for (let z = -w / 2 + 0.12; z < w / 2 - 0.1; z += 0.09 + r() * 0.04) { const c = [AT.bottleGreen, AT.amber, AT.claret, AT.clearGlass, AT.smoke][Math.floor(r() * 5)]; const tall = r() < 0.6; p.alathe(c, tall ? [[0, 0], [0.035, 0], [0.036, 0.2], [0.012, 0.26], [0.011, 0.31], [0, 0.31]] : [[0, 0], [0.045, 0], [0.045, 0.14], [0.02, 0.18], [0.014, 0.22], [0, 0.22]], -0.06, y + 0.025, z, 7); p.ab(AT.label, 0.002, 0.06, 0.04, -0.06 + (tall ? 0.036 : 0.045), y + 0.07, z); }
   }
   for (let i = 0; i < 6; i++) p.lathe(M.glass, [[0, 0], [0.03, 0], [0.006, 0.01], [0.005, 0.06], [0.03, 0.08], [0.035, 0.12], [0.026, 0.09], [0, 0.078]], 0.08, 0.95, -w / 2 + 0.2 + i * 0.1, 6);
-  p.bb(m, 0.32, 0.06, w + 0.06, -0.04, 2.0, 0, 0.012); p.bb(m, 0.36, 0.04, w + 0.1, -0.03, 2.06, 0, 0.012);
+  p.bb(m, 0.32, 0.06, w + 0.06, -0.04, 2.0, 0, 0.012);
+  if (FINE() >= 2) p.ms(m, 0.36, 0.04, w + 0.1, -0.03, 2.06, 0, 'crown', 0); else p.bb(m, 0.36, 0.04, w + 0.1, -0.03, 2.06, 0, 0.012);
   for (const s of [-1, 1]) p.bb(m, 0.2, 1.1, 0.06, -0.1, 0.95, s * (w / 2 - 0.03), 0.008);
 });
 
@@ -628,3 +651,220 @@ export const bookPile = def('bookPile', [0.3, 0.25, 0.15], (p, o) => {
 export const towels = def('towels', [0.3, 0.25, 0.12], (p, o) => { for (let i = 0; i < (o.n ?? 2); i++) p.bb(M.linen, 0.22, 0.045, 0.28, (i % 2) * 0.01, i * 0.045, 0, 0.015); });
 /** a newspaper on a surface */
 export const newspaper = def('newspaper', [0.45, 0.35, 0.02], (p) => { p.ab(AT.paper, 0.32, 0.006, 0.42, 0, 0, 0); p.ab(AT.greyCloth, 0.3, 0.004, 0.4, 0.01, 0.006, 0.01).rotation.y = 0.08; });
+
+// ============================================================ small clutter for deck authors (origin at the base, front +x)
+// Footprints [w (z), d (x), h]; none of these need a collider.
+
+/** tea service on a tray: teapot, two cups and saucers, milk jug and sugar bowl (fine ≥ 1); silver: plated service on an oval tray */
+export const teaSet = def('teaSet', [0.5, 0.36, 0.2], (p, o) => {
+  const silver = !!o.silver, ware = silver ? M.chrome : M.porcelain, F = FINE();
+  let ty;
+  if (silver) { p.lathe(M.chrome, [[0, 0], [0.155, 0], [0.165, 0.006], [0.17, 0.02], [0.163, 0.02], [0.155, 0.008], [0, 0.006]], 0, 0, 0, 16).scale.set(1, 1, 1.47); ty = 0.006; }
+  else {
+    p.bb(M.mahogany, 0.34, 0.012, 0.48, 0, 0, 0, 0.004); ty = 0.012;
+    for (const s of [-1, 1]) { p.bb(M.mahogany, 0.34, 0.03, 0.01, 0, ty, s * 0.235, 0.003); p.bb(M.mahogany, 0.01, 0.03, 0.46, s * 0.165, ty, 0, 0.003); }
+  }
+  teapotOn(p, 0, ty, -0.14, ware, 1);
+  cupSaucer(p, 0.07, ty, 0.02, -Math.PI / 2);
+  cupSaucer(p, -0.05, ty, 0.15, -Math.PI / 2);
+  if (F >= 1) {
+    jugOn(p, -0.1, ty, 0.0, ware, 0.8);
+    p.lathe(ware, [[0, 0], [0.024, 0], [0.04, 0.028], [0.038, 0.05], [0.034, 0.05], [0, 0.04]], 0.09, ty, 0.16, 10); // sugar bowl
+  }
+  if (F >= 3) for (const [x, z] of [[0.07, 0.02], [-0.05, 0.15]]) { const sp = p.bb(M.chrome, 0.09, 0.004, 0.012, x + 0.01, ty + 0.013, z + 0.055, 0.002); sp.rotation.y = 0.4; } // spoons on the saucers
+});
+
+/** vase of flowers; v = colour (0..4), h = vase height */
+export const vaseFlowers = def('vaseFlowers', (o) => [0.2, 0.2, (o.h ?? 0.22) + 0.16], (p, o) => {
+  const F = FINE();
+  vaseOn(p, 0, 0, 0, o.v ?? 0, o.h ?? 0.22, F >= 2 ? 7 : F >= 1 ? 5 : 3);
+});
+
+/** ashtray: table ashtray (cut glass with brass rim and a cigar), stand: floor-standing smoker's stand */
+export const ashtray = def('ashtray', (o) => (o.stand ? [0.32, 0.32, 0.72] : [0.14, 0.14, 0.04]), (p, o) => {
+  const F = FINE();
+  const dish = (y) => {
+    p.lathe(M.glass, [[0, 0], [0.05, 0], [0.065, 0.02], [0.062, 0.026], [0.05, 0.012], [0, 0.01]], 0, y, 0, 10);
+    p.t(M.brass, 0.063, 0.004, 0, y + 0.024, 0, 'y', 12, 3);
+    if (F >= 1) { const c = p.cx(K.ebony ?? M.woodDark, 0.007, 0.09, 0.02, y + 0.03, 0.01, 6); c.rotation.y = 0.5; } // cigar on the rest
+  };
+  if (!o.stand) { dish(0); return; }
+  p.lathe(M.brass, [[0, 0], [0.15, 0], [0.155, 0.012], [0.12, 0.03], [0.05, 0.05], [0.025, 0.07], [0.02, 0.62], [0.035, 0.64], [0, 0.645]], 0, 0, 0, 14);
+  if (F >= 2) for (const y of [0.18, 0.4]) p.lathe(M.brass, [[0.02, -0.01], [0.03, 0], [0.02, 0.01]], 0, y, 0, 8);
+  p.lathe(M.brass, [[0, 0], [0.04, 0], [0.09, 0.02], [0.1, 0.035], [0.095, 0.04], [0.085, 0.025], [0, 0.02]], 0, 0.64, 0, 14);
+  dish(0.665);
+  if (F >= 1) p.bb(M.woodDark, 0.05, 0.012, 0.035, 0, 0.671, 0.08, 0.002); // box of matches on the bowl
+});
+
+/** umbrella stand with two furled umbrellas and a walking stick; mat: 'brass' (default) or 'porcelain' */
+export const umbrellaStand = def('umbrellaStand', [0.3, 0.3, 0.9], (p, o) => {
+  const m = matOf(o.mat, M.brass), F = FINE();
+  p.lathe(m, [[0, 0], [0.14, 0], [0.145, 0.015], [0.13, 0.025], [0.11, 0.03], [0.105, 0.5], [0.115, 0.53], [0.11, 0.55], [0.098, 0.55], [0.098, 0.035], [0, 0.035]], 0, 0, 0, 14);
+  if (F >= 2) for (const y of [0.15, 0.4]) p.lathe(m, [[0.105, -0.008], [0.112, 0], [0.105, 0.008]], 0, y, 0, 14);
+  const um = (a, lean, cell) => { // furled umbrella leaning against the rim
+    const c = Math.cos(a), s = -Math.sin(a), P = (t, r0) => [c * (0.03 + lean * t), 0.04 + 0.78 * t, s * (0.03 + lean * t)];
+    p.ag(cell, G.loft([P(0, 0), P(0.12, 0), P(0.45, 0), P(0.82, 0), P(0.92, 0)], [0.004, 0.026, 0.024, 0.008, 0.006], 6));
+    const top = P(0.92, 0);
+    p.loft(K.ebony ?? M.woodDark, [top, [top[0], top[1] + 0.05, top[2]], [top[0] + c * 0.03, top[1] + 0.08, top[2] + s * 0.03], [top[0] + c * 0.06, top[1] + 0.05, top[2] + s * 0.06]], 0.009, 5);
+  };
+  um(0.6, 0.08, AT.black); um(2.6, 0.07, AT.navy);
+  if (F >= 1) { // walking stick with a silver knob
+    const a = 4.4, c = Math.cos(a), s = -Math.sin(a), b = [c * 0.03, 0.04, s * 0.03], tp = [c * 0.1, 0.86, s * 0.1];
+    p.loft(M.woodDark, [b, tp], [0.008, 0.01], 5);
+    p.s(M.chrome, 0.016, tp[0], tp[1] + 0.008, tp[2]);
+  }
+});
+
+/** coat on a single wall hook (origin = mounting point, faces +x); hat: also a hat on the upper hook; v: colour */
+export const coatHook = def('coatHook', [0.46, 0.3, 1.05], (p, o) => {
+  const F = FINE(), cell = [AT.coat, AT.navy, AT.greyCloth, AT.khaki][(o.v ?? 0) % 4];
+  p.bb(matOf(o.mat, M.mahogany), 0.02, 0.14, 0.09, 0.01, -0.09, 0, 0.005);
+  p.loft(M.brass, [[0.015, -0.06, 0], [0.05, -0.064, 0], [0.075, -0.05, 0], [0.082, -0.02, 0]], 0.006, 4);
+  p.loft(M.brass, [[0.015, -0.04, 0], [0.06, -0.02, 0], [0.095, 0.03, 0]], 0.005, 4);
+  if (o.coat !== false) {
+    p.ag(cell, G.pillow(0.12, 0.24, 0.42, 0.5, 0.4, 3, 10), 0.075, -0.3, 0);            // shoulders hanging from the hook
+    p.ag(cell, G.pillow(0.13, 0.72, 0.44, 0.35, 0.35, 3, 10, 0), 0.075, -0.98, 0);       // skirt of the coat
+    p.ag(cell, G.pillow(0.06, 0.1, 0.16, 0.6, 0.5, 2, 8), 0.07, -0.12, 0);               // collar round the hook
+    if (F >= 2) for (const s of [-1, 1]) p.ag(cell, G.loft([[0.08, -0.12, s * 0.19], [0.085, -0.4, s * 0.215], [0.09, -0.7, s * 0.2]], [0.045, 0.05, 0.045], 6), 0, 0, 0); // sleeves
+    if (F >= 3) for (let i = 0; i < 3; i++) p.s(M.brass, 0.008, 0.142, -0.4 - i * 0.14, 0.04); // buttons
+  }
+  if (o.hat) p.ag(AT.hat, G.lathe([[0, 0], [0.14, 0], [0.13, 0.01], [0.085, 0.014], [0.08, 0.1], [0.07, 0.11], [0, 0.112]], 10), 0.15, 0.03, 0);
+});
+
+/** free-standing hat and coat stand (turned pole, bentwood hooks) with a coat and a hat; bare: no clothes */
+export const coatStand = def('coatStand', [0.55, 0.55, 1.97], (p, o) => {
+  const F = FINE(), m = matOf(o.mat, M.woodDark);
+  p.lathe(m, F >= 2
+    ? [[0, 0], [0.03, 0], [0.026, 0.05], [0.02, 0.1], [0.024, 0.5], [0.032, 0.54], [0.022, 0.58], [0.02, 1.6], [0.03, 1.64], [0.022, 1.7], [0.03, 1.78], [0.02, 1.84], [0, 1.88]]
+    : [[0, 0], [0.03, 0], [0.02, 0.1], [0.02, 1.7], [0.03, 1.78], [0, 1.88]], 0, 0, 0, 8);
+  for (let i = 0; i < 4; i++) { // splayed feet
+    const a = (i / 4) * TAU + Math.PI / 4, c = Math.cos(a), s = -Math.sin(a);
+    p.loft(m, [[c * 0.015, 0.3, s * 0.015], [c * 0.1, 0.12, s * 0.1], [c * 0.22, 0.02, s * 0.22], [c * 0.25, 0.015, s * 0.25]], [0.018, 0.016, 0.014, 0.014], 5);
+  }
+  for (let i = 0; i < 6; i++) { // bentwood hooks in two rings
+    const a = (i / 6) * TAU, c = Math.cos(a), s = -Math.sin(a), y = i % 2 ? 1.62 : 1.72;
+    p.loft(m, [[c * 0.015, y, s * 0.015], [c * 0.1, y + 0.02, s * 0.1], [c * 0.14, y + 0.09, s * 0.14]], 0.011, 5);
+    if (F >= 2) p.s(m, 0.015, c * 0.14, y + 0.1, s * 0.14);
+  }
+  if (!o.bare) {
+    const cell = [AT.coat, AT.navy, AT.greyCloth, AT.khaki][(o.v ?? 0) % 4];
+    p.ag(cell, G.pillow(0.13, 0.22, 0.4, 0.5, 0.4, 3, 10), 0.18, 1.46, 0);
+    p.ag(cell, G.pillow(0.14, 0.75, 0.42, 0.35, 0.35, 3, 10), 0.19, 0.75, 0).rotation.z = 0.05;
+    p.ag(AT.hat, G.lathe([[0, 0], [0.14, 0], [0.13, 0.01], [0.085, 0.014], [0.08, 0.1], [0.07, 0.11], [0, 0.112]], 10), 0, 1.85, 0);
+  }
+});
+
+/** pair of shoes, toes to +x; v: 0 black oxfords, 1 brown brogues, 2 ladies' button boots */
+export const shoes = def('shoes', [0.32, 0.3, 0.17], (p, o) => {
+  const v = (o.v ?? 0) % 3, F = FINE(), up = [AT.black, AT.tea, AT.ebony][v];
+  for (const s of [-1, 1]) {
+    const z = s * 0.065, a = s * 0.1, parts = [];
+    parts.push(p.ag(AT.ebony, G.pillow(0.27, 0.014, 0.095, 0.3, 0.5, 2, 10), 0, 0, z));                    // sole
+    parts.push(p.ag(up, G.pillow(0.25, 0.075, 0.088, 0.55, 0.55, 3, 10, 0.02), 0.01, 0.012, z));           // upper
+    parts.push(p.ag(AT.ebony, G.roundBox(0.06, 0.028, 0.07, 0.008, 1), -0.095, 0.014, z));                  // heel
+    if (v === 2) parts.push(p.ag(up, G.lathe([[0.04, 0], [0.042, 0.06], [0.04, 0.12], [0.044, 0.14], [0, 0.14]], 8), -0.07, 0.03, z)); // boot shaft
+    if (F >= 2 && v !== 2) parts.push(p.ag(v === 1 ? AT.tea : AT.black, G.loft([[0.035, 0.062, z - 0.028], [0.045, 0.07, z], [0.035, 0.062, z + 0.028]], 0.004, 3, false), 0, 0, 0)); // laces
+    for (const m of parts) { const ox = m.position.x, oz = m.position.z - z; m.position.x = ox * Math.cos(a) + oz * Math.sin(a); m.position.z = z - ox * Math.sin(a) + oz * Math.cos(a); m.rotation.y += a; }
+  }
+});
+
+/** low canvas-covered cabin trunk with wooden slats (fits under a berth); mat: cover */
+export const cabinTrunk = def('cabinTrunk', [0.9, 0.52, 0.36], (p, o) => {
+  const m = matOf(o.mat, M.canvas), F = FINE(), w = 0.88, d = 0.5, h = 0.34;
+  p.bb(m, d, h, w, 0, 0, 0, 0.015);
+  for (const zz of [-0.3, 0.3]) p.bb(M.oak, d + 0.014, 0.022, 0.05, 0, h - 0.004, zz, 0.005);              // lid slats
+  for (const yy of [0.04, h * 0.62]) p.bb(M.oak, d + 0.012, 0.035, w + 0.012, 0, yy, 0, 0.006);            // body bands
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.bb(M.brass, 0.05, 0.05, 0.05, sx * (d / 2 - 0.02), h - 0.045, sz * (w / 2 - 0.02), 0.006);
+  p.bb(M.brass, 0.012, 0.07, 0.09, d / 2 + 0.006, h * 0.62, 0, 0.003);                                      // lock
+  for (const s of [-1, 1]) p.loft(M.leather, [[0, h * 0.55, s * (w / 2 + 0.002)], [0, h * 0.6, s * (w / 2 + 0.028)], [0.08, h * 0.6, s * (w / 2 + 0.028)], [0.08, h * 0.55, s * (w / 2 + 0.002)]], 0.011, 4);
+  if (F >= 2) { p.b(M.woodDark, d + 0.004, 0.006, w + 0.004, 0, h * 0.86, 0); for (const s of [-1, 1]) p.ab(s > 0 ? AT.labelRed : AT.label, 0.003, 0.08, 0.12, d / 2 + 0.008, h * 0.2, s * 0.22); }
+});
+
+/** dome-topped steamer trunk (curved lid with wooden bows, brass corners) */
+export const domeTrunk = def('domeTrunk', [0.86, 0.52, 0.64], (p, o) => {
+  const m = matOf(o.mat, M.leather), F = FINE(), w = 0.84, d = 0.5, h = 0.46, dh = 0.16, n = F >= 2 ? 10 : 6;
+  p.bb(m, d, h, w, 0, 0, 0, 0.015);
+  const arc = (dd, k) => { const out = []; for (let i = 0; i <= n; i++) { const t = i / n, a = Math.PI * t; out.push([-Math.cos(a) * dd / 2, h + Math.sin(a) * dh * k]); } out.push([dd / 2, h - 0.002], [-dd / 2, h - 0.002]); return out; };
+  p.extZ(m, arc(d, 1), w, 0, 0, 0, 0.01);
+  for (const zz of [-0.28, 0, 0.28]) p.extZ(M.oak, arc(d + 0.016, 1.06), 0.045, 0, 0, zz, 0.004);           // wooden bows over the lid
+  for (const yy of [0.05, h - 0.06]) p.bb(M.oak, d + 0.012, 0.035, w + 0.012, 0, yy, 0, 0.006);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.bb(M.brass, 0.05, 0.05, 0.05, sx * (d / 2 - 0.02), 0, sz * (w / 2 - 0.02), 0.006);
+  p.bb(M.brass, 0.014, 0.09, 0.1, d / 2 + 0.007, h - 0.08, 0, 0.004);
+  for (const s of [-1, 1]) p.loft(M.leather, [[0, h * 0.55, s * (w / 2 + 0.002)], [0, h * 0.6, s * (w / 2 + 0.03)], [0.08, h * 0.6, s * (w / 2 + 0.03)], [0.08, h * 0.55, s * (w / 2 + 0.002)]], 0.012, 4);
+  if (F >= 2) { const r = rngOf(9); for (let i = 0; i < 3; i++) p.ab([AT.label, AT.labelRed, AT.labelBlue][i], 0.003, 0.07 + r() * 0.04, 0.1 + r() * 0.04, d / 2 + 0.008, 0.12 + i * 0.09, -0.25 + i * 0.2); }
+});
+
+/** leather Gladstone bag with brass frame and handle */
+export const gladstoneBag = def('gladstoneBag', [0.48, 0.26, 0.36], (p, o) => {
+  const m = matOf(o.mat, M.leather), F = FINE();
+  p.pil(m, 0.24, 0.27, 0.46, 0, 0, 0, 0.45, 0.25, 4, 14, 0);
+  p.loft(M.brass, [[0, 0.268, -0.2], [0, 0.272, 0], [0, 0.268, 0.2]], [[0.006, 0.012], [0.006, 0.012], [0.006, 0.012]], 4); // frame along the mouth
+  for (const s of [-1, 1]) p.bb(M.brass, 0.03, 0.02, 0.03, 0, 0.262, s * 0.07, 0.005);
+  p.loft(m, [[0, 0.28, -0.07], [0, 0.33, -0.05], [0, 0.345, 0], [0, 0.33, 0.05], [0, 0.28, 0.07]], 0.011, 5);
+  if (F >= 2) { for (const s of [-1, 1]) p.b(M.leather, 0.25, 0.02, 0.025, 0, 0.17, s * 0.14); p.bb(M.brass, 0.012, 0.03, 0.04, 0.12, 0.2, 0, 0.003); }
+});
+
+/** row of books between two brass book ends (on a desk, a mantel, a shelf); seed: book variation */
+export const bookEnds = def('bookEnds', [0.42, 0.2, 0.26], (p, o) => {
+  const F = FINE();
+  bookRow(p, 0.08, 0, -0.17, 0.17, 0.16, 0.24, o.seed ?? 4, false);
+  for (const s of [-1, 1]) {
+    p.bb(M.brass, 0.15, 0.16, 0.012, 0, 0, s * 0.182, 0.003);
+    p.bb(M.brass, 0.15, 0.008, 0.05, 0, 0, s * 0.21, 0.002);                       // foot plate outside the row
+    if (F >= 2) p.lathe(M.brass, [[0, 0], [0.018, 0], [0.022, 0.02], [0.01, 0.04], [0.014, 0.05], [0, 0.06]], 0, 0.16, s * 0.182, 8); // cast finial
+  }
+});
+
+/** decanters (whisky / port) and glasses on a silver tray */
+export const decanterSet = def('decanterSet', [0.42, 0.3, 0.34], (p, o) => {
+  const F = FINE();
+  p.lathe(M.chrome, [[0, 0], [0.13, 0], [0.14, 0.006], [0.145, 0.016], [0.138, 0.016], [0.13, 0.007], [0, 0.006]], 0, 0, 0, 16).scale.set(1, 1, 1.42);
+  const dec = (z, cell) => {
+    p.lathe(M.glass, [[0, 0], [0.05, 0], [0.055, 0.03], [0.055, 0.15], [0.03, 0.2], [0.018, 0.23], [0.024, 0.24], [0.016, 0.24], [0, 0.2]], 0, 0.006, z, 10);
+    p.alathe(cell, [[0, 0], [0.047, 0], [0.051, 0.03], [0.051, 0.11], [0, 0.11]], 0, 0.009, z, 8);              // contents
+    p.lathe(M.glass, [[0, 0], [0.012, 0], [0.016, 0.02], [0.03, 0.04], [0.016, 0.07], [0, 0.075]], 0, 0.24, z, 8); // stopper
+  };
+  dec(-0.08, AT.amber); if (F >= 1) dec(0.08, AT.claret);
+  for (const [x, z] of [[0.08, 0.0], [-0.08, 0.0], ...(F >= 2 ? [[0.07, 0.15], [-0.07, -0.15]] : [])]) p.lathe(M.glass, SHAPES.TUMBLER.map(([r, h]) => [r * 0.9, h * 0.8]), x, 0.006, z, 8);
+});
+
+/** folded blanket(s) / rug: n layers; mat (default blanket) */
+export const blanketFolded = def('blanketFolded', (o) => [0.6, 0.42, 0.04 * (o.n ?? 2) + 0.01], (p, o) => {
+  foldedBlanket(p, matOf(o.mat, M.blanket), 0.4, 0.58, o.n ?? 2, 0, 0, 0, 0.04);
+});
+
+/** brass spittoon (smoking rooms, bars) */
+export const spittoon = def('spittoon', [0.3, 0.3, 0.16], (p) => {
+  p.lathe(M.brass, [[0, 0], [0.1, 0], [0.128, 0.035], [0.125, 0.085], [0.075, 0.112], [0.09, 0.14], [0.105, 0.152], [0.092, 0.152], [0.06, 0.12], [0, 0.1]], 0, 0, 0, 14);
+});
+
+/** wicker waste-paper basket (crumpled papers inside from fine 2) */
+export const wastebasket = def('wastebasket', [0.32, 0.32, 0.34], (p) => {
+  p.rev(M.wicker, [{ o: 0.11, y: 0, m: 0 }, { o: 0.12, y: 0.02, m: 0.003 }, { o: 0.14, y: 0.3, m: 0.003 }, { o: 0.15, y: 0.32, m: 0 }, { o: 0.13, y: 0.33, m: 0 }, { o: 0.122, y: 0.04, m: 0 }, { o: 0, y: 0.03, m: 0 }], { seg: 16, k: 16, capBottom: true }, 0, 0, 0);
+  if (FINE() >= 2) for (const [x, z, s] of [[0.02, -0.03, 0.09], [-0.04, 0.04, 0.08]]) p.ag(AT.paper, G.pillow(s, s * 0.8, s, 0.9, 0.9, 3, 6), x, 0.24, z);
+});
+
+/** mantel / bracket clock (arched mahogany case, brass bezel and feet) */
+export const mantelClock = def('mantelClock', [0.3, 0.14, 0.4], (p, o) => {
+  const m = matOf(o.mat, M.woodDark), F = FINE();
+  for (const s of [-1, 1]) p.lathe(M.brass, [[0, 0], [0.014, 0], [0.014, 0.012], [0, 0.016]], 0.03, 0, s * 0.1, 6);
+  p.bb(m, 0.12, 0.2, 0.24, 0, 0.012, 0, 0.008);
+  p.extX(m, [[-0.12, 0], [0.12, 0], [0.12, 0.04], [0.07, 0.1], [0, 0.12], [-0.07, 0.1], [-0.12, 0.04]], 0.12, 0, 0.212, 0, 0.005);
+  p.cx(M.brass, 0.075, 0.012, 0.064, 0.137, 0, 16); p.dial(K.clockFace, 0.072, 0.0705, 0.137, 0, 'x', 16); p.t(M.brass, 0.078, 0.007, 0.065, 0.137, 0, 'x', 16, 4);
+  if (F >= 2) { p.lathe(M.brass, [[0, 0], [0.018, 0], [0.012, 0.03], [0.004, 0.05], [0, 0.06]], 0, 0.33, 0, 8); for (const s of [-1, 1]) p.lathe(m, [[0, 0], [0.012, 0], [0.008, 0.02], [0.008, 0.17], [0.012, 0.19], [0, 0.2]], 0.05, 0.012, s * 0.105, 6); }
+});
+
+/** washing set: porcelain basin with a large ewer standing in it (3rd class / crew cabins, washstand tops) */
+export const ewerBasin = def('ewerBasin', [0.42, 0.42, 0.36], (p) => {
+  p.lathe(M.porcelain, [[0, 0], [0.08, 0], [0.12, 0.03], [0.19, 0.08], [0.205, 0.09], [0.195, 0.092], [0.18, 0.083], [0.11, 0.035], [0, 0.03]], 0, 0, 0, 16);
+  jugOn(p, -0.01, 0.03, 0, M.porcelain, 3);
+});
+
+/** writing set: leather blotter, brass inkstand with two wells and a pen, letters */
+export const writingSet = def('writingSet', [0.5, 0.36, 0.1], (p) => {
+  p.bb(M.leatherGreen, 0.3, 0.008, 0.46, 0.02, 0, 0.0, 0.003); p.b(M.paper, 0.26, 0.003, 0.38, 0.02, 0.008, 0.0);
+  p.bb(M.brass, 0.1, 0.012, 0.2, -0.12, 0, 0.0, 0.004);
+  for (const s of [-1, 1]) { p.lathe(M.glass, [[0, 0], [0.025, 0], [0.027, 0.035], [0.013, 0.045], [0, 0.045]], -0.12, 0.012, s * 0.05, 8); p.lathe(M.brass, [[0, 0], [0.015, 0], [0.011, 0.01], [0, 0.014]], -0.12, 0.057, s * 0.05, 8); }
+  const pen = p.cz(K.ebony ?? M.woodDark, 0.004, 0.15, -0.09, 0.016, 0, 6); pen.rotation.y = 0.15;
+  for (let i = 0; i < 2; i++) p.ab(AT.paper, 0.14, 0.003, 0.2, 0.06 + i * 0.015, 0.011 + i * 0.003, 0.08 - i * 0.03).rotation.y = 0.15 + i * 0.3; // letters
+});

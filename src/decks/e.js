@@ -3,8 +3,10 @@
 // first-class staterooms, aft of it second class. Forward and aft ends: third class and crew. Eleven watertight
 // bulkheads with doors where they cross the corridors.
 import { DECK_Y } from '../core/constants.js';
-import { buildDeckShell, bulkhead, createDeckPlan, basinSmall, bench, showerBath, trunk, piano, locker, bunkCrew, workbench, shelves } from '../interior/kit.js';
-import { scotlandRoadDetails, grandLobbyDetails } from './e-details.js';
+import { buildDeckShell, bulkhead, createDeckPlan, basinSmall, bench, showerBath, trunk, piano, locker, bunkCrew, workbench, shelves, PRESETS } from '../interior/kit.js';
+import { scotlandRoadDetails, grandLobbyDetails, musiciansExtras } from './e-details.js';
+import { dormitoryPlus, fineLv } from './f-util.js';
+import { crewMess } from './c-hero.js';
 
 const deck = 'E';
 // longitudinal lines (wall centre lines, z)
@@ -24,12 +26,15 @@ function washroom(ctx) {
   ctx.fit(showerBath(), ['left:lo', 'right:lo', 'left:hi']);
   ctx.fit(bench({ w: Math.min(1.6, ctx.D - 1.4), back: false }), ['right:hi', 'left:hi'], { collide: false });
 }
+// engineers' mess: the kit's mess, laid for a meal (teapots, bread) from fine level 0
+function engMess(ctx) { if (fineLv() < 0) { ctx.opts = { set: true }; PRESETS.mess(ctx); } else crewMess(ctx); }
 // the bandsmen's cabin: bunks, lockers, instrument trunks and an upright piano
 function musicians(ctx) {
   ctx.fit(bunkCrew(), ['right:hi']); ctx.fit(bunkCrew(), ['left:hi']); ctx.fit(bunkCrew(), ['far:mid']); ctx.fit(bunkCrew(), ['far:lo', 'far:hi']);
   ctx.fit(piano(), ['near:hi', 'left:lo', 'right:lo']);
   ctx.fit(locker({ n: 3 }), ['left:lo', 'right:lo', 'near:hi']);
   ctx.fit(trunk({ big: true }), ['right:lo', 'left:lo', 'far:hi']); ctx.fit(trunk(), ['right:mid', 'left:mid'], { collide: false });
+  musiciansExtras(ctx);
 }
 
 export async function build(world) {
@@ -87,14 +92,14 @@ export async function build(world) {
   await world.tick();
   gang('gang-heizer-f', 'Gang zum Matrosenlogis', 104, 108, -0.7, 0.7, { lamp: 'bulkhead' });
   await world.tick();
-  room('trimmer', 'Schlafsaal der Trimmer', 90, 95, -99, -0.7, 'dormitory', [dS(92.5)], CREW);
+  room('trimmer', 'Schlafsaal der Trimmer', 90, 95, -99, -0.7, dormitoryPlus, [dS(92.5)], CREW);
   await world.tick();
-  room('schmierer', 'Schlafsaal der Schmierer', 90, 95, 0.7, 99, 'dormitory', [dP(92.5)], CREW);
+  room('schmierer', 'Schlafsaal der Schmierer', 90, 95, 0.7, 99, dormitoryPlus, [dP(92.5)], CREW);
   await world.tick();
-  room('heizer-bb', 'Schlafsaal der Heizer (Backbord)', 95, 104, -99, -CH, 'dormitory', [dS(96.1)], { ...CREW, teleport: { name: 'Heizerlogis', group: 'Besatzung' },
+  room('heizer-bb', 'Schlafsaal der Heizer (Backbord)', 95, 104, -99, -CH, dormitoryPlus, [dS(96.1)], { ...CREW, teleport: { name: 'Heizerlogis', group: 'Besatzung' },
     info: { title: 'Heizer und Trimmer', text: 'Im Bug wohnten die Heizer, Trimmer und Schmierer – zusammen über 280 Mann, die in Wachen von vier Stunden die 29 Kessel versorgten. Zwei Wendeltreppen führten von ihren Unterkünften hinab in einen Tunnel, durch den sie die Kesselräume erreichten, ohne Passagierbereiche zu betreten. Die Trimmer schaufelten täglich rund 600 Tonnen Kohle aus den Bunkern vor die Feuer.' } });
   await world.tick();
-  room('heizer-stb', 'Schlafsaal der Heizer (Steuerbord)', 95, 104, CH, 99, 'dormitory', [dP(96.1)], CREW);
+  room('heizer-stb', 'Schlafsaal der Heizer (Steuerbord)', 95, 104, CH, 99, dormitoryPlus, [dP(96.1)], CREW);
   await world.tick();
   room('wc-heizer', 'WC der Heizer', 104, 108, -99, -0.7, 'wc', [dS(106)], { ...CREW, floor: 'tile' });
   await world.tick();
@@ -138,29 +143,29 @@ export async function build(world) {
 
   const GLORY = 'Die Stewards schliefen in großen Gemeinschaftsräumen mit eisernen Doppelkojen, die im Seemannsjargon „Glory Holes“ hießen. Bis zu 40 Mann teilten sich einen Raum ohne Tageslicht außer ein paar Bullaugen. Von den rund 420 Stewards und Küchenleuten der Titanic überlebten nur etwa 60.';
   const crewRooms = [
-    [59, 66, 'stewards-3', 'Schlafsaal der Stewards 3. Klasse', 'dormitory'],
+    [59, 66, 'stewards-3', 'Schlafsaal der Stewards 3. Klasse', dormitoryPlus],
     [54, 59, 'wasch-stewards-v', 'Waschraum und WC der Stewards (vorn)', 'wc', { floor: 'tile' }],
     [50, 54, 'obersteward-3', 'Kabine der Obersteward-Assistenten', { preset: 'cabinCrew', berths: 4 }],
-    [41, 50, 'glory-1', 'Schlafsaal der Speisesaalstewards 1. Klasse', 'dormitory', { teleport: { name: 'Stewardunterkünfte', group: 'Besatzung' }, info: { title: 'Stewardunterkünfte – das „Glory Hole“', text: GLORY } }],
-    [34, 41, 'glory-2', 'Schlafsaal der Speisesaalstewards 1. Klasse (II)', 'dormitory'],
-    [28, 34, 'bedroom-stewards', 'Schlafsaal der Kabinenstewards', 'dormitory'],
-    [19, 28, 'stewards-2', 'Schlafsaal der Speisesaalstewards 2. Klasse', 'dormitory'],
+    [41, 50, 'glory-1', 'Schlafsaal der Speisesaalstewards 1. Klasse', dormitoryPlus, { teleport: { name: 'Stewardunterkünfte', group: 'Besatzung' }, info: { title: 'Stewardunterkünfte – das „Glory Hole“', text: GLORY } }],
+    [34, 41, 'glory-2', 'Schlafsaal der Speisesaalstewards 1. Klasse (II)', dormitoryPlus],
+    [28, 34, 'bedroom-stewards', 'Schlafsaal der Kabinenstewards', dormitoryPlus],
+    [19, 28, 'stewards-2', 'Schlafsaal der Speisesaalstewards 2. Klasse', dormitoryPlus],
     [14, 19, 'wasch-stewards-m', 'Waschraum der Stewards', washroom, { floor: 'tile' }],
-    [6, 14, 'kellner', 'Schlafsaal der Kellner des À-la-carte-Restaurants', 'dormitory', { info: { title: 'Kellner des À-la-carte-Restaurants', text: 'Das Personal des À-la-carte-Restaurants auf dem B-Deck war nicht bei der White Star Line angestellt, sondern beim Londoner Gastronomen Luigi Gatti. Die überwiegend italienischen und französischen Kellner und Köche wohnten hier auf dem E-Deck. Von den rund 66 Angestellten des Restaurants überlebten nur drei.' } }],
-    [-2, 6, 'koeche', 'Schlafsaal der Köche', 'dormitory', { teleport: { name: 'Schlafsaal der Köche', group: 'Besatzung' } }],
-    [-9, -2, 'baecker', 'Schlafsaal der Bäcker', 'dormitory'],
-    [-16, -9, 'metzger', 'Schlafsaal der Metzger', 'dormitory'],
-    [-22, -16, 'kuechenjungen', 'Schlafsaal der Küchenjungen', 'dormitory'],
-    [-28, -22, 'tellerwaescher', 'Schlafsaal der Tellerwäscher', 'dormitory'],
+    [6, 14, 'kellner', 'Schlafsaal der Kellner des À-la-carte-Restaurants', dormitoryPlus, { info: { title: 'Kellner des À-la-carte-Restaurants', text: 'Das Personal des À-la-carte-Restaurants auf dem B-Deck war nicht bei der White Star Line angestellt, sondern beim Londoner Gastronomen Luigi Gatti. Die überwiegend italienischen und französischen Kellner und Köche wohnten hier auf dem E-Deck. Von den rund 66 Angestellten des Restaurants überlebten nur drei.' } }],
+    [-2, 6, 'koeche', 'Schlafsaal der Köche', dormitoryPlus, { teleport: { name: 'Schlafsaal der Köche', group: 'Besatzung' } }],
+    [-9, -2, 'baecker', 'Schlafsaal der Bäcker', dormitoryPlus],
+    [-16, -9, 'metzger', 'Schlafsaal der Metzger', dormitoryPlus],
+    [-22, -16, 'kuechenjungen', 'Schlafsaal der Küchenjungen', dormitoryPlus],
+    [-28, -22, 'tellerwaescher', 'Schlafsaal der Tellerwäscher', dormitoryPlus],
     [-33, -28, 'wc-crew', 'WC und Waschraum der Küchenmannschaft', 'wc', { floor: 'tile' }],
     [-38, -33, 'schmierer-achtern', 'Kabine der Maschinenschmierer', { preset: 'cabinCrew', berths: 8 }],
-    [-48, -38, 'ing-messe', 'Ingenieursmesse', { preset: 'mess', set: true }, { wall: 'pine', teleport: { name: 'Ingenieursmesse', group: 'Besatzung' },
+    [-48, -38, 'ing-messe', 'Ingenieursmesse', engMess, { wall: 'pine', teleport: { name: 'Ingenieursmesse', group: 'Besatzung' },
       info: { title: 'Ingenieursmesse', text: 'Die 25 Ingenieure der Titanic unter Chefingenieur Joseph Bell aßen in ihrer eigenen Messe nahe dem Maschinenschacht. Sie und die Elektriker hielten bis zuletzt Pumpen und Dynamos in Gang, damit das Schiff Licht und Funkstrom behielt. Keiner der Ingenieure überlebte den Untergang.' } }],
     [-53, -48, 'ing-pantry', 'Pantry der Ingenieursmesse', 'pantry', { floor: 'tile' }],
     [-58, -53, 'musiker', 'Musikerkabine', musicians, { teleport: { name: 'Musikerkabine', group: 'Besatzung' },
       info: { title: 'Musikerkabine', text: 'Die acht Musiker der Titanic reisten als Passagiere der Zweiten Klasse, wohnten aber in einer eigenen Kabine an der Scotland Road mit einem Nebenraum für ihre Instrumente. Unter Kapellmeister Wallace Hartley spielten sie während der Evakuierung weiter, um die Passagiere zu beruhigen. Keiner von ihnen überlebte.' } }],
-    [-64, -58, 'glory-3', 'Schlafsaal der Stewards 2. Klasse', 'dormitory'],
-    [-70, -64, 'glory-4', 'Schlafsaal der Stewards 3. Klasse (achtern)', 'dormitory'],
+    [-64, -58, 'glory-3', 'Schlafsaal der Stewards 2. Klasse', dormitoryPlus],
+    [-70, -64, 'glory-4', 'Schlafsaal der Stewards 3. Klasse (achtern)', dormitoryPlus],
   ];
   await world.tick();
   for (const [x0, x1, id, name, furnish, o] of crewRooms) room(id, name, x0, x1, -99, SR0, furnish, [dS((x0 + x1) / 2, { style: 'steel' })], { ...CREW, ...o });

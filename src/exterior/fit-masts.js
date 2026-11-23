@@ -3,6 +3,7 @@ import { mats, canvasTexture } from '../core/materials.js';
 import { box } from '../core/geo.js';
 import { FUNNELS, MASTS, DECK_Y, SHIP } from '../core/constants.js';
 import { BY, RY, cyl, vcyl, ball, lathe, Wires, edge, innerCylGeo } from './fit-util.js';
+import { TIER } from '../core/tier.js';
 import { Inst, merge, boxG, cylG, bottleScrewGeo as BSCREW, rodGeo as ROD, shackleGeo as SHACKLE } from './inst.js';
 
 let _block = null, _sheave = null, _cleat = null;
@@ -51,7 +52,7 @@ ensignMat.name = 'fitBlueEnsign';
 
 /** Waving flag: hoist at the local origin edge, streaming towards -x (aft). */
 function makeFlag(mat, w, h, x, y, z, phase) {
-  const nx = 36, ny = 14;
+  const lo = TIER.fine <= 1, nx = lo ? 18 : 36, ny = lo ? 7 : 14;
   const geo = new THREE.PlaneGeometry(w, h, nx, ny);
   const p = geo.attributes.position, uv = geo.attributes.uv;
   const u = new Float32Array(p.count), by = new Float32Array(p.count);
@@ -89,12 +90,13 @@ export function buildMasts(world, parent) {
   const steel = mats.funnelBuff;          // masts were painted a buff "mast colour"
   const P = (M, y) => M.x - (y - M.baseY) * TAN;
 
+  const ms = 16; // (rung legs are fitted to the 16-gon)
   const lowerMast = (M, yTop, r0, r1) => {
-    root.add(cyl(steel, M.x, M.baseY - 0.05, 0, P(M, yTop), yTop, 0, r0, 16, r1, true));
+    root.add(cyl(steel, M.x, M.baseY - 0.05, 0, P(M, yTop), yTop, 0, r0, ms, r1, true));
     // riveted strake bands
     for (let y = M.baseY + 3; y < yTop - 1; y += 3) {
       const r = r0 + ((r1 - r0) * (y - M.baseY)) / (yTop - M.baseY) + 0.012;
-      root.add(cyl(steel, P(M, y - 0.07), y - 0.07, 0, P(M, y + 0.07), y + 0.07, 0, r, 16));
+      root.add(cyl(steel, P(M, y - 0.07), y - 0.07, 0, P(M, y + 0.07), y + 0.07, 0, r, ms));
     }
     // mast foot: partner ring, wedges and collar
     root.add(vcyl(mats.steelDark, M.x, M.baseY, 0, 0.35, r0 + 0.22, 12, r0 + 0.1));

@@ -594,3 +594,36 @@ export function statue(parent, x, y, z, rotY = 0, scale = 0.9, mat = mats.marble
   parent.add(g);
   return g;
 }
+
+// ------------------------------------------------------------------ carved ornament (fine detail levels; shared by decks boat, A, B)
+
+/** carved festoon (swag of husks and leaves between two rosettes, ribbon tails) – wall mounted, origin = top centre, faces +x */
+export const festoon = def('abFestoon', (o) => [o.w ?? 0.6, 0.05, (o.drop ?? 0.1) + 0.08], (p, o) => {
+  const w = o.w ?? 0.6, dr = o.drop ?? 0.1, m = matOf(o.mat ?? 'gold'), pts = [], rad = [];
+  for (let i = 0; i <= 10; i++) { const t = i / 10, s = Math.sin(Math.PI * t); pts.push([0.01 + 0.012 * s, -0.025 - dr * s, -w / 2 + 0.03 + (w - 0.06) * t]); rad.push(0.008 + 0.014 * s); }
+  p.loft(m, pts, rad, 6);
+  for (const t of [0.3, 0.5, 0.7]) { const s = Math.sin(Math.PI * t); p.s(m, 0.022, 0.024 + 0.012 * s, -0.025 - dr * s, -w / 2 + 0.03 + (w - 0.06) * t, 0.45, 0.9, 1.2); }
+  for (const s of [-1, 1]) {
+    p.s(m, 0.022, 0.008, -0.02, s * (w / 2 - 0.02), 0.45, 1, 1);
+    const r1 = p.b(m, 0.004, 0.09, 0.012, 0.008, -0.12, s * (w / 2 - 0.01)); r1.rotation.x = s * 0.18;
+  }
+});
+/** carved console bracket (modillion) under a cornice – wall mounted, origin = top on the wall, faces +x */
+export const modillion = def('abModillion', (o) => [0.05, 0.08, 0.1], (p, o) => {
+  const m = matOf(o.mat ?? 'oak');
+  p.extZ(m, [[0, 0], [0.075, 0], [0.075, -0.018], [0.058, -0.024], [0.046, -0.04], [0.05, -0.058], [0.036, -0.082], [0.014, -0.09], [0, -0.09]], 0.045, 0, 0, 0, 0);
+  if (o.leaf) p.s(matOf(o.leaf), 0.02, 0.05, -0.05, 0, 0.5, 1.2, 0.9);
+});
+/**
+ * Ornament run along a wall face w ({axis, c, n}): one prop every `pitch` from a..e (skip intervals left out), mounted at
+ * height y (world) and `off` in front of the face. put(prop, x, z, rotY, y) does the placing (instancing).
+ */
+export function ornRun(w, a, e, pitch, make, put, y, off = 0, skip = []) {
+  for (const [p, q] of runs(a, e, skip, pitch * 0.6)) {
+    const n = Math.max(1, Math.floor((q - p) / pitch)), st = (q - p) / n;
+    for (let i = 0; i < n; i++) {
+      const s = p + st * (i + 0.5), c = w.c + w.n * off;
+      put(make(), w.axis === 'x' ? s : c, w.axis === 'x' ? c : s, w.axis === 'x' ? faceDir(0, w.n) : faceDir(w.n, 0), y);
+    }
+  }
+}

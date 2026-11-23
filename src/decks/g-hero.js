@@ -6,7 +6,7 @@ import {
   kitMats, pipe, squashMarkings, bench, locker, tableRect, stool, sackPile, desk, chairDining, safe, shelves, crate, crateStack,
   barrel, trunk, luggagePile, suitcase, tankV, clockWall, mirrorWall, basinSmall, sack, def, workbench, hatBox, notice,
 } from '../interior/kit.js';
-import { meatMat, fatMat, iceMat, corkMat } from './f-util.js';
+import { meatMat, fatMat, iceMat, corkMat, fineLv, cgLetters, cgLedger, cgTowelHooks, cgBoots, cgMenuBoard, cgMopBucket, hangFree } from './f-util.js';
 import { gratingMat } from './tank-lib.js';
 
 function rng(seed) { let s = (seed * 2654435761) >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
@@ -131,6 +131,24 @@ const waxBench = def('ghWaxBench', [1.6, 0.7, 1.05], (p) => {
   p.b(mats.brass, 0.02, 0.02, 0.3, 0, ty + 0.15, 0.52);
   for (let i = 0; i < 4; i++) p.c(mats.brass, 0.015 + i * 0.004, 0.02 + i * 0.006, -0.18, ty, 0.42 + i * 0.05, 8);
 });
+/** canvas mail basket on castors with bags and loose letters (front +x) */
+const mailCart = def('ghMailCart', [0.75, 1.1, 0.95], (p) => {
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) { p.c(mats.iron, 0.012, 0.75, sx * 0.33, 0.06, sz * 0.5, 6); p.c(mats.rubber, 0.04, 0.03, sx * 0.33, 0.0, sz * 0.5, 8).rotation.x = Math.PI / 2; p.b(mats.iron, 0.04, 0.06, 0.03, sx * 0.33, 0.02, sz * 0.5); }
+  p.b(mats.oak, 0.66, 0.02, 1.0, 0, 0.18, 0);
+  for (const s of [-1, 1]) { p.b(mats.canvas, 0.66, 0.6, 0.006, 0, 0.2, s * 0.5); p.b(mats.canvas, 0.006, 0.6, 1.0, s * 0.33, 0.2, 0); }
+  for (const y of [0.8]) { p.cz(mats.iron, 0.012, 1.0, 0.33, y, 0, 6); p.cz(mats.iron, 0.012, 1.0, -0.33, y, 0, 6); p.cx(mats.iron, 0.012, 0.66, 0, y, 0.5, 6); p.cx(mats.iron, 0.012, 0.66, 0, y, -0.5, 6); }
+  for (const s of [-1, 1]) { const g = mailBag({ lie: true }); for (const m of g.children) p.add(m.geometry, m.material, 0.0, 0.2, s * 0.2, 0, 0, 0); }
+  for (let i = 0; i < 4; i++) p.b(mats.paper, 0.16, 0.004, 0.11, -0.1 + i * 0.07, 0.63, -0.1 + i * 0.08).rotation.y = i * 0.5;
+  p.cx(mats.iron, 0.014, 0.3, 0.5, 0.82, 0, 6); for (const s of [-1, 1]) p.b(mats.iron, 0.2, 0.02, 0.02, 0.43, 0.81, s * 0.14);
+});
+/** squash racquet press with a racquet, a towel and a ball tin on the bench (same origin as the bench, w 1.6) */
+const squashKit = def('ghSquashKit', [0.5, 1.6, 0.6], (p) => {
+  p.bb(mats.linen, 0.3, 0.04, 0.36, 0, 0.435, -0.45, 0.01);
+  p.c(mats.steel, 0.04, 0.09, 0.05, 0.435, 0.1, 8); p.c(kitMats.fireRed, 0.041, 0.03, 0.05, 0.505, 0.1, 8);
+  p.b(mats.oak, 0.26, 0.02, 0.24, 0, 0.435, 0.45); p.b(mats.oak, 0.26, 0.02, 0.24, 0, 0.475, 0.45);
+  p.t(mats.oak, 0.1, 0.008, 0, 0.465, 0.5, 'y', 12, 3); p.b(mats.oak, 0.03, 0.02, 0.38, 0, 0.455, 0.25);
+});
+
 /** platform weighing machine (beam scale) for mail bags */
 const platformScale = def('ghScale', [0.8, 0.8, 1.35], (p) => {
   p.bb(mats.iron, 0.78, 0.12, 0.78, 0, 0, 0, 0.01); p.b(mats.steelFloor, 0.7, 0.01, 0.7, 0, 0.12, 0);
@@ -163,7 +181,7 @@ export function squashCourt(ctx) {
   b.box(kitMats.slate, s.x0, Y + 1.5, s.z0 + 0.6, s.x0 + 0.03, Y + 2.0, s.z0 + 1.4, 'X');
   b.box(mats.oak, s.x0, Y + 1.48, s.z0 + 0.58, s.x0 + 0.04, Y + 2.02, s.z0 + 1.42, 'yY');
   for (let i = 0; i < 4; i++) b.box(mats.paper, s.x0 + 0.031, Y + 1.62 + (i % 2) * 0.18, s.z0 + 0.75 + Math.floor(i / 2) * 0.4, s.x0 + 0.033, Y + 1.72 + (i % 2) * 0.18, s.z0 + 0.85 + Math.floor(i / 2) * 0.4, 'X');
-  ctx.fit(bench({ w: 1.6, back: false, mat: 'oak' }), ['near:hi', 'near:lo'], { collide: false });
+  if (ctx.fit(bench({ w: 1.6, back: false, mat: 'oak' }), ['near:hi', 'near:lo'], { collide: false }) && fineLv() >= 0) ctx.attach(squashKit(), 0, 0, { y: 0.001 });
   for (let k = 0; k < 3; k++) {
     const z = s.z1 - 0.4 - k * 0.14;
     b.box(mats.oak, s.x0 + 0.02, Y + 0.45, z, s.x0 + 0.04, Y + 1.0, z + 0.025, 'xXzZ');
@@ -174,7 +192,11 @@ export function squashCourt(ctx) {
   for (let i = 0; i < 4; i++) b.box(mats.rubber, s.x0 + 0.1 + (i % 2) * 0.1, Y + 0.25, s.z1 - 1.25 + Math.floor(i / 2) * 0.12, s.x0 + 0.14 + (i % 2) * 0.1, Y + 0.29, s.z1 - 1.21 + Math.floor(i / 2) * 0.12);
 }
 export function squashChanging(ctx) {
-  ctx.fit(locker({ n: 3, mat: 'oak' }), ['far:mid', 'left:hi']); ctx.fit(bench({ w: 1.6, back: false, mat: 'oak' }), ['left:mid', 'right:mid'], { collide: false });
+  ctx.fit(locker({ n: 3, mat: 'oak' }), ['far:mid', 'left:hi']);
+  if (ctx.fit(bench({ w: 1.6, back: false, mat: 'oak' }), ['left:mid', 'right:mid'], { collide: false }) && fineLv() >= 0) {
+    ctx.mount(cgTowelHooks({ w: 1.2, mat: 'oak', v: 3 }), ctx.last.wall, ctx.last.pos, 1.78);
+    if (fineLv() >= 1) ctx.attach(cgBoots({ brown: true }), 0.32, 0.4, { y: 0.001, turn: 0.3 });
+  }
   ctx.fit(basinSmall(), ['right:lo', 'near:hi'], { collide: false }); ctx.mount(mirrorWall({ w: 0.5, h: 0.7 }), 'far', ctx.W * 0.25, 1.6);
 }
 /** sea post office: pigeon-hole frames, sorting tables with letters, stencilled mail bags, sealing-wax bench, scales,
@@ -207,12 +229,15 @@ export function postOffice(ctx) {
   }
   ctx.grid(2.6, 2.0, (u, v, i) => {
     if (!ctx.put(tableRect({ w: 1.8, d: 0.8, mat: 'oak', items: i % 2 === 0 }), u, v, 'in')) return;
+    if (fineLv() >= 0) { if (i % 2) ctx.attach(cgLetters({ v: i }), 0.05, -0.35, { y: 0.75, turn: 0.2 }); else ctx.attach(cgLetters({ v: i + 7 }), 0.05, 0.62, { y: 0.75, turn: -0.3 }); }
+    if (fineLv() >= 1 && i % 2) ctx.attach(cgLedger({ open: true, v: i }), -0.08, 0.35, { y: 0.75, turn: Math.PI / 2 });
     ctx.put(stool({ mat: 'oak', seat: 'oak' }), u - 0.5, v - 0.62, 'in', { collide: false }); ctx.put(stool({ mat: 'oak', seat: 'oak' }), u + 0.5, v + 0.62, 'out', { collide: false });
     if (i % 2 === 0) ctx.put(bagPile({ v: i + 1 }), u + 1.25, v, 'in');
   }, 0.9);
   ctx.fit(waxBench(), ['near:hi', 'right:lo', 'left:hi']);
   ctx.fit(platformScale(), ['near:mid', 'right:mid']);
-  ctx.fit(desk({ w: 1.2, mat: 'oak' }), ['near:hi', 'right:hi']);
+  if (ctx.fit(desk({ w: 1.2, mat: 'oak' }), ['near:hi', 'right:hi']) && fineLv() >= 0) { ctx.attach(cgLedger({ v: 1 }), 0.15, -0.42, { y: 0.773 }); ctx.attach(cgLedger({ v: 4 }), 0.15, -0.42, { y: 0.818, turn: -0.1 }); }
+  if (fineLv() >= 1) ctx.fit(mailCart(), ['right:mid', 'left:mid', 'near:mid', 'right:lo']);
   for (const p of ['near:mid', 'left:mid', 'right:lo']) ctx.fit(bagPile({ v: p.length }), [p]);
   ctx.mount(clockWall(), 'near', ctx.W * 0.6, 2.0);
   ctx.mount(notice(), 'near', ctx.W * 0.45, 1.5);

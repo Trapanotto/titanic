@@ -5,7 +5,7 @@ import { mats as M } from '../core/materials.js';
 import { def, kitMats as K, matOf } from '../interior/kit.js';
 import { AT } from '../interior/batch.js';
 import * as G from '../interior/geom.js';
-import { turnedLeg, cabriole, cushion, drawer, cabDoor, knob, mattress, pillowAt, blanket, rngOf, papers, bookRow } from '../interior/props-core.js';
+import { turnedLeg, cabriole, cushion, drawer, cabDoor, knob, mattress, pillowAt, blanket, rngOf, papers, bookRow, SHAPES } from '../interior/props-core.js';
 import { BM } from './bc-util.js';
 
 const sphere = (r, a = 8, b = 6) => new THREE.SphereGeometry(r, a, b);
@@ -422,4 +422,111 @@ export const bcTelemotor = def('bcTelemotor', [1.0, 0.6, 1.3], (p) => {
   p.cx(M.brass, 0.08, 0.04, 0.22, 1.05, 0, 12);
   const dial = new THREE.CircleGeometry(0.065, 12); dial.rotateY(Math.PI / 2); // upright, unmirrored gauge face towards +x
   p.add(dial, K.gaugeFace, 0.241, 1.05, 0);
+});
+
+// ============================================================ fine clutter (shared by the hero rooms of the boat deck, A and B)
+// Placed only from the detail level that can afford them (TIER.fine, see docs/CONTRACT.md "Detail levels").
+
+/** gilt-bronze three-light candelabrum of a mantel garniture – origin on the shelf */
+export const bcCandelabrum = def('bcCandelabrum', [0.2, 0.2, 0.44], (p) => {
+  const g = M.gold;
+  p.lathe(g, [[0, 0], [0.06, 0], [0.06, 0.012], [0.04, 0.03], [0.02, 0.05], [0.026, 0.09], [0.012, 0.12], [0.012, 0.26], [0.022, 0.28], [0.01, 0.3], [0, 0.3]], 0, 0, 0, 12);
+  for (const s of [-1, 1]) {
+    p.loft(g, [[0, 0.26, 0], [0, 0.25, s * 0.05], [0, 0.29, s * 0.09], [0, 0.33, s * 0.09]], 0.006, 4, false);
+    p.lathe(g, [[0, 0], [0.018, 0], [0.022, 0.014], [0, 0.016]], 0, 0.33, s * 0.09, 8);
+    p.ab(AT.ivory, 0.016, 0.08, 0.016, 0, 0.344, s * 0.09);
+  }
+  p.lathe(g, [[0, 0], [0.018, 0], [0.022, 0.014], [0, 0.016]], 0, 0.3, 0, 8); p.ab(AT.ivory, 0.016, 0.1, 0.016, 0, 0.314, 0);
+});
+/** gilt-bronze lidded urn (garniture of the Louis rooms) – origin on the shelf */
+export const bcUrn = def('bcUrn', [0.16, 0.16, 0.34], (p) => {
+  p.lathe(M.gold, [[0, 0], [0.05, 0], [0.05, 0.02], [0.03, 0.03], [0.022, 0.06], [0.05, 0.09], [0.068, 0.15], [0.06, 0.21], [0.04, 0.24], [0.046, 0.25], [0.03, 0.27], [0.012, 0.3], [0.016, 0.32], [0, 0.335]], 0, 0, 0, 12);
+  for (const s of [-1, 1]) p.t(M.gold, 0.025, 0.005, 0, 0.2, s * 0.065, 'x', 8, 3);
+});
+/** brass helmet coal scuttle with swing handle, filled with coal – origin on the hearth */
+export const bcScuttle = def('bcScuttle', [0.3, 0.24, 0.34], (p) => {
+  const b = M.brass;
+  p.lathe(b, [[0, 0], [0.08, 0], [0.09, 0.02], [0.07, 0.04], [0.09, 0.06], [0.11, 0.16], [0.104, 0.166], [0, 0.15]], 0, 0, 0, 12);
+  const lip = p.lathe(b, [[0, 0], [0.06, 0], [0.05, 0.07], [0, 0.06]], 0.09, 0.12, 0, 10); lip.rotation.z = -0.9; // pouring lip
+  p.tube(b, [[-0.02, 0.16, -0.1], [-0.04, 0.27, -0.06], [-0.04, 0.3, 0], [-0.04, 0.27, 0.06], [-0.02, 0.16, 0.1]], 0.007, 8, 4);
+  for (let i = 0; i < 5; i++) p.bb(M.coal, 0.05, 0.035, 0.05, -0.04 + (i % 3) * 0.035, 0.135, -0.05 + i * 0.025, 0.01).rotation.y = i;
+});
+/** small flower vase (table centrepiece); v = colour mix, silver = plated vase */
+export const bcVase = def('bcVase', [0.14, 0.14, 0.24], (p, o) => {
+  const v = o.v ?? 0, cells = [[AT.flowerRed, AT.pink], [AT.flowerWhite, AT.flowerYellow], [AT.pink, AT.flowerWhite], [AT.rose, AT.flowerYellow]][v % 4];
+  p.lathe(o.silver ? M.chrome : M.glass, [[0, 0], [0.03, 0], [0.035, 0.02], [0.022, 0.07], [0.015, 0.1], [0.024, 0.12], [0.02, 0.12], [0, 0.11]], 0, 0, 0, 8);
+  const fl = sphere(0.022, 6, 4), lf = sphere(0.02, 5, 3);
+  for (let i = 0; i < 7; i++) { const a = i * 0.9 + v, rr = i < 5 ? 0.035 : 0.0; p.ag(cells[i % 2], fl.clone(), Math.cos(a) * rr, 0.15 + (i % 3) * 0.016 + (i >= 5 ? 0.03 : 0), Math.sin(a) * rr); }
+  for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.5; p.ag(AT.leafDark, lf.clone(), Math.cos(a) * 0.05, 0.125, Math.sin(a) * 0.05); }
+});
+/** smoker's clutter on a table: brass ashtray with a cigar, tumbler of whisky, matchbox; v 0..3 */
+export const bcSmokerSet = def('bcSmokerSet', [0.34, 0.34, 0.12], (p, o) => {
+  const v = o.v ?? 0;
+  p.lathe(M.brass, [[0, 0], [0.06, 0], [0.066, 0.016], [0.058, 0.024], [0.05, 0.012], [0, 0.01]], 0, 0, 0, 12);
+  p.cz(M.leather, 0.008, 0.11, 0.03, 0.022, 0.02, 6).rotation.y = 0.5;
+  if (v !== 1) { p.lathe(M.glass, SHAPES.TUMBLER, -0.12, 0, 0.1, 8); p.alathe(AT.amber, [[0, 0.006], [0.028, 0.006], [0.03, 0.04], [0, 0.04]], -0.12, 0, 0.1, 8); }
+  if (v === 1 || v === 3) p.ab(AT.yellow, 0.05, 0.015, 0.035, 0.1, 0, -0.11).rotation.y = 0.4;
+  if (v === 2) { const n = p.ab(AT.paper, 0.24, 0.008, 0.3, 0.02, 0, -0.04); n.rotation.y = 0.3; }
+  if (v === 3) p.lathe(M.glass, SHAPES.TUMBLER, -0.06, 0, -0.13, 8);
+});
+/** coffee for two: cups on saucers, sugar bowl, spoons (café tables) */
+export const bcCoffee = def('bcCoffee', [0.4, 0.4, 0.1], (p) => {
+  for (const s of [-1, 1]) {
+    const x = s * 0.13, z = s * 0.05;
+    p.lathe(M.porcelain, [[0, 0], [0.06, 0], [0.065, 0.01], [0, 0.008]], x, 0, z, 10);
+    p.lathe(M.porcelain, SHAPES.CUP, x, 0.008, z, 8);
+    p.t(M.porcelain, 0.016, 0.004, x, 0.045, z + s * 0.045, 'x', 8, 3);
+    p.b(M.chrome, 0.08, 0.003, 0.01, x, 0.01, z - s * 0.05).rotation.y = 0.3;
+  }
+  p.lathe(M.chrome, [[0, 0], [0.025, 0], [0.04, 0.03], [0.038, 0.05], [0.02, 0.055], [0.006, 0.07], [0, 0.072]], 0.0, 0, -0.08, 10);
+});
+/** menu card in a silver holder */
+export const bcMenu = def('bcMenu', [0.1, 0.06, 0.16], (p) => {
+  p.bb(M.chrome, 0.04, 0.012, 0.08, 0, 0, 0, 0.003);
+  const c = p.ab(AT.label, 0.004, 0.14, 0.09, 0, 0.008, 0); c.rotation.z = 0.12;
+  p.ab(AT.gilt, 0.002, 0.02, 0.07, 0.004, 0.13, 0).rotation.z = 0.12;
+});
+/** fern in a jardinière on a turned stand (palm courts, promenades); o.mat = stand */
+export const bcFernStand = def('bcFernStand', [0.5, 0.5, 1.25], (p, o) => {
+  const m = matOf(o.mat ?? 'wicker');
+  p.lathe(m, [[0, 0], [0.18, 0], [0.16, 0.03], [0.04, 0.08], [0.035, 0.6], [0.05, 0.65], [0.12, 0.7], [0.14, 0.72], [0, 0.72]], 0, 0, 0, 10);
+  p.lathe(M.porcelain, [[0, 0.72], [0.09, 0.72], [0.14, 0.78], [0.155, 0.88], [0.14, 0.9], [0, 0.88]], 0, 0, 0, 12);
+  p.ag(AT.soil, G.lathe([[0, 0], [0.135, 0], [0, 0.01]], 10), 0, 0.875, 0);
+  const polys = [], r = rngOf(o.v ?? 7);
+  for (let f = 0; f < 11; f++) {
+    const a = (f / 11) * Math.PI * 2 + r() * 0.4, R = 0.32 + r() * 0.14, lift = 0.18 + r() * 0.12, ca = Math.cos(a), sa = Math.sin(a);
+    const P = (t) => [ca * R * t, 0.88 + lift * Math.sin(Math.PI * t * 0.75) - 0.25 * t * t, sa * R * t];
+    const N = [-sa, 0, ca];
+    for (let k = 0; k < 7; k++) {
+      const t0 = 0.05 + k / 7.6, t1 = t0 + 1 / 7.6, A = P(t0), B = P(t1), w = 0.07 * (1 - t0 * 0.8);
+      for (const s of [-1, 1]) polys.push([A, B, [A[0] + N[0] * s * w + (B[0] - A[0]) * 0.8, A[1] - 0.012, A[2] + N[2] * s * w + (B[2] - A[2]) * 0.8]]);
+    }
+  }
+  p.add(G.polysGeo(polys), K.ivy);
+});
+/** newspaper stand: oak rack with papers hung over wooden sticks (smoking rooms) */
+export const bcNewsRack = def('bcNewsRack', [0.7, 0.4, 1.3], (p) => {
+  const m = M.oak;
+  for (const s of [-1, 1]) {
+    p.bb(m, 0.36, 0.04, 0.05, 0, 0, s * 0.32, 0.006); p.bb(m, 0.04, 1.25, 0.04, 0, 0.04, s * 0.32, 0.006);
+    p.lathe(m, [[0, 0], [0.025, 0], [0.02, 0.03], [0, 0.05]], 0, 1.29, s * 0.32, 8);
+    p.bb(m, 0.3, 0.03, 0.03, 0, 1.11, s * 0.3, 0.005); // arms carrying the sticks
+  }
+  for (let i = 0; i < 4; i++) {
+    const x = (i - 1.5) * 0.07;
+    p.cz(m, 0.009, 0.66, x, 1.15, 0, 6);
+    p.ab(i % 2 ? AT.paper : AT.chalk, 0.006, 0.44, 0.34, x + 0.01, 0.71, (i % 2 - 0.5) * 0.12);
+  }
+});
+/** bead row: n small gilt beads along local z, spacing 0.1 (egg-and-dart effect under mouldings) – origin = centre */
+export const bcBeadRow = def('bcBeadRow', (o) => [0.1 * (o.n ?? 10), 0.05, 0.05], (p, o) => {
+  const n = o.n ?? 10;
+  for (let i = 0; i < n; i++) { const z = (i - (n - 1) / 2) * 0.1; p.s(M.gold, 0.022, 0, 0, z, 0.6, 1.25, 0.9); p.b(M.gold, 0.012, 0.03, 0.012, 0, -0.015, z + 0.05); }
+});
+/** silver champagne cooler on a table with a bottle on ice */
+export const bcCooler = def('bcCooler', [0.2, 0.2, 0.4], (p) => {
+  p.lathe(M.chrome, [[0, 0], [0.06, 0], [0.065, 0.02], [0.08, 0.2], [0.086, 0.21], [0.075, 0.205], [0, 0.18]], 0, 0, 0, 12);
+  for (const s of [-1, 1]) p.t(M.chrome, 0.022, 0.004, 0, 0.17, s * 0.085, 'x', 8, 3);
+  p.alathe(AT.bottleGreen, [[0, 0], [0.038, 0], [0.038, 0.17], [0.015, 0.23], [0.012, 0.3], [0, 0.3]], 0.0, 0.05, 0.0, 8).rotation.z = 0.25;
+  p.ab(AT.gilt, 0.03, 0.04, 0.03, 0.07, 0.3, 0).rotation.z = 0.25;
 });

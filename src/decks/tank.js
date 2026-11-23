@@ -99,12 +99,13 @@ export async function build(world) {
   const b = new Batch(world, DECK);
   const inst = new Instancer(world);
   await world.tick();
-  buildBoilerRooms(world, b, inst);
+  await buildBoilerRooms(world, inst);
   await world.tick();
   for (const x of [66, ...BOILER_ROOMS.map((r) => r.x0).filter((x) => x > -22), -22]) wtGear(world, b, x);
   await world.tick();
   boilerAccess(world, b);
-  const anim = buildEngineSpaces(world, b);
+  await world.tick();
+  const anim = await buildEngineSpaces(world);
 
   await world.tick();
   // ============================================================== rooms (registry, teleports, infos) + low spaces
@@ -192,7 +193,7 @@ export async function build(world) {
   for (const s of [-1, 1]) place2(world, ladder({ h: HLOW - 0.2 }), -102.5, s * 2.9, s > 0 ? Math.PI / 2 : -Math.PI / 2);
 
   await world.tick();
-  inst.flush();
+  await inst.flushAsync();
   await world.tick();
   b.flush();
 

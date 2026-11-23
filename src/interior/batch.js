@@ -5,6 +5,10 @@ import { mats, canvasTexture } from '../core/materials.js';
 import {
   DECK_Y, DECK_SEGMENTS, ZONE_LEN, hullHalfWidth, A_HOUSE, BOAT_HOUSES, CASINGS,
 } from '../core/constants.js';
+import { TIER } from '../core/tier.js';
+
+/** Fine-detail level used by the kit's architecture and clutter (TIER.fine 0..3, read at build time). */
+export function kitFine() { return TIER.fine; }
 
 /** Distance between the outer hull surface and the inner face of the hull lining (decks C and below). */
 export const LINING_INSET = 0.15;
@@ -383,12 +387,16 @@ export function matOf(m, fallback = mats.paintWhite) {
  * Collects quads/polygons and creates ONE mesh per (zone, material) on flush().
  * Vertical faces get UVs (horizontal metres, y - yRef), horizontal faces (x, z) – all in metres.
  */
+const _pv = new THREE.Vector3(), _pn = new THREE.Vector3(), _pm = new THREE.Matrix4(), _nm = new THREE.Matrix3();
+
 export class Batch {
   constructor(world, deck, yRef = DECK_Y[deck]) { this.world = world; this.deck = deck; this.yRef = yRef; this.buckets = new Map(); this.tris = 0; }
 
   _bucket(mat, zx) {
     const zi = Math.floor(zx / ZONE_LEN), k = zi + '|' + mat.uuid;
     let b = this.buckets.get(k);
+    // a full bucket is parked under its own key: keeps every flush step short (time slicing) – the zone bake merges them
+    if (b && b.pos.length > 150000) { this._full = (this._full ?? 0) + 1; this.buckets.set(k + '#' + this._full, b); b = null; }
     if (!b) this.buckets.set(k, (b = { mat, zi, pos: [], nor: [], uv: [], idx: [] }));
     return b;
   }
@@ -535,9 +543,51 @@ export class Batch {
     if (caps) { const A = [], B = []; for (let k = 0; k < n; k++) { A.push(ring(a, k)); B.push(ring(b, k)); } this.poly(mat, A, [-d[0], -d[1], -d[2]], undefined, zx); this.poly(mat, B, d, undefined, zx); }
   }
 
+  /** Rivet / bolt head: 4-sided pyramid (4 triangles) on a surface at p, surface normal O (unit), A = a unit direction in the surface. */
+  stud(mat, p, O, A, r = 0.009, h = 0.009) {
+    const B = [O[1] * A[2] - O[2] * A[1], O[2] * A[0] - O[0] * A[2], O[0] * A[1] - O[1] * A[0]];
+    const q = (a, b) => [p[0] + A[0] * a + B[0] * b, p[1] + A[1] * a + B[1] * b, p[2] + A[2] * a + B[2] * b];
+    const ps = [q(-r, -r), q(r, -r), q(r, r), q(-r, r)], t = [p[0] + O[0] * h, p[1] + O[1] * h, p[2] + O[2] * h];
+    for (let k = 0; k < 4; k++) this.poly(mat, [ps[k], ps[(k + 1) % 4], t], O, undefined, p[0]);
+  }
+
+  /**
+   * Merge a prop instance (Group from a def() prop or a template, children = meshes) into the batch at world (x, y, z),
+   * rotated by rotY like place(). Adds no meshes: small clutter repeated in hundreds of rooms costs only vertices.
+   * Returns the number of triangles added.
+   */
+  prop(group, x, y, z, rotY = 0) {
+    const c = Math.cos(rotY), s = Math.sin(rotY);
+    let n = 0;
+    for (const m of group.children) {
+      if (!m.isMesh || !m.geometry?.attributes?.position) continue;
+      const g = m.geometry, pa = g.attributes.position, na = g.attributes.normal, ua = g.attributes.uv, ix = g.index;
+      const ident = m.position.lengthSq() === 0 && m.rotation.x === 0 && m.rotation.y === 0 && m.rotation.z === 0 && m.scale.x === 1 && m.scale.y === 1 && m.scale.z === 1;
+      if (!ident) { m.updateMatrix(); _pm.copy(m.matrix); _nm.getNormalMatrix(_pm); }
+      const b = this._bucket(m.material, x), base = b.pos.length / 3;
+      for (let i = 0; i < pa.count; i++) {
+        _pv.set(pa.getX(i), pa.getY(i), pa.getZ(i));
+        if (na) _pn.set(na.getX(i), na.getY(i), na.getZ(i)); else _pn.set(0, 1, 0);
+        if (!ident) { _pv.applyMatrix4(_pm); _pn.applyMatrix3(_nm).normalize(); }
+        b.pos.push(x + c * _pv.x + s * _pv.z, y + _pv.y, z - s * _pv.x + c * _pv.z);
+        b.nor.push(c * _pn.x + s * _pn.z, _pn.y, -s * _pn.x + c * _pn.z);
+        if (ua) b.uv.push(ua.getX(i), ua.getY(i)); else b.uv.push(0, 0);
+      }
+      if (ix) { for (let i = 0; i < ix.count; i++) b.idx.push(base + ix.getX(i)); n += ix.count / 3; }
+      else { for (let i = 0; i < pa.count; i++) b.idx.push(base + i); n += pa.count / 3; }
+    }
+    this.tris += n;
+    return n;
+  }
+
   /** Create the meshes (one per zone and material) and reset. */
-  flush() {
-    for (const b of this.buckets.values()) {
+  flush() { for (const _ of this.flushSteps()) { /* all at once */ } }
+
+  /** flush() as a generator: yields after every bucket with geometry (time slicing, see rooms.js finishAsync). */
+  *flushSteps() {
+    const list = [...this.buckets.values()];
+    this.buckets.clear();
+    for (const b of list) {
       if (!b.idx.length) continue;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
@@ -547,8 +597,8 @@ export class Batch {
       const m = new THREE.Mesh(g, b.mat);
       m.receiveShadow = true;
       this.world.zone(this.deck, b.zi * ZONE_LEN + 1).add(m);
+      yield;
     }
-    this.buckets.clear();
   }
 }
 

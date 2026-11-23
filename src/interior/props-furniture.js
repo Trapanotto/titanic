@@ -6,6 +6,7 @@ import * as G from './geom.js';
 import {
   def, PROPS, rngOf, turnedLeg, taperLeg, cabriole, bail, knob, keyplate, drawer, cabDoor, mattress, pillowAt, blanket, cushion,
   tuftBack, tuftSeat, placeSetting, tableLampOn, towelOn, bookRow, papers, SHAPES, PLATE, slabWithHoles,
+  FINE, piping, foldedBlanket, soapOn, toothMug, hairBrush, handMirror, vaseOn,
 } from './props-core.js';
 
 // ============================================================ helpers
@@ -34,14 +35,22 @@ const FINIAL = [[0, 0], [0.03, 0], [0.034, 0.045], [0.012, 0.09], [0.016, 0.1], 
 
 export const bedFirst = def('bedFirst', (o) => [2.05, o.wide ? 1.4 : 1.0, o.canopy ? 2.15 : 1.2], (p, o) => {
   const W = o.wide ? 1.4 : 1.0, L = 2.05, wood = o.style === 'mahogany' || o.canopy, cover = matOf(o.cover, M.fabricGold);
-  const hz = -L / 2 + 0.035, fz = L / 2 - 0.035, my = 0.3, mt = my + 0.2;
+  const hz = -L / 2 + 0.035, fz = L / 2 - 0.035, my = 0.3, mt = my + 0.2, F = FINE();
   // base: side rails, spring frame, valance
-  for (const s of [-1, 1]) p.b(wood ? M.mahogany : M.iron, 0.035, wood ? 0.2 : 0.07, L - 0.09, s * (W / 2 - 0.02), wood ? 0.13 : 0.23, 0);
+  for (const s of [-1, 1]) {
+    if (wood && F >= 1) p.bb(M.mahogany, 0.035, 0.2, L - 0.09, s * (W / 2 - 0.02), 0.13, 0, 0.006);
+    else p.b(wood ? M.mahogany : M.iron, 0.035, wood ? 0.2 : 0.07, L - 0.09, s * (W / 2 - 0.02), wood ? 0.13 : 0.23, 0);
+  }
   p.b(M.canvas, W - 0.08, 0.03, L - 0.12, 0, my - 0.03, 0);
   mattress(p, W - 0.04, L - 0.1, 0.2, 0, my, 0);
-  if (o.wide) { for (const s of [-1, 1]) pillowAt(p, W * 0.42, 0.42, 0.14, s * W * 0.22, mt - 0.02, hz + 0.27); }
+  if (F >= 2) { // a second pillow leaning against the head board behind the first
+    const xs = o.wide ? [-1, 1].map((s) => s * W * 0.22) : [0], pw = o.wide ? W * 0.4 : W * 0.74;
+    for (const x of xs) p.pil(M.linen, pw, 0.15, 0.34, x, mt - 0.03, hz + 0.215, 0.6, 0.45, 3, 10, 0.02).rotation.x = -0.3;
+    for (const x of xs) pillowAt(p, pw + 0.02, 0.4, 0.13, x, mt - 0.02, hz + 0.38);
+  } else if (o.wide) { for (const s of [-1, 1]) pillowAt(p, W * 0.42, 0.42, 0.14, s * W * 0.22, mt - 0.02, hz + 0.27); }
   else pillowAt(p, W * 0.78, 0.42, 0.14, 0, mt - 0.02, hz + 0.27);
   blanket(p, cover, W - 0.01, 0, mt, hz + 0.62, fz - 0.03, 0.2);
+  if (F >= 2) foldedBlanket(p, cover === M.fabricGold ? M.fabricRed : M.fabricGold, W * 0.86, 0.34, F >= 3 ? 2 : 1, 0, mt + 0.018, fz - 0.3, 0.03); // folded eiderdown at the foot
   if (!wood) {
     const end = (z, h, rails) => {
       for (const s of [-1, 1]) p.lathe(M.brass, BRASS_POST(h), s * W / 2, 0, z, 6);
@@ -50,6 +59,10 @@ export const bedFirst = def('bedFirst', (o) => [2.05, o.wide ? 1.4 : 1.0, o.cano
       const n = o.wide ? 5 : 3, y0 = rails[rails.length - 1];
       for (let i = 1; i <= n; i++) { const x = -W / 2 + (W * i) / (n + 1); p.c(M.brass, 0.009, h - 0.07 - y0, x, y0, z, 5); }
       p.b(M.iron, W, 0.03, 0.03, 0, 0.255, z);
+      if (F >= 2) { // turned collars where the rails meet the posts, ball on every spindle
+        for (const s of [-1, 1]) for (const y of [...rails, 0.27]) p.lathe(M.brass, [[0.019, -0.014], [0.028, 0], [0.019, 0.014]], s * W / 2, y, z, 6);
+        if (F >= 3) for (let i = 1; i <= n; i++) p.s(M.brass, 0.016, -W / 2 + (W * i) / (n + 1), (y0 + h - 0.07) / 2, z);
+      }
     };
     end(hz, 1.18, [0.52]); end(fz, 0.86, [0.5]);
   } else {
@@ -59,8 +72,19 @@ export const bedFirst = def('bedFirst', (o) => [2.05, o.wide ? 1.4 : 1.0, o.cano
       p.extZ(M.mahogany, out, 0.035, 0, 0, z, 0);
       const pw = (W - 0.12 - (panels - 1) * 0.06) / panels;
       for (let i = 0; i < panels; i++) { const x = -W / 2 + 0.06 + pw / 2 + i * (pw + 0.06), ph = h - 0.48; const f = p.fp(M.mahogany, pw, ph, x, 0.3 + ph / 2, z + Math.sign(-z) * 0.0175, 0.01, 0.04); f.rotation.y = z < 0 ? -Math.PI / 2 : Math.PI / 2; }
-      for (const s of [-1, 1]) { p.b(M.mahogany, 0.065, h - 0.04, 0.065, s * (W / 2 + 0.0), 0, z); p.lathe(M.mahogany, FINIAL, s * W / 2, h - 0.04, z, 6); }
+      for (const s of [-1, 1]) {
+        if (F >= 1) p.bb(M.mahogany, 0.065, h - 0.04, 0.065, s * W / 2, 0, z, 0.008); else p.b(M.mahogany, 0.065, h - 0.04, 0.065, s * (W / 2 + 0.0), 0, z);
+        p.lathe(M.mahogany, FINIAL, s * W / 2, h - 0.04, z, 6);
+      }
       p.b(M.gold, W * 0.4, 0.02, 0.04, 0, top(0.5) - 0.08, z);
+      if (F >= 2) { // rounded cap rail following the shaped top
+        const pts = []; for (let i = 0; i <= 10; i++) { const t = 0.04 + (0.92 * i) / 10; pts.push([-W / 2 + W * t, top(t) - 0.004, z]); }
+        p.loft(M.mahogany, pts, 0.021, 5);
+      }
+      if (F >= 3) { // carved cartouche on the face towards the room / mattress (+z)
+        const cy = 0.3 + (h - 0.48) / 2, sh = []; for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; sh.push([Math.cos(a) * 0.09 * (1 + 0.15 * Math.cos(a * 2)), cy + Math.sin(a) * 0.065]); }
+        if (panels === 2) p.extZ(M.mahogany, sh, 0.014, 0, 0, z + 0.0175 + 0.007, 0.004);
+      }
     };
     board(hz, 1.12, o.wide ? 3 : 2); board(fz, 0.72, o.wide ? 3 : 2);
   }
@@ -80,13 +104,13 @@ export const bedFirst = def('bedFirst', (o) => [2.05, o.wide ? 1.4 : 1.0, o.cano
 
 export const berthSecond = def('berthSecond', (o) => [1.99, 0.8, o.upper === false ? 0.75 : 1.8], (p, o) => {
   const wood = matOf(o.mat, M.mahogany), cover = matOf(o.cover, M.fabricGreen), tiers = o.upper === false ? [0.3] : [0.3, 1.3];
-  const h = o.upper === false ? 0.75 : 1.8;
+  const h = o.upper === false ? 0.75 : 1.8, F = FINE();
   // end boards with raised panels
   for (const s of [-1, 1]) {
     p.b(wood, 0.8, h, 0.035, 0, 0, s * 0.975);
     const n = tiers.length;
     for (let i = 0; i < n; i++) { const y0 = i ? 1.02 : 0.05, ph = i ? h - 1.1 : 0.22; const f = p.fp(wood, 0.6, ph, 0, y0 + ph / 2, s * 0.957, 0.008, 0.035); f.rotation.y = s > 0 ? -Math.PI / 2 : Math.PI / 2; }
-    p.b(wood, 0.8, 0.03, 0.05, 0, h - 0.03, s * 0.975);
+    if (F >= 1) p.bb(wood, 0.82, 0.035, 0.055, 0, h - 0.035, s * 0.975, 0.008); else p.b(wood, 0.8, 0.03, 0.05, 0, h - 0.03, s * 0.975);
   }
   // drawers under the lower berth
   for (const s of [-1, 1]) drawer(p, wood, 0.86, 0.2, 0.4, 0.14, s * 0.47, 1, false);
@@ -97,19 +121,25 @@ export const berthSecond = def('berthSecond', (o) => [1.99, 0.8, o.upper === fal
     p.b(wood, 0.05, 0.03, 1.92, 0.385, y + 0.21, 0);
     mattress(p, 0.7, 1.85, 0.13, -0.02, y + 0.05, 0);
     pillowAt(p, 0.5, 0.36, 0.11, -0.04, y + 0.16, -0.72);
-    p.bb(cover, 0.74, 0.1, 1.28, -0.02, y + 0.1, 0.26, 0.012); p.b(M.linen, 0.74, 0.02, 0.05, -0.02, y + 0.195, -0.4);
+    // soft blanket with a rolled sheet edge (not a box)
+    p.pil(cover, 0.74, 0.1, 1.28, -0.02, y + 0.1, 0.26, 0.25, 0.12, 2, 12, 0.004);
+    p.cx(M.linen, 0.016, 0.74, -0.02, y + 0.192, -0.375, 8);
+    if (F >= 3) foldedBlanket(p, M.blanket, 0.5, 0.3, 1, -0.05, y + 0.19, 0.72, 0.03);
   }
   if (o.upper !== false) {
     p.cz(M.brass, 0.011, 1.92, 0.38, 1.76, 0, 8);
+    if (F >= 2) for (const s of [-1, 1]) p.latheZ(M.brass, [[0, 0], [0.024, 0], [0.022, 0.006], [0.014, 0.016], [0, 0.02]], 0.38, 1.76, s * 0.957, 6, -s); // rod flanges on the end boards
     p.add(G.curtain(0.42, 1.4, 3, 0.025, 0, 0, 9, 3), cover, 0.39, 1.75, -0.73);
   }
 });
 
 export const bunkThird = def('bunkThird', (o) => [1.9, 0.75, (o.tiers ?? 2) > 1 ? 1.65 : 0.7], (p, o) => {
   const tiers = (o.tiers ?? 2) > 1 ? [0.3, 1.2] : [0.3], h = tiers.length > 1 ? 1.65 : 0.7, iron = !!o.iron;
-  const frame = iron ? M.iron : M.pine, cover = iron ? matOf(o.cover, M.blanket) : K.blanketWS;
+  const frame = iron ? M.iron : M.pine, cover = iron ? matOf(o.cover, M.blanket) : K.blanketWS, F = FINE();
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    if (iron) p.c(frame, 0.018, h, sx * 0.35, 0, sz * 0.925, 6); else p.b(frame, 0.05, h, 0.05, sx * 0.35, 0, sz * 0.925);
+    if (iron) p.c(frame, 0.018, h, sx * 0.35, 0, sz * 0.925, 6);
+    else if (F >= 3) p.bb(frame, 0.05, h, 0.05, sx * 0.35, 0, sz * 0.925, 0.007); // chamfered posts
+    else p.b(frame, 0.05, h, 0.05, sx * 0.35, 0, sz * 0.925);
   }
   for (const y of tiers) {
     if (iron) {
@@ -122,8 +152,9 @@ export const bunkThird = def('bunkThird', (o) => [1.9, 0.75, (o.tiers ?? 2) > 1 
     }
     p.pil(M.linen, 0.66, 0.1, 1.78, 0, y + 0.06, 0, 0.3, 0.15, 2, 10, 0.004);
     p.pil(M.linen, 0.42, 0.09, 0.3, 0, y + 0.14, -0.7, 0.6, 0.45, 2, 8);
-    p.b(cover, 0.7, 0.115, 1.2, 0, y + 0.065, 0.28);
-    p.b(M.linen, 0.71, 0.022, 0.05, 0, y + 0.165, -0.31);
+    // soft blanket instead of a box, rolled sheet edge from level 2
+    p.pil(cover, 0.7, 0.115, 1.2, 0, y + 0.065, 0.28, 0.25, 0.1, 2, 8, 0.003);
+    if (F >= 2) p.cx(M.linen, 0.014, 0.7, 0, y + 0.163, -0.31, 6); else p.b(M.linen, 0.71, 0.022, 0.05, 0, y + 0.165, -0.31);
   }
   if (tiers.length > 1 && !iron) for (let k = 0; k < 3; k++) p.b(frame, 0.03, 0.03, 0.04, 0.36, 0.55 + k * 0.28, 0.925);
 });
@@ -161,11 +192,14 @@ export const coolingCouch = def('coolingCouch', [1.9, 0.75, 0.8], (p, o) => {
 // ============================================================ storage
 
 export const wardrobe = def('wardrobe', (o) => [o.w ?? 1.1, 0.55, 2.02], (p, o) => {
-  const m = matOf(o.mat, M.mahogany), w = o.w ?? 1.1, fx = 0.267;
-  plinth(p, m, 0.54, w, 0.09);
+  const m = matOf(o.mat, M.mahogany), w = o.w ?? 1.1, fx = 0.267, F = FINE();
+  if (F >= 2) p.ms(m, 0.54, 0.09, w, 0, 0, 0, 'plinth', 0); else plinth(p, m, 0.54, w, 0.09);
   p.bb(m, 0.5, 1.76, w - 0.03, -0.015, 0.09, 0, 0.01);
-  p.bb(m, 0.52, 0.09, w - 0.01, -0.01, 1.85, 0, 0.01); p.bb(m, 0.54, 0.035, w + 0.02, 0, 1.94, 0, 0.012); p.bb(m, 0.55, 0.045, w + 0.03, 0, 1.975, 0, 0.012);
+  p.bb(m, 0.52, 0.09, w - 0.01, -0.01, 1.85, 0, 0.01);
+  p.ms(m, 0.55, 0.08, w + 0.03, 0, 1.94, 0, 'crown', 0); // one coved crown moulding instead of stacked boards
   p.bb(M.gold, 0.005, 0.02, w - 0.06, 0.247, 1.88, 0, 0.003);
+  if (F >= 3) for (const s of [-1, 1]) { const f = p.fp(m, 0.36, 1.4, -0.015, 0.95, s * (w / 2 - 0.015), 0.008, 0.04); f.rotation.y = s > 0 ? -Math.PI / 2 : Math.PI / 2; } // fielded side panels
+  if (F >= 2 && !o.open) for (const s of [-1, 1]) for (const y of [0.32, 1.5]) p.c(M.brass, 0.007, 0.07, fx - 0.003, y, s * (w / 2 - 0.022), 6); // hinge knuckles
   const dw = w / 2 - 0.025, dh = 1.68;
   if (o.open) {
     p.b(M.woodDark, 0.02, 1.7, w - 0.06, -0.2, 0.12, 0);
@@ -187,7 +221,7 @@ export const chest = def('chest', [0.9, 0.5, 0.95], (p, o) => {
   const m = matOf(o.mat, M.mahogany);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.lathe(m, [[0, 0], [0.03, 0], [0.04, 0.03], [0.035, 0.06], [0.028, 0.075], [0, 0.075]], sx * 0.19, 0, sz * 0.4, 10);
   p.bb(m, 0.46, 0.83, 0.88, -0.01, 0.075, 0, 0.01);
-  p.bb(m, 0.5, 0.035, 0.92, 0, 0.905, 0, 0.014);
+  if (FINE() >= 2) p.ms(m, 0.5, 0.035, 0.92, 0, 0.905, 0, 'ogee', 0.02); else p.bb(m, 0.5, 0.035, 0.92, 0, 0.905, 0, 0.014);
   const hs = [0.2, 0.24, 0.27];
   let y = 0.1;
   for (let i = 0; i < 3; i++) { drawer(p, m, 0.82, hs[i] - 0.015, 0.243, y + hs[i] / 2, 0, 2, true); y += hs[i]; }
@@ -210,11 +244,11 @@ export const locker = def('locker', (o) => [0.4 * (o.n ?? 1), 0.45, 1.8], (p, o)
 });
 
 export const bookcase = def('bookcase', (o) => [o.w ?? 1.4, 0.4, 2.05], (p, o) => {
-  const m = matOf(o.mat, M.mahogany), w = o.w ?? 1.4;
-  plinth(p, m, 0.42, w, 0.08);
+  const m = matOf(o.mat, M.mahogany), w = o.w ?? 1.4, F = FINE();
+  if (F >= 2) p.ms(m, 0.42, 0.08, w, 0, 0, 0, 'plinth', 0); else plinth(p, m, 0.42, w, 0.08);
   p.bb(m, 0.38, 0.72, w - 0.02, -0.01, 0.08, 0, 0.01);
   for (const s of [-1, 1]) cabDoor(p, m, w / 2 - 0.03, 0.62, 0.18 + 0.022, 0.13, s * w / 4, { knobAt: -s * (w / 4 - 0.06) });
-  p.bb(m, 0.42, 0.04, w + 0.02, 0, 0.8, 0, 0.012);
+  if (F >= 2) p.ms(m, 0.42, 0.04, w + 0.02, 0, 0.8, 0, 'ovolo', 0); else p.bb(m, 0.42, 0.04, w + 0.02, 0, 0.8, 0, 0.012);
   // upper glazed case
   const y0 = 0.84, y1 = 1.92, iw = w - 0.08;
   p.b(m, 0.3, y1 - y0, 0.02, -0.04, y0, -w / 2 + 0.03); p.b(m, 0.3, y1 - y0, 0.02, -0.04, y0, w / 2 - 0.03); p.b(m, 0.02, y1 - y0, w - 0.04, -0.18, y0, 0);
@@ -233,7 +267,8 @@ export const bookcase = def('bookcase', (o) => [o.w ?? 1.4, 0.4, 2.05], (p, o) =
     p.b(M.glass, 0.004, dh - 0.1, dw - 0.08, 0.112, y0 + 0.05, z);
     knob(p, 0.126, y0 + dh * 0.45, z - s * (dw / 2 - 0.05), 0.009);
   }
-  p.bb(m, 0.4, 0.06, w, -0.01, y1, 0, 0.012); p.bb(m, 0.44, 0.04, w + 0.04, 0, y1 + 0.06, 0, 0.014); p.bb(m, 0.46, 0.03, w + 0.06, 0.005, y1 + 0.1, 0, 0.01);
+  p.bb(m, 0.4, 0.06, w, -0.01, y1, 0, 0.012);
+  p.ms(m, 0.46, 0.07, w + 0.06, 0.005, y1 + 0.06, 0, 'crown', 0); // coved cornice
 });
 
 export const shelves = def('shelves', (o) => [o.w ?? 1.5, 0.45, 1.9], (p, o) => {
@@ -292,7 +327,8 @@ export const dressingTable = def('dressingTable', [1.0, 0.5, 1.62], (p, o) => {
     for (let i = 0; i < 3; i++) drawer(p, m, 0.27, 0.19, 0.235, 0.17 + i * 0.205, s * 0.34, 1, false);
   }
   drawer(p, m, 0.36, 0.1, 0.235, 0.66, 0, 1, false);
-  p.bb(m, 0.5, 0.035, 1.0, 0, 0.72, 0, 0.012);
+  const F = FINE();
+  if (F >= 2) p.ms(m, 0.5, 0.035, 1.0, 0, 0.72, 0, 'ovolo', 0.02); else p.bb(m, 0.5, 0.035, 1.0, 0, 0.72, 0, 0.012);
   // swing mirror between turned uprights + jewel drawers
   for (const s of [-1, 1]) {
     p.b(m, 0.2, 0.12, 0.2, -0.13, 0.755, s * 0.36);
@@ -308,6 +344,8 @@ export const dressingTable = def('dressingTable', [1.0, 0.5, 1.62], (p, o) => {
   p.lathe(M.brass, [[0, 0], [0.12, 0], [0.125, 0.01], [0, 0.004]], 0.05, 0.755, -0.05, 12).scale.set(1, 1, 1.5);
   for (const [dz, c] of [[-0.14, AT.rose], [-0.06, AT.clearGlass], [0.02, AT.amber]]) p.alathe(c, [[0, 0], [0.028, 0], [0.025, 0.07], [0.008, 0.09], [0.012, 0.11], [0, 0.12]], 0.05, 0.76, dz, 6);
   p.b(M.woodDark, 0.06, 0.03, 0.22, 0.1, 0.755, 0.18);
+  if (F >= 2) { hairBrush(p, 0.16, 0.755, -0.36, Math.PI, M.woodDark); handMirror(p, 0.17, 0.755, 0.39, Math.PI / 2, M.chrome); }
+  if (F >= 3) p.lathe(M.porcelain, [[0, 0], [0.03, 0], [0.04, 0.025], [0.036, 0.04], [0.012, 0.046], [0.014, 0.056], [0, 0.058]], 0.0, 0.755, 0.17, 10); // powder bowl
 });
 
 /** fold-down wash cabinet ("compactum") of 2nd / 3rd class and crew cabins */
@@ -331,6 +369,7 @@ export const washstand = def('washstand', [0.6, 0.42, 1.6], (p, o) => {
   // brass rack with carafe and glasses, soap dish, towel on the side rail
   if (o.items !== false) { p.lathe(M.glass, SHAPES.CARAFE, -0.01, 1.59, 0.2, 8); p.lathe(M.glass, SHAPES.TUMBLER, -0.02, 1.59, -0.2, 6); }
   p.lathe(M.porcelain, [[0, 0], [0.04, 0], [0.05, 0.015], [0, 0.008]], 0.15, 0.81, -0.24, 8).scale.set(1, 1, 1.4);
+  if (FINE() >= 2) { soapOn(p, 0.15, 0.816, -0.24, 0.3); toothMug(p, 0.14, 0.81, 0.23); }
   p.cx(M.brass, 0.008, 0.34, 0, 0.7, 0.296, 6);
   p.bb(M.linen, 0.26, 0.28, 0.03, 0.02, 0.42, 0.296, 0.01); p.cx(M.linen, 0.02, 0.26, 0.02, 0.7, 0.296, 8);
 });
@@ -354,6 +393,7 @@ export const washbasinMarble = def('washbasinMarble', (o) => [o.double ? 1.5 : 0
       p.b(M.porcelain, 0.06, 0.012, 0.012, -0.17, 0.92, z + s * 0.1);
     }
     p.lathe(M.porcelain, [[0, 0], [0.04, 0], [0.045, 0.012], [0, 0.006]], 0.1, 0.871, z + 0.24 * (z <= 0 ? 1 : -1), 8);
+    if (FINE() >= 2) soapOn(p, 0.1, 0.877, z + 0.24 * (z <= 0 ? 1 : -1), 0.4);
   }
   p.lathe(M.glass, SHAPES.TUMBLER, -0.12, 0.871, -w / 2 + 0.1, 6);
   if (o.mirror !== false) {
@@ -362,6 +402,11 @@ export const washbasinMarble = def('washbasinMarble', (o) => [o.double ? 1.5 : 0
     p.b(M.mirror, 0.005, 0.52, w * 0.8 - 0.1, -0.208, 1.18, 0);
     p.b(M.glass, 0.12, 0.008, w * 0.6, -0.17, 1.1, 0);
     for (const s of [-1, 1]) p.b(M.brass, 0.1, 0.02, 0.01, -0.19, 1.08, s * w * 0.28);
+    if (FINE() >= 2) { // toilet things on the glass shelf
+      toothMug(p, -0.17, 1.108, w * 0.2);
+      p.alathe(AT.amber, [[0, 0], [0.028, 0], [0.028, 0.1], [0.01, 0.13], [0.01, 0.15], [0, 0.15]], -0.17, 1.108, -w * 0.18, 6);
+      if (FINE() >= 3) p.alathe(AT.blueGlass, [[0, 0], [0.022, 0], [0.024, 0.07], [0.008, 0.09], [0.012, 0.11], [0, 0.11]], -0.17, 1.108, -w * 0.08, 6);
+    }
   }
   p.b(M.linen, 0.03, 0.14, 0.3, 0.19, 0.02, w / 2 - 0.25);
 });
@@ -375,6 +420,7 @@ export const basinSmall = def('basinSmall', [0.5, 0.4, 1.0], (p) => {
   p.lathe(M.brass, [[0, 0], [0.014, 0], [0.01, 0.06], [0, 0.07]], -0.13, 0.86, 0.1, 6);
   p.loft(M.brass, [[-0.13, 0.92, 0.1], [-0.08, 0.93, 0.1], [-0.06, 0.9, 0.1]], 0.008, 6);
   p.bb(M.paintCream, 0.06, 0.03, 0.09, -0.12, 0.865, -0.14, 0.01);
+  if (FINE() >= 2) soapOn(p, -0.12, 0.895, -0.14, Math.PI / 2);
 });
 
 export const bathtub = def('bathtub', [1.75, 0.78, 0.65], (p, o) => {
@@ -459,7 +505,15 @@ export const sink = def('sink', (o) => [o.w ?? 1.2, 0.6, 1.1], (p, o) => {
 
 // ============================================================ seating
 
-const legShort = (p, m, x, z, h = 0.1) => p.lathe(m, [[0, 0], [0.02, 0], [0.032, h * 0.5], [0.034, h], [0, h]], x, 0, z, 6);
+const legShort = (p, m, x, z, h = 0.1) => p.lathe(m, FINE() >= 2
+  ? [[0, 0], [0.018, 0], [0.022, h * 0.12], [0.017, h * 0.25], [0.03, h * 0.55], [0.03, h * 0.75], [0.036, h * 0.85], [0.034, h], [0, h]]
+  : [[0, 0], [0.02, 0], [0.032, h * 0.5], [0.034, h], [0, h]], x, 0, z, 6);
+/** carved / upholstered scroll on the front end of a rolled arm (arm axis along x, front at x), radii ry (y) × rz (z) */
+function armScroll(p, f, x, y, z, ry, rz, wood = null) {
+  const m = p.latheX(f, [[0, 0], [0.088, 0], [0.09, 0.006], [0.072, 0.012], [0.05, 0.009], [0.03, 0.014], [0, 0.013]], x, y, z, 10);
+  m.scale.set(ry / 0.09, 1, rz / 0.09);
+  if (wood && FINE() >= 3) p.latheX(wood, [[0, 0], [0.018, 0], [0.016, 0.008], [0, 0.012]], x + 0.012, y, z, 8);
+}
 
 export const sofa = def('sofa', (o) => [o.w ?? 1.8, 0.8, 0.9], (p, o) => {
   const f = matOf(o.mat, M.fabricRed), w = o.w ?? 1.8;
@@ -474,6 +528,7 @@ export const sofa = def('sofa', (o) => [o.w ?? 1.8, 0.8, 0.9], (p, o) => {
   for (const s of [-1, 1]) {
     p.bb(f, 0.74, 0.32, 0.14, 0, 0.36, s * (w / 2 - 0.08), 0.03);
     p.loft(f, [[-0.34, 0.69, s * (w / 2 - 0.075)], [0, 0.71, s * (w / 2 - 0.08)], [0.36, 0.69, s * (w / 2 - 0.075)]], [[0.095, 0.08], [0.095, 0.085], [0.095, 0.08]], 8);
+    if (FINE() >= 2) armScroll(p, f, 0.352, 0.69, s * (w / 2 - 0.075), 0.096, 0.081, M.woodDark);
   }
 });
 
@@ -486,7 +541,7 @@ export const settee = def('settee', (o) => [o.w ?? 1.85, 0.62, 0.9], (p, o) => {
   cushion(p, f, 0.56, 0.12, w - 0.14, 0.01, 0.35, 0);
   p.bb(M.mahogany, 0.06, 0.52, w, -0.28, 0.36, 0, 0.01);
   tuftBack(p, f, w - 0.16, 0.36, -0.248, 0.62, 0, Math.max(3, Math.round(w * 3)), 2, 0.012, 0.03);
-  p.bb(M.mahogany, 0.09, 0.04, w + 0.02, -0.27, 0.86, 0, 0.012);
+  if (FINE() >= 2) p.ms(M.mahogany, 0.09, 0.04, w + 0.02, -0.27, 0.86, 0, 'thumb', 0.012); else p.bb(M.mahogany, 0.09, 0.04, w + 0.02, -0.27, 0.86, 0, 0.012);
   for (const s of [-1, 1]) {
     const out = [[-0.3, 0], [0.3, 0], [0.3, 0.18], [0.27, 0.24], [0.2, 0.26], [0.1, 0.24], [-0.05, 0.3], [-0.2, 0.38], [-0.3, 0.42]];
     p.extZ(M.mahogany, out, 0.05, 0, 0.32, s * (w / 2 - 0.025), 0.008);
@@ -503,6 +558,8 @@ function clubChair(p, f) {
   for (const s of [-1, 1]) {
     p.bb(f, 0.72, 0.3, 0.13, 0, 0.27, s * 0.33, 0.035);
     p.loft(f, [[-0.32, 0.6, s * 0.335], [0.0, 0.61, s * 0.335], [0.34, 0.59, s * 0.335]], [[0.085, 0.07], [0.085, 0.075], [0.085, 0.07]], 8);
+    if (FINE() >= 2) armScroll(p, f, 0.332, 0.59, s * 0.335, 0.086, 0.071);
+    if (FINE() >= 3) for (let i = 0; i < 6; i++) p.latheX(M.brass, [[0, 0], [0.006, 0], [0.004, 0.004], [0, 0.005]], 0.358, 0.3 + i * 0.045, s * 0.33, 5); // brass nail heads
   }
 }
 export const armchair = def('armchair', (o) => (o.kind === 'wicker' ? [0.66, 0.66, 0.9] : [0.8, 0.8, 0.9]), (p, o) => {
@@ -524,7 +581,7 @@ export const armchair = def('armchair', (o) => (o.kind === 'wicker' ? [0.66, 0.6
   // upholstered bergère with carved walnut frame and cabriole legs
   const wd = M.woodDark;
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) cabriole(p, wd, 0.3, sx * 0.29, sz * 0.29, sx * 0.7, sz * 0.7, 0.026, 0, 4);
-  p.bb(wd, 0.64, 0.09, 0.64, 0, 0.28, 0, 0.012);
+  if (FINE() >= 2) p.ms(wd, 0.64, 0.09, 0.64, 0, 0.28, 0, 'thumb', 0.02); else p.bb(wd, 0.64, 0.09, 0.64, 0, 0.28, 0, 0.012);
   p.bb(f, 0.6, 0.06, 0.6, 0.0, 0.36, 0, 0.02);
   cushion(p, f, 0.54, 0.1, 0.52, 0.04, 0.4, 0);
   // back: carved frame with upholstered panel
@@ -533,6 +590,7 @@ export const armchair = def('armchair', (o) => (o.kind === 'wicker' ? [0.66, 0.6
   const hole = new THREE.Path(); hole.moveTo(-0.26, 0.05); hole.lineTo(-0.26, 0.32); hole.quadraticCurveTo(0, 0.44, 0.26, 0.32); hole.lineTo(0.26, 0.05); hole.lineTo(-0.26, 0.05); shape.holes.push(hole);
   const fr = p.extX(wd, shape, 0.045, -0.3, 0.42, 0, 0); fr.rotation.z = 0.1;
   const pad = p.pil(f, 0.06, 0.4, 0.54, -0.29, 0.44, 0, 0.5, 0.25, 3, 10); pad.rotation.z = 0.1;
+  if (FINE() >= 3) p.latheX(wd, [[0, 0], [0.03, 0], [0.032, 0.008], [0.02, 0.014], [0.008, 0.012], [0, 0.02]], -0.324, 0.85, 0, 10); // carved rosette on the crest
 
   for (const s of [-1, 1]) {
     p.loft(wd, [[-0.28, 0.66, s * 0.31], [0.0, 0.635, s * 0.325], [0.26, 0.6, s * 0.32], [0.3, 0.45, s * 0.305], [0.28, 0.36, s * 0.29]], 0.021, 5);
@@ -550,13 +608,22 @@ export const chairDining = def('chairDining', [0.48, 0.5, 0.96], (p, o) => {
     const bl = p.fr(wood, 0.032, 0.032, 0.036, 0.036, 0.96, -0.2, 0, sz * 0.19); bl.rotation.z = 0.06;
     p.lathe(wood, [[0, 0], [0.022, 0], [0.025, 0.02], [0.012, 0.045], [0, 0.05]], -0.23, 0.95, sz * 0.19, 8);
   }
-  for (const sz of [-1, 1]) p.b(wood, 0.36, 0.025, 0.022, 0, 0.12, sz * 0.19);
-  p.b(wood, 0.022, 0.025, 0.36, 0.0, 0.12, 0);
+  if (FINE() >= 2 && cls !== 'plain') { // turned H-stretcher
+    const st = [[0.009, 0], [0.012, 0.03], [0.008, 0.09], [0.013, 0.18], [0.008, 0.27], [0.012, 0.33], [0.009, 0.36]];
+    for (const sz of [-1, 1]) p.latheX(wood, st, -0.18, 0.1325, sz * 0.19, 6, 1);
+    p.latheZ(wood, st, 0, 0.1325, -0.18, 6, 1);
+  } else {
+    for (const sz of [-1, 1]) p.b(wood, 0.36, 0.025, 0.022, 0, 0.12, sz * 0.19);
+    p.b(wood, 0.022, 0.025, 0.36, 0.0, 0.12, 0);
+  }
   p.bb(wood, 0.46, 0.06, 0.44, 0, sy - 0.04, 0, 0.008);
   if (cls === 'plain') {
     p.bb(wood, 0.46, 0.025, 0.44, 0, sy + 0.02, 0, 0.006);
     p.bb(wood, 0.035, 0.08, 0.38, -0.215, 0.84, 0, 0.008); p.bb(wood, 0.03, 0.05, 0.38, -0.205, 0.6, 0, 0.006);
-    for (let i = -2; i <= 2; i++) p.c(wood, 0.008, 0.2, -0.21, 0.65, i * 0.07, 6);
+    for (let i = -2; i <= 2; i++) {
+      if (FINE() >= 2) p.lathe(wood, [[0.007, 0], [0.01, 0.04], [0.006, 0.09], [0.011, 0.14], [0.007, 0.2]], -0.21, 0.65, i * 0.07, 6); // turned spindles
+      else p.c(wood, 0.008, 0.2, -0.21, 0.65, i * 0.07, 6);
+    }
     return;
   }
   p.pil(seat, 0.44, 0.07, 0.42, 0.01, sy + 0.01, 0, 0.35, 0.18, 3, 12, 0.005);
@@ -622,15 +689,19 @@ export const barberChair = def('barberChair', [0.7, 1.1, 1.3], (p) => {
 
 export const tableRound = def('tableRound', (o) => [2 * (o.r ?? 0.5), 2 * (o.r ?? 0.5), o.lamp ? 1.05 : 0.78], (p, o) => {
   const r = o.r ?? 0.5, m = matOf(o.mat, M.mahogany), seg = r > 0.45 ? 20 : 16;
+  const F = FINE();
   if (!o.cloth) {
-    p.lathe(m, [[0, 0.705], [r - 0.02, 0.705], [r, 0.725], [r - 0.01, 0.75], [0, 0.75]], 0, 0, 0, seg);
+    if (F >= 2) p.lathe(m, [[0, 0.705], [r - 0.03, 0.705], [r - 0.012, 0.711], [r, 0.724], [r, 0.735], [r - 0.006, 0.745], [r - 0.014, 0.75], [0, 0.75]], 0, 0, 0, seg); // moulded edge
+    else p.lathe(m, [[0, 0.705], [r - 0.02, 0.705], [r, 0.725], [r - 0.01, 0.75], [0, 0.75]], 0, 0, 0, seg);
     p.lathe(m, [[0.0, 0.64], [r * 0.6, 0.64], [r * 0.6, 0.705], [0, 0.705]], 0, 0, 0, 10);
   } else p.c(m, r * 0.7, 0.04, 0, 0.66, 0, 10);
-  p.lathe(m, [[0, 0.1], [0.07, 0.1], [0.045, 0.2], [0.07, 0.36], [0.04, 0.48], [0.04, 0.6], [0.09, 0.66], [0, 0.66]], 0, 0, 0, 8);
+  if (F >= 2) p.lathe(m, [[0, 0.1], [0.075, 0.1], [0.07, 0.13], [0.045, 0.19], [0.05, 0.25], [0.072, 0.33], [0.05, 0.42], [0.04, 0.48], [0.045, 0.52], [0.038, 0.58], [0.05, 0.61], [0.09, 0.65], [0.09, 0.66], [0, 0.66]], 0, 0, 0, 8); // turned pedestal
+  else p.lathe(m, [[0, 0.1], [0.07, 0.1], [0.045, 0.2], [0.07, 0.36], [0.04, 0.48], [0.04, 0.6], [0.09, 0.66], [0, 0.66]], 0, 0, 0, 8);
   const nf = r >= 0.4 ? 4 : 3, reach = Math.min(r * 0.72, 0.42);
   for (let i = 0; i < nf; i++) {
     const a = (i / nf) * Math.PI * 2 + Math.PI / 4, cx = Math.cos(a), cz = Math.sin(a);
     p.loft(m, [[cx * 0.04, 0.2, cz * 0.04], [cx * reach * 0.45, 0.14, cz * reach * 0.45], [cx * reach * 0.85, 0.05, cz * reach * 0.85], [cx * reach, 0.02, cz * reach]], [[0.03, 0.04], [0.025, 0.035], [0.02, 0.025], [0.02, 0.02]], 5);
+    if (F >= 3) p.s(m, 0.026, cx * reach, 0.022, cz * reach, 1, 0.85, 1); // scrolled toe
   }
   if (o.cloth) {
     p.rev(M.linen, [{ o: r + 0.045, y: 0.5, m: 0.014 }, { o: r + 0.035, y: 0.66, m: 0.007 }, { o: r + 0.02, y: 0.745 }, { o: r - 0.02, y: 0.756 }], { seg: r > 0.45 ? 36 : 28, k: Math.round(r * 16), capTop: true }, 0, 0, 0);
@@ -644,7 +715,7 @@ export const tableRound = def('tableRound', (o) => [2 * (o.r ?? 0.5), 2 * (o.r ?
 
 export const tableRect = def('tableRect', (o) => [o.w ?? 1.2, o.d ?? 0.8, o.lamp ? 1.05 : 0.78], (p, o) => {
   const w = o.w ?? 1.2, d = o.d ?? 0.8, m = matOf(o.mat, M.mahogany);
-  p.bb(m, d, 0.035, w, 0, 0.715, 0, 0.012);
+  if (FINE() >= 2 && !o.cloth) p.ms(m, d, 0.035, w, 0, 0.715, 0, 'ovolo', 0.02); else p.bb(m, d, 0.035, w, 0, 0.715, 0, 0.012);
   for (const s of [-1, 1]) { p.bb(m, 0.022, 0.1, w - 0.16, s * (d / 2 - 0.06), 0.615, 0, 0.005); p.bb(m, d - 0.14, 0.1, 0.022, 0, 0.615, s * (w / 2 - 0.06), 0.005); }
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) turnedLeg(p, m, 0.715, sx * (d / 2 - 0.07), sz * (w / 2 - 0.07), 0.034, 0, 6);
   if (o.cloth) p.rev(M.linen, [{ o: 0.04, y: 0.48, m: 0.012 }, { o: 0.032, y: 0.65, m: 0.006 }, { o: 0.02, y: 0.745 }, { o: -0.02, y: 0.755 }], { perim: G.rectLoop(d, w, 0.04, 1, 0.18), k: Math.round((w + d) * 4), capTop: true }, 0, 0, 0);
@@ -666,7 +737,7 @@ export const writingDesk = def('writingDesk', [1.1, 0.6, 1.1], (p, o) => {
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) taperLeg(p, m, 0.6, sx * 0.25, sz * 0.5, 0.05, 0.032);
   p.bb(m, 0.56, 0.12, 1.04, 0, 0.6, 0, 0.006);
   drawer(p, m, 0.5, 0.09, 0.285, 0.66, 0, 2, true);
-  p.bb(m, 0.6, 0.03, 1.1, 0, 0.72, 0, 0.01);
+  if (FINE() >= 2) p.ms(m, 0.6, 0.03, 1.1, 0, 0.72, 0, 'ogee', 0.02); else p.bb(m, 0.6, 0.03, 1.1, 0, 0.72, 0, 0.01);
   // gallery: pigeon holes + small drawers
   const gx = -0.21, gy = 0.75;
   p.bb(m, 0.17, 0.32, 1.06, gx, gy, 0, 0.006); p.bb(m, 0.19, 0.025, 1.08, gx + 0.01, gy + 0.32, 0, 0.008);
@@ -696,7 +767,7 @@ export const desk = def('desk', (o) => [o.w ?? 1.4, 0.7, 0.8], (p, o) => {
   }
   p.bb(m, 0.62, 0.11, w - 2 * pw + 0.02, -0.01, 0.62, 0, 0.006); // frieze drawer carcass over the kneehole
   drawer(p, m, w - 2 * pw - 0.06, 0.08, 0.322, 0.66, 0, 2, true);
-  p.bb(m, 0.7, 0.04, w, 0, 0.73, 0, 0.012);
+  if (FINE() >= 2) p.ms(m, 0.7, 0.04, w, 0, 0.73, 0, 'ovolo', 0.02); else p.bb(m, 0.7, 0.04, w, 0, 0.73, 0, 0.012);
   p.b(M.leatherGreen, 0.5, 0.003, w - 0.2, 0.0, 0.77, 0);
   p.bb(M.leather, 0.3, 0.008, 0.46, 0.08, 0.773, 0.05, 0.003); p.b(M.paper, 0.27, 0.003, 0.4, 0.08, 0.781, 0.05);
   papers(p, 0.0, 0.774, w / 2 - 0.3, 0.2, 2);

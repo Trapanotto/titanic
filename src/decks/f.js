@@ -269,6 +269,6 @@ export async function build(world) {
   await world.tick();
   inst.flush();
   await world.tick();
-  console.info(`[F] ${res.rooms.length} rooms, ${res.walls} wall pieces, ${res.doors} doors, ${inst.n} instanced chairs, ${res.problems.length} problems`);
+  console.info(`[F] ${res.rooms.length} rooms, ${res.walls} wall pieces, ${res.doors} doors, ${inst.n} instanced props, ${res.problems.length} problems`);
   return {};
 }

@@ -9,7 +9,8 @@ import * as THREE from 'three';
 import { mats as M } from '../core/materials.js';
 import { AT } from '../interior/batch.js';
 import { def, piano, pottedPalm, sconce, pilaster, kitMats as K } from '../interior/kit.js';
-import { InstField, G, boxG, merge, rng, rotOf, wctx, panelRun, strapCeiling, ceilingOrnaments, leadedWindow, propTris } from './d-util.js';
+import { InstField, G, boxG, merge, rng, rotOf, wctx, panelRun, strapCeiling, ceilingOrnaments, leadedWindow, propTris, corbel } from './d-util.js';
+import { fineLv } from './f-util.js';
 
 const TAU = Math.PI * 2;
 const atl = (g, cell) => G.atlasCell(g, cell);
@@ -86,6 +87,20 @@ export const setting = def('dSetting', [0.4, 0.3, 0.16], (p, o) => {
   const cut = merge([boxG(0.19, 0.004, 0.018, 0, 0.002, -0.165, 'xXy'), boxG(0.21, 0.004, 0.014, -0.005, 0.002, 0.15, 'xXy'), boxG(0.19, 0.004, 0.016, 0, 0.002, 0.175, 'xXy')]);
   p.add(cut, M.chrome);
   p.add(G.extrude([[-0.05, 0], [0.05, 0], [0.035, 0.07], [0, 0.11], [-0.035, 0.07]], 0.024), M.linen, 0.0, 0.012, 0).rotation.y = Math.PI / 2;
+});
+
+/** the rest of a full place setting, by detail level (same frame as `setting`): lv ≥ 1 water tumbler, ≥ 2 side plate with
+ *  butter knife and a bread roll, ≥ 3 dessert spoon and fork above the plate */
+export const settingExtra = def('dSetX', [0.4, 0.5, 0.12], (p, o) => {
+  const lv = o.lv ?? 1, first = o.cls !== 'second';
+  p.lathe(M.glass, [[0, 0], [0.03, 0], [0.034, 0.095], [0, 0.09]], first ? 0.2 : 0.17, 0, first ? 0.215 : 0.19, 6);
+  if (lv >= 2) {
+    p.lathe(M.porcelain, [[0, 0], [0.085, 0.01], [0, 0.006]], 0.1, 0, -0.27, 8);
+    if (first) p.add(atl(G.lathe([[0.086, 0.0102], [0.072, 0.0085]], 8), AT.cobalt), K.atlas, 0.1, 0, -0.27);
+    p.add(boxG(0.15, 0.004, 0.012, 0, 0.002, 0, 'y'), M.chrome, 0.1, 0.01, -0.25).rotation.y = 0.5;
+    p.add(atl(G.pillow(0.07, 0.04, 0.09, 0.6, 0.7, 3, 6), AT.ochre), K.atlas, 0.12, 0.009, -0.3);
+  }
+  if (lv >= 3) for (const [x, w] of [[0.15, 0.17], [0.175, 0.16]]) p.add(boxG(0.014, 0.004, w, 0, 0.002, 0, 'y'), M.chrome, x, 0, 0);
 });
 
 /** table assembly without settings: draped damask cloth, base, shaded lamp. kind: {round:r} or {lx, lz}; lamp */
@@ -284,6 +299,13 @@ export function furnishDining1(ctx) {
       }
     }
   }
+  if (fineLv() >= 1) { // carved consoles under the fore-and-aft beams at the end walls
+    const yb = TOP - 0.004 - 0.22;
+    for (const z of [-DINING1.bay, -5.35, 0, 5.35, DINING1.bay]) {
+      if (!w.doorGaps('fwd', 0.1).some(([a, c]) => z > a - 0.15 && z < c + 0.15)) corbel(b, M.paintWhite, x1 - 0.05, z, [-1, 0], yb, 0.24, 0.26, 0.24);
+      if (!w.doorGaps('aft', 0.1).some(([a, c]) => z > a - 0.15 && z < c + 0.15) && Math.abs(z) > 1) corbel(b, M.paintWhite, x0 + 0.05, z, [1, 0], yb, 0.24, 0.26, 0.24);
+    }
+  }
   const archTris = b.tris - t0;
 
   // ---------------------------------------------------------------- columns, sideboards, stations, piano, palms
@@ -307,6 +329,8 @@ export function furnishDining1(ctx) {
   const K1 = kindsFirst();
   for (const [k, t] of Object.entries(K1)) f.defineProp('t_' + k, tableAsm(t.o));
   f.defineProp('chair', chairJac()).defineProp('set', setting({ cls: 'first' })).defineProp('cruet', cruet()).defineProp('menu', menuCard()).defineProp('carafe', carafeG());
+  const fl = fineLv();
+  if (fl >= 1) f.defineProp('setx', settingExtra({ cls: 'first', lv: fl }));
   for (let i = 0; i < 3; i++) f.defineProp('vase' + i, vase({ v: i }));
   let tables = 0, seats = 0;
   const place = (x, z, k, rotated) => {
@@ -317,7 +341,9 @@ export function furnishDining1(ctx) {
       const [px, pz] = tr(seat.p), [nx, nz] = [seat.n[0] * c + seat.n[1] * s, -seat.n[0] * s + seat.n[1] * c];
       const out = D() < 0.07 ? 0.18 + D() * 0.12 : D() * 0.08, yaw = rotOf(-nx, -nz) + (D() - 0.5) * (out > 0.15 ? 0.7 : 0.16);
       f.addProp('chair', px + nx * (0.25 + out), Y, pz + nz * (0.25 + out), yaw);
-      f.addProp('set', px - nx * 0.17, Y + 0.757, pz - nz * 0.17, rotOf(-nx, -nz) + (D() - 0.5) * 0.06);
+      const sa = rotOf(-nx, -nz) + (D() - 0.5) * 0.06;
+      f.addProp('set', px - nx * 0.17, Y + 0.757, pz - nz * 0.17, sa);
+      if (fl >= 1) f.addProp('setx', px - nx * 0.17, Y + 0.757, pz - nz * 0.17, sa);
     }
     // centre pieces: vase, cruet, menus (carafe on the larger tables), seeded offsets
     const big = !!t.long, o1 = big ? 0.42 : 0.16, sg = D() < 0.5 ? 1 : -1;
@@ -415,6 +441,8 @@ export function furnishDining2(ctx) {
 
   // ---------------------------------------------------------------- long tables athwartships, swivel chairs every 0.62 m
   f.defineProp('chair', swivelJac()).defineProp('set', setting({ cls: 'second' })).defineProp('cruet', cruet()).defineProp('carafe', carafeG());
+  const fl = fineLv();
+  if (fl >= 1) f.defineProp('setx', settingExtra({ cls: 'second', lv: fl }));
   for (let i = 0; i < 2; i++) f.defineProp('vase' + i, vase({ v: i + 1 }));
   const LENS = [5.0, 3.7];
   for (const L of LENS) f.defineProp('t' + L, tableAsm({ lx: 0.9, lz: L, lamp: false, wood: 'mahogany' }));
@@ -428,7 +456,9 @@ export function furnishDining2(ctx) {
       for (const sx of [-1, 1]) {
         const yaw = rotOf(-sx, 0) + (D() - 0.5) * 0.5; // swivel chairs stand at slightly different angles
         f.addProp('chair', x + sx * 0.72, Y, zc + dz, yaw);
-        f.addProp('set', x + sx * 0.28, Y + 0.757, zc + dz, rotOf(-sx, 0) + (D() - 0.5) * 0.05);
+        const sa = rotOf(-sx, 0) + (D() - 0.5) * 0.05;
+        f.addProp('set', x + sx * 0.28, Y + 0.757, zc + dz, sa);
+        if (fl >= 1) f.addProp('setx', x + sx * 0.28, Y + 0.757, zc + dz, sa);
       }
     }
     for (let k = 0; k < Math.round(len / 1.8); k++) {
