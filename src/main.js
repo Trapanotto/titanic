@@ -7,7 +7,7 @@ import { Player } from './app/player.js';
 import { Controls } from './app/controls.js';
 import { UI } from './app/ui.js';
 import { PostPipeline, QUALITY_LEVELS } from './app/post.js';
-import { TIER, TIERS, setTier, detectTier, probeCaps, applyDebugCaps, lowerTier } from './core/tier.js';
+import { TIER, TIERS, setTier, detectTier, probeCaps, applyDebugCaps, lowerTier, crashGuard } from './core/tier.js';
 import { DeckStreamer } from './app/stream.js';
 
 const params = new URLSearchParams(location.search);
@@ -18,6 +18,12 @@ const DEG = Math.PI / 180;
 applyDebugCaps(params);
 const caps = probeCaps();
 const tierPick = detectTier(params, caps);
+// the last session died without closing (bluescreen, driver reset): never start above the tier below it again
+const guard = crashGuard(params);
+if (guard.cap && TIERS.indexOf(tierPick.name) > TIERS.indexOf(guard.cap)) {
+  tierPick.name = guard.cap;
+  tierPick.reason += (tierPick.reason ? ', ' : '') + 'nach Absturz zurückgestuft';
+}
 setTier(tierPick.name, tierPick.reason, { ...tierPick.info, ...(caps || {}) });
 TIER.streaming = !flag('nostream');
 
@@ -87,8 +93,9 @@ const NO_WEBGL2 = 'Dein Browser oder deine Grafikkarte unterstützt WebGL 2 nich
 let renderer = null, post = null;
 try {
   if (!caps && !hasWebGL2()) throw new Error('no webgl2');
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: TIER.antialias, powerPreference: 'high-performance' });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: TIER.antialias, powerPreference: TIER.power || 'default' });
   ui.renderer = renderer;
+  guard.beat(TIER.name);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, TIER.maxPixelRatio, coarse ? 1.5 : 2)); // phones: cap the pixel ratio
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -175,8 +182,13 @@ function autoQuality(raw) {
 }
 debug.autoQuality = autoQ;
 
+// Frame limit: never more than ~60–72 pictures per second, whatever the display runs at (120/144/240 Hz laptops would
+// otherwise keep the GPU at full load and heat for nothing).
+const MIN_FRAME_MS = 13.5;
 function frame(now) {
   raf = requestAnimationFrame(frame);
+  if (now - last < MIN_FRAME_MS) return;
+  guard.beat(TIER.name);
   const raw = Math.max(0, (now - last) / 1000);
   const dt = Math.min(0.05, raw);
   last = now;
@@ -196,7 +208,9 @@ function start() {
 function stop() {
   running = false;
   cancelAnimationFrame(raf);
+  guard.clear(); // a paused or closed page is not a crash
 }
+window.addEventListener('pagehide', () => guard.clear());
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) { stop(); controls.clearKeys(); } else start(); });
 let hideLost = null;
@@ -241,6 +255,7 @@ debug.frame = (dt = 1 / 60, count = 1) => { if (renderer) for (let i = 0; i < co
  * there it only yields to the event loop (MessageChannel, not throttled) – loading continues at full speed.
  */
 function nextPaint() {
+  guard.beat(TIER.name); // loading counts as running: a crash while the ship is built lowers the tier as well
   if (document.hidden) return yieldTask();
   return new Promise((resolve) => {
     let done = false;
@@ -418,6 +433,7 @@ async function main() {
   }
   debug.ready = true;
   ui.ready();
+  if (guard.crashed) ui.toast?.('Der letzte Besuch wurde unerwartet beendet – die Grafik läuft jetzt eine Stufe einfacher.', 7);
   start();
 }
 
