@@ -98,3 +98,9 @@ On all tiers the app first runs every module once to register logical data (coll
 infos, lamps, rooms) and then rebuilds deck geometry on demand (`src/app/stream.js`). Module builds must therefore be
 deterministic, free of one-time global side effects, and must not rely on the return values of registration calls.
 `node tools/smoke.mjs` and `?nostream=1` build everything without streaming.
+
+## Time slicing (no hitches while a deck is rebuilt)
+A background rebuild gets only a few milliseconds per frame. Deck modules therefore `await world.tick()` between
+their top-level statements and finish with `await plan.finishAsync()` (not `plan.finish()`): both hand the frame back
+when the slice is used up and are no-ops otherwise. Keep a single synchronous step below ~10 ms; long helpers need
+their own `await world.tick()` (make them async) or must be split.

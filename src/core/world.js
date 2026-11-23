@@ -83,6 +83,12 @@ export class World {
     return g;
   }
 
+  /**
+   * Cooperative time slicing: modules `await world.tick()` at natural breaks of their build. While the deck streamer
+   * rebuilds a deck in the background it hands the frame back whenever the slice is used up; otherwise a no-op.
+   */
+  tick() { const s = this.slicer; return s && now() >= s.until ? s.pause() : undefined; }
+
   /** Register an exterior group whose static meshes should be merged by bake(). */
   markForBake(group) { this._bakeGroups.push(group); return group; }
 
@@ -173,7 +179,7 @@ export class World {
       for (const g of [this.interior, this.exterior]) g.traverse((o) => { if (o.name === 'baked' && o.geometry?.index?.array) U.list.push(o); });
     }
     this._uploadRun(renderer, budgetMs);
-    if (U.i >= U.list.length) { this._uploadDone = true; U.rt.dispose(); U.mat.dispose(); this._upload = null; }
+    if (U.i >= U.list.length) { this._uploadDone = true; U.list.length = 0; U.i = 0; } // the state stays (deck streaming uploads later)
     return !this._uploadDone;
   }
 
@@ -199,7 +205,7 @@ export class World {
     try {
       while (U.i < U.list.length && now() - t0 < budgetMs) {
         const batch = [];
-        for (let k = 0; k < 24 && U.i < U.list.length; k++) {
+        for (let k = 0, kn = this.slicer ? 4 : 24; k < kn && U.i < U.list.length; k++) {
           const m = U.list[U.i++];
           if (!m.geometry.index.array) continue; // already uploaded by a normal frame
           batch.push([m, m.parent, m.visible, m.frustumCulled]);
@@ -538,17 +544,32 @@ export class World {
    * modules' caches are reused by later rebuilds). Time-sliced; `budgetMs` per slice.
    */
   async bakeZones(zones, { budgetMs = 12, onProgress = null } = {}) {
-    const renderer = this.renderer || null, up = renderer ? this._uploadState() : null;
+    const renderer = this.renderer || null;
     let slice = now(), bytes = 0, tris = 0;
     for (let i = 0; i < zones.length; i++) {
       const g = zones[i];
-      const r = bakeGroup(this, g, true, null);
+      const it = bakeGroupSteps(this, g, true, null);
+      let r;
+      while (!(r = it.next()).done) { this._bakeStep = r.value; const p = this.tick(); if (p) await p; }
+      r = r.value;
       g.userData.bytes = r.bytes; g.userData.tris = r.tris;
       bytes += r.bytes; tris += r.tris;
-      if (up) for (const o of g.children) if (o.name === 'baked' && o.geometry.index?.array) up.list.push(o);
-      if (up) this._uploadRun(renderer, Infinity);
+      if (renderer) {
+        // upload in slices too (a zone is several MB of vertex data)
+        const mine = g.children.filter((o) => o.name === 'baked' && o.geometry.index?.array);
+        let k = 0;
+        while (k < mine.length) {
+          const up = this._uploadState(), s = this.slicer;
+          const n = s ? 4 : mine.length;
+          for (let e = Math.min(mine.length, k + n); k < e; k++) up.list.push(mine[k]);
+          this._uploadRun(renderer, Infinity);
+          if (up.i >= up.list.length) { up.list.length = 0; up.i = 0; }
+          const p = this.tick(); if (p) await p;
+        }
+      }
       this._zoneChanged(g, true);
-      if (now() - slice > budgetMs) { onProgress?.((i + 1) / zones.length); await yieldTask(); slice = now(); }
+      if (this.slicer) { onProgress?.((i + 1) / zones.length); const p = this.tick(); if (p) await p; }
+      else if (now() - slice > budgetMs) { onProgress?.((i + 1) / zones.length); await yieldTask(); slice = now(); }
     }
     this._clusterGrids.clear();
     return { bytes, tris };
@@ -694,10 +715,17 @@ function newBucket(o, cid) {
 }
 
 function bakeGroup(world, root, isZone, users = null) {
+  const it = bakeGroupSteps(world, root, isZone, users);
+  for (;;) { const r = it.next(); if (r.done) return r.value; }
+}
+
+/** bakeGroup as a generator: yields between source meshes and output batches (time slicing in bakeZones). */
+function* bakeGroupSteps(world, root, isZone, users = null) {
   root.updateWorldMatrix(true, true);
   const rootM = root.matrixWorld, identity = isIdentity(rootM);
   const inv = new THREE.Matrix4().copy(rootM).invert();
   const grid = isZone ? world._clusterGrid(root.userData.deck) : null;
+  yield 'grid';
   const originals = [];
   root.traverse((o) => {
     if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.children.length) return;
@@ -710,6 +738,7 @@ function bakeGroup(world, root, isZone, users = null) {
   const byMat = new Map(); // material key -> { list: [bucket], map: Map(cid*4+bin -> bucket) }
   for (let si = 0; si < originals.length; si++) {
     const o = originals[si];
+    yield 'mesh';
     let g = o.geometry;
     if (!g.attributes.normal) { g = g.clone(); g.computeVertexNormals(); }
     const P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, I = g.index;
@@ -729,6 +758,7 @@ function bakeGroup(world, root, isZone, users = null) {
     const pA = plain(P) && P.itemSize === 3 ? P.array : null, nA = plain(N) && N.itemSize === 3 ? N.array : null;
     const uA = U && plain(U) && U.itemSize === 2 ? U.array : null;
     for (let i = 0, j = 0; i < nv; i++, j += 3) {
+      if ((i & 16383) === 16383) yield 'verts';
       let x, y, z;
       if (pA) { x = pA[j]; y = pA[j + 1]; z = pA[j + 2]; } else { x = P.getX(i); y = P.getY(i); z = P.getZ(i); }
       const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
@@ -748,6 +778,7 @@ function bakeGroup(world, root, isZone, users = null) {
     const nt = I ? Math.floor(I.count / 3) : Math.floor(nv / 3);
     let lastC = NaN, lastB = null;
     for (let t = 0; t < nt; t++) {
+      if ((t & 8191) === 8191) yield 'tris';
       let a = ia ? ia[t * 3] : t * 3, b = ia ? ia[t * 3 + 1] : t * 3 + 1, c = ia ? ia[t * 3 + 2] : t * 3 + 2;
       if (flip) { const s = b; b = c; c = s; }
       let cx = (tp[a * 3] + tp[b * 3] + tp[c * 3]) / 3, cz = (tp[a * 3 + 2] + tp[b * 3 + 2] + tp[c * 3 + 2]) / 3;
@@ -778,7 +809,9 @@ function bakeGroup(world, root, isZone, users = null) {
 
   // one mesh per material and cluster; small / tiny objects at the end of the index buffer (distance LOD = drawRange)
   const chunks = isZone ? (root.userData.chunks ??= []) : null;
+  yield 'detach';
   for (const M of byMat.values()) {
+    yield 'batch';
     // interior, opaque: all clusters of a material share one mesh (multi-draw of the visible clusters)
     if (isZone && M.list.length && !M.list[0].material.transparent) { bakeBatches(world, root, M.list, res, chunks); continue; }
     // exterior, opaque: collected over all groups (World.bake builds one batch per material with float positions)
@@ -807,6 +840,7 @@ function bakeGroup(world, root, isZone, users = null) {
       res.after++;
     }
   }
+  yield 'loose';
   // everything that stays separate (noMerge / animated parts, engines …) goes into a wrapper group that is culled
   // by its box like a chunk – the object's own `visible` stays under the control of its module
   if (isZone) {

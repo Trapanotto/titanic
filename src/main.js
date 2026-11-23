@@ -385,7 +385,7 @@ async function main() {
     // only the own deck before going interactive (time to interactive); stairwell views and neighbours follow right
     // after the start in idle slices
     const { own } = streamer.wanted(camera.position, new Set(), 0);
-    await streamer.load(streamer.zonesByDeck[own] || []);
+    await streamer.load(streamer.zonesByDeck[own] || [], { rush: true });
     debug.timings.push({ id: 'deck ' + own, build: Math.round(performance.now() - t0), heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : -1 });
   }
   ui.setProgress(1, 'Leinen los!');

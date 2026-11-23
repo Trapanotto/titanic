@@ -31,6 +31,8 @@ export class Controls {
     this._touchLook = { id: -1, x: 0, y: 0 };
     this._touchJump = false;
     this._touchUp = 0;
+    this._taps = new Map();   // touch id -> { x, y, t } (a short touch that does not move is a tap)
+    this._press = null;       // mouse press { x, y, t }
     this._bind();
   }
 
@@ -111,11 +113,19 @@ export class Controls {
       }
     });
     c.addEventListener('mousedown', (e) => {
-      if (e.button === 0) this._drag = true; // drag-look works even without pointer lock
+      if (e.button === 0) { this._drag = true; this._press = { x: e.clientX, y: e.clientY, t: performance.now(), locked: this.locked }; } // drag-look works even without pointer lock
       if (this.noLock || this.touch) return;
       if (!this.locked) this.requestLock();
     });
-    window.addEventListener('mouseup', () => { this._drag = false; });
+    window.addEventListener('mouseup', (e) => {
+      this._drag = false;
+      const p = this._press;
+      this._press = null;
+      if (!p || e.button !== 0 || this.isBlocked() || performance.now() - p.t > 400) return;
+      // a click without dragging: with a locked pointer it aims at the centre of the view
+      if (p.locked) this.onAction('tap', e, { x: window.innerWidth / 2, y: window.innerHeight / 2 });
+      else if (Math.hypot(e.clientX - p.x, e.clientY - p.y) < 6) this.onAction('tap', e, { x: e.clientX, y: e.clientY });
+    });
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.addEventListener('wheel', (e) => {
       if (this.isBlocked()) return;
@@ -130,6 +140,7 @@ export class Controls {
       if (this.isBlocked()) return;
       e.preventDefault();
       for (const t of e.changedTouches) {
+        this._taps.set(t.identifier, { x: t.clientX, y: t.clientY, t: performance.now() });
         if (t.clientX < window.innerWidth * 0.45 && tm.id === -1) {
           tm.id = t.identifier; tm.x0 = t.clientX; tm.y0 = t.clientY; tm.f = tm.s = 0;
           this.onAction('stick', e, tm);
@@ -154,6 +165,11 @@ export class Controls {
     }, { passive: false });
     const end = (e) => {
       for (const t of e.changedTouches) {
+        const tap = this._taps.get(t.identifier);
+        this._taps.delete(t.identifier);
+        if (tap && e.type === 'touchend' && !this.isBlocked() && performance.now() - tap.t < 400 && Math.hypot(t.clientX - tap.x, t.clientY - tap.y) < 12) {
+          this.onAction('tap', e, { x: t.clientX, y: t.clientY });
+        }
         if (t.identifier === tm.id) { tm.id = -1; tm.f = tm.s = 0; this.onAction('stick', e, tm); }
         if (t.identifier === tl.id) tl.id = -1;
       }

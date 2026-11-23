@@ -737,8 +737,10 @@ export async function build(world) {
   const batches = new Map();
   const B = (deck) => { let b = batches.get(deck); if (!b) batches.set(deck, (b = new Batch(world, deck))); return b; };
 
+  await world.tick();
   for (const f of stairFlights()) if (f.type === 'scissor') buildFlight(world, f, B(f.from), B(f.to));
 
+  await world.tick();
   for (const st of STAIRS) {
     if (isImperial(st)) { buildImperial(world, st, B); continue; }
     const grand = st.style === 'grand';
@@ -751,6 +753,7 @@ export async function build(world) {
 
   // machinery access openings in the F-deck floor: railing on three sides (open at the +x end), slab rims
   const bf = B('F'), yf = DECK_Y.F, S = STYLE.steel;
+  await world.tick();
   for (const m of MACHINERY_ACCESS) {
     for (const z of [m.z0, m.z1]) {
       railX(world, 'F', bf, S, m.x0, yf, m.x1, yf, z);
@@ -763,6 +766,7 @@ export async function build(world) {
     bf.wallZ(mats.steel, m.x0, m.z0, m.z1, yf - SLAB, yf, 1); bf.wallZ(mats.steel, m.x1, m.z0, m.z1, yf - SLAB, yf, -1);
   }
 
+  await world.tick();
   for (const b of batches.values()) b.flush();
   return {};
 }

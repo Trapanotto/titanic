@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { DECK_Y, deckAtY } from '../core/constants.js';
 
 const VIEW_DIST = 40;
+const PICK_DIST = 16;      // tapping / clicking a marker opens it up to this distance (m)
 const STORE_KEY = 'titanic.entdeckt.v1';
 
 function tokenTexture() {
@@ -115,6 +116,29 @@ export class InfoPoints {
     this.mesh.count = n;
     if (colorDirty) this.mesh.instanceColor.needsUpdate = true;
     this.nearest = best;
+  }
+
+  /**
+   * Info marker under a screen point (tap / click), or -1. Markers are small, so the hit area is generous
+   * (at least a fingertip); the nearest marker to the camera wins.
+   */
+  pick(sx, sy, camera, w = window.innerWidth, h = window.innerHeight) {
+    if (!this.mesh || !camera) return -1;
+    const v = (this._v ??= new THREE.Vector3()), cp = camera.position;
+    const focal = (h / 2) / Math.tan((camera.fov * Math.PI) / 360);
+    let best = -1, bestD = Infinity;
+    for (const i of this._visible) {
+      const it = this.items[i];
+      const d = Math.hypot(it.x - cp.x, it.y - cp.y, it.z - cp.z);
+      if (d > PICK_DIST || Math.abs(it.y - cp.y) > 3.2 || d >= bestD) continue;
+      v.set(it.x, it.y, it.z).project(camera);
+      if (v.z < -1 || v.z > 1) continue;
+      const px = (v.x * 0.5 + 0.5) * w, py = (-v.y * 0.5 + 0.5) * h;
+      const r = Math.max(30, (0.11 * focal / Math.max(d, 0.3)) * 1.6);
+      if (Math.hypot(px - sx, py - sy) > r) continue;
+      best = i; bestD = d;
+    }
+    return best;
   }
 
   /** Mark as read; returns true if it was new. */

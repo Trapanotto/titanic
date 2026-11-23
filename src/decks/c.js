@@ -59,6 +59,7 @@ function consulting(ctx) {
 
 export async function build(world) {
   const Y = DECK_Y[deck];
+  await world.tick();
   buildDeckShell(world, deck, { floors: [{ x0: 94, x1: 133, mat: 'linoRed' }, { x0: -134, x1: -106, mat: 'linoRed' }] });
   const plan = createDeckPlan(world, deck, { wall: 'whitePanel' });
 
@@ -94,78 +95,126 @@ export async function build(world) {
   };
   const alley = (id, x0, x1) => gang(id, 'Quergang 1. Klasse', x0, x1, -CZ0, CZ0, { floor: 'linoCream' });
 
+  await world.tick();
   // ====================================================================================================== FORECASTLE x 94..133
   const LF = { x0: 94, x1: 106, z: 5.2 };
+  await world.tick();
   room('eingang-3v', 'Eingangshalle 3. Klasse (vorn)', LF.x0, LF.x1, -LF.z, LF.z, 'empty', [], {
     type: 'lobby', cls: 'third', stairs: true, walls: 'none', wall: 'paintWhite', floor: 'linoRed', lamp: 'bulkhead',
     info: { title: 'Eingang der 3. Klasse unter der Back', x: 95.2, z: -3.2, radius: 4, text: 'Durch die Türen im Schott zum vorderen Brunnendeck gelangten die Passagiere der Dritten Klasse in diese Halle unter der Back. Von hier führte die vordere Treppe der Dritten Klasse hinunter zu den Kabinen der allein reisenden Männer auf den Decks D bis G. Das offene Brunnendeck davor diente ihnen tagsüber als Promenade.' } });
+  await world.tick();
   tp('Eingangshalle 3. Klasse (vorn)', '3. Klasse', 95.3, -3.4, 0);
+  await world.tick();
   room('zimmermann', 'Werkstatt des Zimmermanns', 94, 100, -99, -LF.z, carpenter, [dS(97.5, { style: 'steel' })], { ...SVC, walls: ['fwd', 'stbd', 'port'] });
+  await world.tick();
   room('wasch-crew-v', 'Waschraum und WC der Decksmannschaft', 100, 106, -99, -LF.z, washroom, [dS(103.2)], { ...CREW, floor: 'tile' });
+  await world.tick();
   room('crew-kombuese', 'Mannschaftsküche', 94, 100, LF.z, 99, { preset: 'galley', ranges: 1 }, [dP(97.5, { style: 'steel' })], { ...SVC, floor: 'tile', walls: ['fwd', 'port', 'stbd'],
     });
+  await world.tick();
   room('lampen', 'Lampenraum und Bootsmannsstore', 100, 106, LF.z, 99, lampRoom, [dP(103.2, { style: 'steel' })], SVC);
+  await world.tick();
   gang('gang-back', 'Gang unter der Back', 106, 112, -0.7, 0.7, { lamp: 'bulkhead', wall: 'paintWhite' });
+  await world.tick();
   room('messe-matrosen', 'Mannschaftsmesse (Matrosen)', 106, 112, -99, -0.7, crewMess, [dS(109)], { ...CREW, wall: 'pine',
     teleport: { name: 'Mannschaftsmesse', group: 'Besatzung' },
     info: { title: 'Mannschaftsmessen unter der Back', text: 'Unter der Back lagen die Messen der Decksmannschaft und der Heizer. Die Männer aßen an langen Tischen mit festen Bänken; das Essen kam aus der benachbarten Mannschaftsküche. Für die rund 900 Besatzungsmitglieder gab es keinen gemeinsamen Speisesaal – jede Abteilung hatte ihre eigene Messe.' } });
+  await world.tick();
   room('messe-heizer', 'Heizermesse', 106, 112, 0.7, 99, crewMess, [dP(109)], { ...CREW, wall: 'pine' });
   const WL = { x0: 112, x1: 119 };
+  await world.tick();
   room('ankerspill', 'Ankerspill-Maschinenraum', WL.x0, WL.x1, -99, 99, () => windlassRoom(plan, WL), [dA(0, { w: 0.9, style: 'steel' }), dF(0, { w: 0.9, style: 'steel' })], {
     ...SVC, wall: 'steel', floor: 'steelFloor', teleport: { name: 'Ankerspill-Maschinenraum', group: 'Besatzung', x: WL.x0 + 1.0, z: 0, yaw: 0 },
     info: { title: 'Ankerspillmaschinen', x: WL.x0 + 1.2, z: 0, text: 'Zwei Dampfmaschinen trieben über senkrechte Wellen die Ankerspille und Spillköpfe auf dem Vordeck darüber an. Durch die Kettenrohre lief die Ankerkette hinunter in den Kettenkasten. Allein die beiden Buganker wogen je etwa acht Tonnen, der Mittelanker auf der Back sogar rund 15,8 Tonnen.' } });
+  await world.tick();
   gang('gang-bug', 'Gang zu den Bugstores', 119, 124, -0.6, 0.6, { lamp: 'bulkhead', wall: 'paintWhite' });
+  await world.tick();
   room('farben', 'Farbenlast', 119, 124, -99, -0.6, 'store', [dS(121.5, { style: 'steel' })], SVC);
+  await world.tick();
   room('tauwerk', 'Tauwerklast', 119, 124, 0.6, 99, { preset: 'store', shelves: 2 }, [dP(121.5, { style: 'steel' })], SVC);
+  await world.tick();
   room('bugstore', 'Bootsmannsstore im Bug', 124, 133, -99, 99, 'store', [dA(0, { w: 0.9, style: 'steel' })], { ...SVC, walls: ['aft'] });
 
+  await world.tick();
   // ====================================================================================================== MAIN SEGMENT x −90..78
   // ---------------------------------------------------------------- forward end x 62..78
+  await world.tick();
   gang('quer-vorn', 'Quergang am vorderen Brunnendeck', 76.2, 78, -CZ1, CZ1, { floor: 'linoCream', wall: 'whitePanel' });
+  await world.tick();
   tp('Eingang vom vorderen Brunnendeck', '1. Klasse', 76.9, 3.8, Math.PI);
+  await world.tick();
   for (const s of [-1, 1]) {
     gang(s < 0 ? 'gang-bb-v' : 'gang-stb-v', s < 0 ? 'Kabinengang Backbord (vorn)' : 'Kabinengang Steuerbord (vorn)', 48, 76.2, s < 0 ? -CZ1 : CZ0, s < 0 ? -CZ0 : CZ1, { handrail: true, floor: 'linoCream', group: '1. Klasse' });
     room(s < 0 ? 'post-v' : 'stewards-v', s < 0 ? 'Kabine der Postbeamten' : 'Kabine der Kabinenstewards', 74.4, 78, s < 0 ? -99 : CZ1, s < 0 ? -CZ1 : 99,
       { preset: 'cabinCrew', berths: s < 0 ? 2 : 4, officer: s < 0 }, [{ side: s < 0 ? 'stbd' : 'port', at: 75.4, style: 'pine' }], { ...CREW, walls: s < 0 ? ['aft', 'stbd'] : ['aft', 'port'] });
   }
+  await world.tick();
   tp('Kabinengang 1. Klasse (vorn)', '1. Klasse', 72, CZC, Math.PI);
+  await world.tick();
   outside(62, 74.4, 3);
+  await world.tick();
   inside(59.5, 66.2, 2);
+  await world.tick();
   plan.cabinRow({ x0: 66.2, x1: 76.2, z0: -CZ0, z1: -CH, count: 3, corridorSide: 'port', type: 'crew', name: 'Kabine der Postbeamten', idPrefix: 'C-post-', furnish: { preset: 'cabinCrew', berths: 2, officer: true }, door: 'pine', lamp: 'bulkhead' });
+  await world.tick();
   plan.cabinRow({ x0: 66.2, x1: 76.2, z0: CH, z1: CZ0, count: 3, corridorSide: 'stbd', type: 'crew', name: 'Kabine der Stewards', idPrefix: 'C-steward-', furnish: { preset: 'cabinCrew', berths: 4 }, door: 'pine', lamp: 'bulkhead' });
+  await world.tick();
   gang('stich-vorn', 'Stichgang zum Gepäckraum', 68, 76.2, -0.7, 0.7, { wall: 'paintWhite', lamp: 'bulkhead' });
+  await world.tick();
   room('gepaeck-1', 'Gepäckraum 1. Klasse (Kabinengepäck)', 59.5, 68, -CH, CH, 'hold', [dF(0, { w: 1.0, style: 'steel' })], { ...SVC, walls: ['fwd', 'port', 'stbd'] });
+  await world.tick();
   room('waesche-v', 'Wäschekammer (vorn)', 68, 76.2, -CH, -0.7, 'linen', [dS(72.2)], SVC);
+  await world.tick();
   room('pantry-v', 'Stewardpantry 1. Klasse (vorn)', 68, 76.2, 0.7, CH, 'pantry', [dP(72.2)], { ...SVC, floor: 'tile' });
 
+  await world.tick();
   // ---------------------------------------------------------------- x 48..62  (funnel casing 1: 52.5..59.5)
   outside(48, 62, 4);
+  await world.tick();
   alley('quer-e', 48, 49.2);
+  await world.tick();
   inside(49.2, 59.5, 3);
+  await world.tick();
   room('bad-1v', 'Bad 1. Klasse', 49.2, 52.5, -CH, 0, { preset: 'bathroom', shower: true }, [dA(-1.5)], { ...WET, cls: 'first', walls: ['aft', 'port', 'stbd'] });
+  await world.tick();
   room('wc-1v', 'WC 1. Klasse', 49.2, 52.5, 0, CH, 'wc', [dA(1.5)], { ...WET, cls: 'first', walls: ['aft', 'port', 'stbd'] });
 
+  await world.tick();
   // ---------------------------------------------------------------- x 37.5..48  forward Grand Staircase
   const GL = { x0: 37.5, x1: 48 };
+  await world.tick();
   room('grosse-treppe', 'Halle der Großen Treppe (C-Deck)', GL.x0, GL.x1, -CZ1, CZ1, () => grandLobby(plan, GL), [], {
     type: 'lobby', cls: 'first', stairs: true, walls: 'none', wall: 'oakPanel', floor: 'linoCream', lamp: 'bowl',
     info: { title: 'Große Treppe auf dem C-Deck', x: 38.4, z: 4.0, radius: 5, text: 'Auf dem C-Deck öffnete sich die vordere Große Treppe zu einer weiten Halle mit Eichentäfelung und einem Boden aus cremefarbenen und roten Linoleumfliesen. Hier lagen das Zahlmeisterbüro und das Auskunftsbüro, die erste Anlaufstelle der Passagiere nach dem Einschiffen. Vor der Treppe fuhren drei elektrische Aufzüge zwischen dem E- und dem A-Deck.' } });
+  await world.tick();
   plan.wall(GL.x1, -CZ0, GL.x1, CZ0, { wall: 'oakPanel' });
+  await world.tick();
   tp('Große Treppe – C-Deck', '1. Klasse', 45.0, 0, Math.PI);
+  await world.tick();
   row('p', { x0: GL.x0, x1: GL.x1, z0: -99, z1: -CZ1, count: 3, corridorSide: 'stbd', ...F1, wall: 'damaskGold' });
+  await world.tick();
   room('zahlmeister', 'Zahlmeisterbüro', GL.x0, 42.5, CZ1, 99, purserOffice, [dP(40.2, { style: 'oak' })], {
     type: 'office', cls: 'first', wall: 'oakDado', floor: 'carpetGreen', teleport: { name: 'Zahlmeisterbüro', group: '1. Klasse' },
     info: { title: 'Zahlmeisterbüro', text: 'Zahlmeister Hugh McElroy und seine Gehilfen verwahrten im Tresor dieses Büros Geld, Schmuck und Wertpapiere der Passagiere, gaben Wertmarken aus und wechselten Devisen. Hier gaben die Passagiere auch ihre Marconi-Telegramme auf. In der Unglücksnacht drängten sich Passagiere vor dem Schalter, um ihre Wertsachen zurückzufordern.' } });
+  await world.tick();
   room('auskunft', 'Auskunftsbüro', 42.5, GL.x1, CZ1, 99, enquiryOffice, [dP(47.3, { style: 'oak' })], { type: 'office', cls: 'first', wall: 'oakDado', floor: 'carpetGreen' });
+  await world.tick();
   bay(plan, 43.0, 46.6, CZ1, { sill: 1.05, head: 2.1, neg: 'oakPanel', pos: 'oakPanel', frame: 'mahogany', grille: true, shelf: 0.12 });
+  await world.tick();
   bay(plan, 41.0, 42.4, CZ1, { sill: 1.05, head: 2.1, neg: 'oakPanel', pos: 'oakPanel', frame: 'mahogany', grille: true, shelf: 0.12 });
 
+  await world.tick();
   // ---------------------------------------------------------------- x 2..37.5  (funnel casings 2: 30.5..37.5, 3: 8.5..15.5)
   for (const s of [-1, 1]) gang(s < 0 ? 'gang-bb-m' : 'gang-stb-m', s < 0 ? 'Kabinengang Backbord (mittschiffs)' : 'Kabinengang Steuerbord (mittschiffs)', 2, GL.x0, s < 0 ? -CZ1 : CZ0, s < 0 ? -CZ0 : CZ1, { handrail: true, floor: 'linoCream', group: '1. Klasse' });
+  await world.tick();
   tp('Kabinengang 1. Klasse (mittschiffs)', '1. Klasse', 26, -CZC, Math.PI);
+  await world.tick();
   outside(30, 37.5, 2);
+  await world.tick();
   inside(30.5, 37.5, 2);
+  await world.tick();
   alley('quer-d2', 29.3, 30.5);
+  await world.tick();
   inside(16.7, 29.3, 4);
   // the two parlour suites: sitting room, bedroom, private bath
   ctr.p = 55; ctr.s = 62;
@@ -177,83 +226,133 @@ export async function build(world) {
       id: 'C' + n2, type: 'cabin', cls: 'first', wall: s < 0 ? 'damaskRed' : 'damaskGold', floor: 'carpetRed', lamp: 'bowl' });
     room('bad-' + n1, `Suite C ${n1}–${n2} – Bad`, 28, 30, z0, z1, { preset: 'bathroom', wc: true }, [dA(zc)], { ...WET, cls: 'first' });
   };
+  await world.tick();
   suite(-1); suite(1);
+  await world.tick();
   plan.rooms.find((r) => r.id === 'C55').teleport = { name: 'Suite C 55–57 (Straus)', group: '1. Klasse' };
+  await world.tick();
   plan.rooms.find((r) => r.id === 'C55').info = { title: 'Suite C 55–57: Isidor und Ida Straus', text: 'In dieser Suite aus Salon, Schlafzimmer und Bad reisten Isidor Straus, Mitinhaber des New Yorker Kaufhauses Macy’s, und seine Frau Ida. Als ihr ein Platz im Rettungsboot angeboten wurde, weigerte sich Ida, ihren Mann zu verlassen: Sie hätten ihr Leben lang zusammengelebt und würden auch zusammen sterben. Beide kamen beim Untergang ums Leben.' };
+  await world.tick();
   plan.rooms.find((r) => r.id === 'C62').info = { title: 'Suite C 62–64: John Jacob Astor', text: 'Die Suite an der Steuerbordseite bewohnten der Multimillionär John Jacob Astor IV., der reichste Mann an Bord, und seine junge, schwangere Frau Madeleine. Astor half ihr in Rettungsboot 4 und blieb selbst zurück, weil nur Frauen und Kinder einsteigen durften. Madeleine überlebte; Astors Leichnam wurde Tage später geborgen.' };
   ctr.p = 59; ctr.s = 66;
+  await world.tick();
   outside(2, 20, 5);
+  await world.tick();
   alley('quer-d1', 15.5, 16.7);
+  await world.tick();
   inside(2, 15.5, 4);
+  await world.tick();
   room('zofen', 'Aufenthaltsraum der Zofen und Diener', 16.7, 23.6, -CH, CH, maidsSaloon, [dA(0)], {
     type: 'public', cls: 'first', wall: 'whiteDado', floor: 'linoCream', teleport: { name: 'Salon der Zofen und Diener', group: '1. Klasse' } });
+  await world.tick();
   room('arzt-behandlung', 'Behandlungsraum des Schiffsarztes', 23.6, 29.3, -CH, 0, surgery, [dF(-1.5)], { type: 'service', cls: 'first', wall: 'paintWhite', floor: 'tile' });
+  await world.tick();
   room('arzt', 'Sprechzimmer des Schiffsarztes', 23.6, 29.3, 0, CH, consulting, [dF(1.5, { style: 'oak' })], {
     type: 'office', cls: 'first', wall: 'oakDado', floor: 'carpetGreen', teleport: { name: 'Schiffsarzt', group: '1. Klasse' },
     info: { title: 'Der Schiffsarzt', text: 'Chefarzt William O’Loughlin, seit über 40 Jahren im Dienst der White Star Line, und sein Assistent John Edward Simpson behandelten die Passagiere der Ersten Klasse in diesem Sprechzimmer; das Hospital lag ein Deck tiefer. Beide Ärzte blieben in der Unglücksnacht an Bord und kamen ums Leben.' } });
+  await world.tick();
   room('deckpantry', 'Deckpantry', 2, 8.5, -CH, 0, 'pantry', [dA(-1.5)], { ...SVC, floor: 'tile', walls: ['aft', 'port', 'stbd'] });
+  await world.tick();
   room('friseur', 'Friseursalon 1. Klasse', 2, 8.5, 0, CH, barberShop, [dA(1.5, { style: 'mahogany' })], {
     type: 'public', cls: 'first', wall: 'mahoganyDado', floor: 'tile', walls: ['aft', 'port', 'stbd'], teleport: { name: 'Friseursalon', group: '1. Klasse' },
     info: { title: 'Friseursalon der 1. Klasse', text: 'Beim Friseur der Ersten Klasse konnte man sich rasieren und frisieren lassen und zugleich Andenken kaufen: Von der Decke hingen Wimpel, Puppen, Fähnchen und Mützenbänder mit dem Schiffsnamen, dazu gab es Postkarten, Tabak und Spielzeug. Der Barbier August Weikman überlebte den Untergang.' } });
 
+  await world.tick();
   // ---------------------------------------------------------------- x −6.5..2  aft Grand Staircase (lowest deck C)
   const AL = { x0: -6.5, x1: 2 };
+  await world.tick();
   room('treppe-achtern', 'Halle der hinteren Großen Treppe (C-Deck)', AL.x0, AL.x1, -CZ1, CZ1, () => aftLobby(plan, AL), [], {
     type: 'lobby', cls: 'first', stairs: true, walls: 'none', wall: 'oakPanel', floor: 'linoCream', lamp: 'bowl',
     info: { title: 'Hintere Große Treppe', x: -5.8, z: -4.0, radius: 5, text: 'Die hintere Große Treppe begann auf dem C-Deck und führte, ebenso prunkvoll wie die vordere, hinauf bis zum Bootsdeck mit seiner eigenen Glaskuppel. Sie erschloss den hinteren Teil der Ersten Klasse mit dem Rauchsalon, dem À-la-carte-Restaurant und dem Café Parisien. Beim Untergang brach das Schiff ungefähr an dieser Stelle auseinander.' } });
+  await world.tick();
   tp('Große Treppe (achtern) – C-Deck', '1. Klasse', 1.0, 0, Math.PI);
+  await world.tick();
   outside(AL.x0, AL.x1, 2);
 
+  await world.tick();
   // ---------------------------------------------------------------- x −38.5..−6.5  (funnel casing 4: −13.5..−6.5, engine casing −36..−24)
   for (const s of [-1, 1]) gang(s < 0 ? 'gang-bb-a' : 'gang-stb-a', s < 0 ? 'Kabinengang Backbord (achtern)' : 'Kabinengang Steuerbord (achtern)', -38.5, AL.x0, s < 0 ? -CZ1 : CZ0, s < 0 ? -CZ0 : CZ1, { handrail: true, floor: 'linoCream', group: '1. Klasse' });
+  await world.tick();
   tp('Kabinengang 1. Klasse (achtern)', '1. Klasse', -20, CZC, Math.PI);
+  await world.tick();
   outside(-38.5, AL.x0, 9);
+  await world.tick();
   inside(-22.8, AL.x0, 4);
+  await world.tick();
   alley('quer-c', -24, -22.8);
+  await world.tick();
   inside(-36, -24, 3);
+  await world.tick();
   gang('stich-c', 'Gang zu den Bädern 1. Klasse', -22.8, -13.5, -0.6, 0.6, { floor: 'linoCream' });
+  await world.tick();
   room('bad-1a', 'Bad 1. Klasse', -22.8, -18.15, -CH, -0.6, { preset: 'bathroom', shower: true }, [dS(-20.5)], { ...WET, cls: 'first' });
+  await world.tick();
   room('wc-1a-d', 'WC 1. Klasse (Damen)', -18.15, -13.5, -CH, -0.6, 'wc', [dS(-15.8)], { ...WET, cls: 'first' });
+  await world.tick();
   room('bad-1b', 'Bad 1. Klasse', -22.8, -18.15, 0.6, CH, 'bathroom', [dP(-20.5)], { ...WET, cls: 'first' });
+  await world.tick();
   room('wc-1a-h', 'WC 1. Klasse (Herren)', -18.15, -13.5, 0.6, CH, 'wc', [dP(-15.8)], { ...WET, cls: 'first' });
+  await world.tick();
   room('pantry-a', 'Stewardpantry 1. Klasse (achtern)', -38.5, -36, -CZ0, 0, 'pantry', [dP(-37.25)], { ...SVC, floor: 'tile' });
+  await world.tick();
   room('waesche-a', 'Wäschekammer 1. Klasse (achtern)', -38.5, -36, 0, CZ0, 'linen', [dS(-37.25)], SVC);
+  await world.tick();
   info('Kabinen der 1. Klasse auf dem C-Deck', -20, -CZC, 'Das C-Deck war fast auf ganzer Länge mit Kabinen der Ersten Klasse belegt, nummeriert von C 1 im Bug bis über C 140 – ungerade Nummern an Backbord, gerade an Steuerbord. Die Außenkabinen hatten Bullaugen, die Innenkabinen nur elektrisches Licht. Viele waren in verschiedenen Stilen ausgestattet, mit Messing- oder Mahagonibetten, Waschtisch und eigener Heizung.');
 
+  await world.tick();
   // ---------------------------------------------------------------- x −59..−38.5  second-class staircase, library, promenades
   const O2 = { type: 'lobby', cls: 'second', stairs: true, walls: 'none', wall: 'oakDado', floor: 'linoBlue', lamp: 'bowl' };
+  await world.tick();
   room('treppe-2', 'Treppenhalle 2. Klasse (C-Deck)', -47.5, -38.5, -WZ, WZ, (ctx) => {
     for (const s of [-1, 1]) { plan.prop(bench({ w: 1.8, mat: 'oak', iron: false }), -45.8, s * (WZ - 0.35), s < 0 ? PZ_ : NZ_, { collide: true }); plan.prop(pottedPalm(), -39.2, s * (WZ - 0.6), 0, { collide: false }); }
   }, [], { ...O2 });
+  await world.tick();
   tp('Treppenhaus 2. Klasse – C-Deck', '2. Klasse', -39.1, -4.2, Math.PI);
+  await world.tick();
   for (const z of [-CZC, CZC]) plan.wall(-38.5, z - 0.9, -38.5, z + 0.9, { wall: 'whitePanel', doors: [{ at: z, w: 0.9 }] });
   const LB = { x0: -59, x1: -47.5 };
   const bays = [[-57.3, -55.0], [-54.4, -52.1], [-51.5, -49.2]];
+  await world.tick();
   room('bibliothek-2', 'Bibliothek 2. Klasse', LB.x0, LB.x1, -WZ, WZ, (ctx) => library(ctx, LB, WZ, bays),
     [dF(-4.5, { w: 1.4, leaf: false, style: 'mahogany' }), dF(4.5, { w: 1.4, leaf: false, style: 'mahogany' }), dA(-4.5, { w: 1.2, style: 'mahogany' }), dA(4.5, { w: 1.2, style: 'mahogany' })], {
       type: 'public', cls: 'second', wall: 'libAdam', floor: 'carpetGreen', lamp: false,
       teleport: { name: 'Bibliothek 2. Klasse', group: '2. Klasse', x: -48.4, z: -3.0, yaw: Math.PI },
       info: { title: 'Bibliothek der 2. Klasse', x: -53.3, z: 0, radius: 6, text: 'Die Bibliothek der Zweiten Klasse war mit hellem Bergahorn getäfelt, darunter ein geschnitzter Mahagonisockel; Mahagonimöbel mit grünem Bezug und ein großer Bücherschrank luden zum Lesen und Briefeschreiben ein. Große Fenster gingen auf die verglasten Promenaden an beiden Seiten. Der Lehrer Lawrence Beesley, der hier am Nachmittag des 14. April saß, beschrieb den Raum später in seinem Buch über den Untergang.' } });
+  await world.tick();
   for (const s of [-1, 1]) {
     room(s < 0 ? 'prom-2-bb' : 'prom-2-stb', s < 0 ? 'Geschlossene Promenade 2. Klasse (Backbord)' : 'Geschlossene Promenade 2. Klasse (Steuerbord)', LB.x0, -38.5, s < 0 ? -99 : WZ, s < 0 ? -WZ : 99,
       () => promenade(plan, LB.x0, -38.5, s, plan.halfWidth(-50)), [{ side: s < 0 ? 'stbd' : 'port', at: -43, w: 1.2, leaf: false }],
       { type: 'promenade', cls: 'second', wall: 'whitePanel', floor: 'deckWood', lamp: 'dome' });
   }
+  await world.tick();
   tp('Promenade 2. Klasse (C-Deck)', '2. Klasse', -40, 12.2, Math.PI);
 
+  await world.tick();
   // ---------------------------------------------------------------- x −90..−59  aft staircase, second-class staterooms
   room('treppe-2a', 'Hintere Treppenhalle 2. Klasse (C-Deck)', -68, LB.x0, -SZ1, SZ1, 'empty', [], { ...O2 });
+  await world.tick();
   tp('Hinteres Treppenhaus 2. Klasse – C-Deck', '2. Klasse', -59.8, -4.4, Math.PI);
+  await world.tick();
   row('s2', { x0: -68, x1: LB.x0, z0: SZ1, z1: 99, count: 3, corridorSide: 'port', ...S2 });
+  await world.tick();
   row('p2', { x0: -68, x1: LB.x0, z0: -99, z1: -SZ1, count: 3, corridorSide: 'stbd', ...S2 });
+  await world.tick();
   gang('quer-achtern', 'Quergang am hinteren Brunnendeck', -90, -88.6, -99, 99, { floor: 'linoBlue', wall: 'whitePanel' });
+  await world.tick();
   tp('Eingang vom hinteren Brunnendeck', '2. Klasse', -89.3, 3.6, 0);
+  await world.tick();
   for (const s of [-1, 1]) gang(s < 0 ? 'gang-2-bb' : 'gang-2-stb', s < 0 ? 'Kabinengang 2. Klasse (Backbord)' : 'Kabinengang 2. Klasse (Steuerbord)', -88.6, -68, s < 0 ? -SZ1 : SZ0, s < 0 ? -SZ0 : SZ1, { handrail: true, floor: 'linoBlue', group: '2. Klasse' });
+  await world.tick();
   tp('Kabinengang 2. Klasse (C-Deck)', '2. Klasse', -80, SZC, 0);
+  await world.tick();
   row('p2', { x0: -88.6, x1: -68, z0: -99, z1: -SZ1, count: 7, corridorSide: 'stbd', ...S2, berths: 4 });
+  await world.tick();
   row('s2', { x0: -88.6, x1: -68, z0: SZ1, z1: 99, count: 7, corridorSide: 'port', ...S2, berths: 4 });
+  await world.tick();
   row('p2', { x0: -88.6, x1: -68, z0: -SZ0, z1: -SIN, count: 6, corridorSide: 'port', ...S2 });
+  await world.tick();
   row('s2', { x0: -88.6, x1: -68, z0: SIN, z1: SZ0, count: 6, corridorSide: 'stbd', ...S2 });
+  await world.tick();
   gang('mittelgang-2', 'Mittelgang 2. Klasse', -88.6, -68, -0.6, 0.6, { floor: 'linoBlue', wall: 'paintWhite' });
   const mid = [
     [-88.6, -81.73, -1, 'wc-2-d', 'WC 2. Klasse (Damen)', 'wc', WET],
@@ -263,36 +362,48 @@ export async function build(world) {
     [-81.73, -74.87, 1, 'bad-2', 'Bäder 2. Klasse', { preset: 'bathroom', shower: true }, WET],
     [-74.87, -68, 1, 'gepaeck-2', 'Gepäckraum 2. Klasse', 'hold', SVC],
   ];
+  await world.tick();
   for (const [x0, x1, s, id, name, furnish, o] of mid) room(id, name, x0, x1, s < 0 ? -SIN : 0.6, s < 0 ? -0.6 : SIN, furnish, [{ side: s < 0 ? 'stbd' : 'port', at: (x0 + x1) / 2, style: o === SVC ? 'steel' : 'white' }], { cls: 'second', ...o });
 
+  await world.tick();
   // ====================================================================================================== POOP x −134..−106
   const LP = { x0: -118, x1: -106, z: 6 };
+  await world.tick();
   room('eingang-3a', 'Eingangshalle 3. Klasse (achtern)', LP.x0, LP.x1, -LP.z, LP.z, (ctx) => {
     poster(plan, LP.x0 + 0.05, -5.2, 1, 0, 0.6, 0.8, 1.6); poster(plan, LP.x0 + 0.05, -1.6, 1, 0, 0.6, 0.8, 1.6);
   }, [], { type: 'lobby', cls: 'third', stairs: true, walls: 'none', wall: 'paintWhite', floor: 'linoRed', lamp: 'bulkhead' });
+  await world.tick();
   tp('Eingangshalle 3. Klasse (achtern)', '3. Klasse', -107.0, -3.4, Math.PI);
   const GR = { x0: -122, x1: -106 }, DOOR3 = -108.6, HATCH = [-121.4, -119.4];
+  await world.tick();
   room('aufenthalt-3', 'Allgemeiner Aufenthaltsraum 3. Klasse', GR.x0, GR.x1, LP.z, 99, (ctx) => thirdSaloon(ctx, GR, 1, LP.z, false, DOOR3),
     [dP(DOOR3, { w: 1.2, style: 'pine' })], {
       type: 'public', cls: 'third', walls: ['aft', 'port', 'stbd'], wall: 'third3', floor: 'linoRed', lamp: 'dome',
       teleport: { name: 'Aufenthaltsraum 3. Klasse', group: '3. Klasse', x: DOOR3, z: 6.9, yaw: Math.PI },
       info: { title: 'Allgemeiner Aufenthaltsraum der 3. Klasse', x: -114, z: 7.0, text: 'Der Gesellschaftsraum der Dritten Klasse war mit weiß lackierter Kiefer getäfelt und mit massiven Teakholztischen und -bänken eingerichtet. Ein Klavier sorgte für Musik und Tanz, an den Wänden hingen Plakate der White Star Line. Für viele Auswanderer war dieser Raum komfortabler als alles, was sie aus der Heimat kannten.' } });
+  await world.tick();
   room('rauchsalon-3', 'Rauchsalon 3. Klasse', GR.x0, GR.x1, -99, -LP.z, (ctx) => thirdSaloon(ctx, GR, -1, LP.z, true, DOOR3, HATCH),
     [dS(DOOR3, { w: 1.2, style: 'oak' })], {
       type: 'public', cls: 'third', walls: ['aft', 'port', 'stbd'], wall: 'third3oak', floor: 'linoRed', lamp: 'dome',
       teleport: { name: 'Rauchsalon 3. Klasse', group: '3. Klasse', x: DOOR3, z: -6.9, yaw: Math.PI },
       info: { title: 'Rauchsalon der 3. Klasse', x: -114, z: -7.0, text: 'Der Rauchsalon der Dritten Klasse war mit Eiche getäfelt und mit robusten Bänken, Tischen und Stühlen aus Teak möbliert; Spucknäpfe aus Messing standen auf dem Boden. Durch eine Durchreiche aus der Bar wurden Bier und Spirituosen ausgeschenkt. Der Raum war den Männern vorbehalten, die hier rauchten, Karten spielten und diskutierten.' } });
+  await world.tick();
   bay(plan, HATCH[0], HATCH[1], -LP.z, { sill: 1.0, head: 1.9, neg: 'oak', pos: 'paintWhite', frame: 'oak', shelf: 0.15 });
+  await world.tick();
   gang('gang-ruder', 'Gang zum Rudermaschinenraum', -122, LP.x0, -0.7, 0.7, { wall: 'paintWhite', lamp: 'bulkhead' });
+  await world.tick();
   room('bar-3', 'Ausschank des Rauchsalons', -122, LP.x0, -LP.z, -0.7, barPantry, [dF(-3.6, { style: 'pine' })], { ...SVC, floor: 'tile' });
+  await world.tick();
   room('wc-3-f', 'WC 3. Klasse (Frauen)', -122, LP.x0, 0.7, 3.35, 'wc', [dF(2.0)], { ...WET, wall: 'paintWhite', cls: 'third' });
+  await world.tick();
   room('wc-3-m', 'WC 3. Klasse (Männer)', -122, LP.x0, 3.35, LP.z, 'wc', [dF(4.68)], { ...WET, wall: 'paintWhite', cls: 'third' });
   const SG = { x0: -134, x1: -122 };
+  await world.tick();
   room('rudermaschine', 'Rudermaschinenraum', SG.x0, SG.x1, -99, 99, () => steeringGear(plan, SG), [dF(0.2, { w: 0.9, style: 'steel' })], {
     ...SVC, walls: ['fwd'], wall: 'steel', floor: 'steelFloor', teleport: { name: 'Rudermaschinenraum', group: 'Besatzung', x: SG.x1 - 0.8, z: 0.2, yaw: Math.PI },
     info: { title: 'Rudermaschinenraum', x: SG.x1 - 1.2, z: 0.2, text: 'Ganz im Heck saß auf dem Kopf des Ruderschafts der große Ruderquadrant. Ihn bewegten zwei Dampf-Rudermaschinen über Zahnräder – eine im Betrieb, die zweite als Reserve. Gesteuert wurden sie hydraulisch über den Telemotor vom Steuerrad auf der Brücke. Das über 100 Tonnen schwere Ruder war für die Größe des Schiffes eher klein, was die Ausweichbewegung vor dem Eisberg erschwerte.' } });
 
-  const res = plan.finish();
+  const res = await plan.finishAsync();
   if (res.problems.length) console.warn(`[C] ${res.problems.length} kit problems`);
   return {};
 }

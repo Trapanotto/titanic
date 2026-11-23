@@ -17,7 +17,8 @@ const HELP = [
   ['J', 'Minikarte ein/aus'],
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
-  ['E', 'Info lesen'],
+  ['E', 'Info lesen (in der Nähe einer Marke)'],
+  ['Klick / Antippen', 'Info-Marke direkt öffnen'],
   ['1 – 9', 'Schnellreise zu Höhepunkten'],
   ['P', 'Leistungsanzeige (FPS, Zeichenaufrufe, Dreiecke, Speicher)'],
   ['G', 'Grafikqualität (niedrig / mittel / hoch)'],
@@ -117,7 +118,11 @@ export class UI {
     this._refreshOverlay();
   }
 
-  onLockChange() { this._refreshOverlay(250); }
+  onLockChange() {
+    // a click that opened a panel may also have asked for the pointer lock: a panel needs a free pointer
+    if (this.modal && this.controls?.locked) this.controls.releaseLock();
+    this._refreshOverlay(250);
+  }
 
   /** Start / pause overlay is shown whenever the player has no way to look around. */
   _refreshOverlay(delay = 0) {
@@ -195,6 +200,12 @@ export class UI {
       case 'bob': p.headBob = !p.headBob; this.toast(p.headBob ? 'Kopfwippen an' : 'Kopfwippen aus', 1.5); break;
       case 'quick': { const t = this.quick[arg - 1]; if (!this.modal && t) this.teleportTo(t); break; }
       case 'touchmode': this.entered = true; this.enableTouch(); break;
+      case 'tap': {
+        if (this.modal || !arg) break;
+        const i = this.info.pick(arg.x, arg.y, this.world.camera);
+        if (i >= 0) this.openInfo(i);
+        break;
+      }
       case 'stick': this._stick(arg); break;
       default: break;
     }
@@ -399,7 +410,7 @@ export class UI {
     const ib = el('div', 'panel info-box');
     this.infoTitle = el('h2', '', '');
     this.infoText = el('div', 'info-text');
-    ib.append(el('div', 'info-orn', '✦  White Star Line  ✦'), this.infoTitle, this.infoText, el('div', 'panel-foot', 'E, Esc oder Klick zum Schließen'));
+    ib.append(el('div', 'info-orn', '✦  White Star Line  ✦'), this.infoTitle, this.infoText, el('div', 'panel-foot', 'E, Esc, Klick oder Antippen zum Schließen'));
     info.append(ib);
     info.addEventListener('click', () => this.closeModal());
 

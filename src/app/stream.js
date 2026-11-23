@@ -30,7 +30,10 @@ export class DeckStreamer {
     this.used = new Map();     // zone -> last time wanted (s)
     this.busy = false;         // a load is running
     this.blocking = false;     // the player's own deck is loading (veil, no simulation)
-    this.stats = { builds: 0, evictions: 0, lastMs: 0, mb: 0, zones: 0 };
+    this.stats = { builds: 0, evictions: 0, lastMs: 0, mb: 0, zones: 0, maxOver: 0 };
+    this.rush = false;         // the running load must finish as fast as possible (veil is up)
+    this.sliceMs = tier.stream.sliceMs ?? 4; // background work per frame
+    this._swap = null;
     this._idle = 0;
     this._still = 0;
     this._last = { x: NaN, y: NaN, z: NaN };
@@ -40,49 +43,100 @@ export class DeckStreamer {
 
   // ------------------------------------------------------------------ build helpers
 
-  /** Run one module build. full = registrations on (dry pass); keep = zones whose new content is kept (else all dropped). */
+  /**
+   * Run one module build. full = registrations on (dry pass); keep = zones whose new content is kept.
+   * A rebuild (full = false) is time-sliced: the module awaits world.tick() at its natural breaks and the frame loop
+   * keeps running in between. While it is paused the world looks untouched: the registration stubs and the module's
+   * private state are swapped out, content for zones that are not wanted goes into detached stand-in groups, and the
+   * module's per-frame code is only registered once the build is complete.
+   */
   async _run(m, full, keep) {
     const W = this.world;
     const before = new Map();
-    for (const g of W.zones.values()) before.set(g, g.children.length);
+    if (full) for (const g of W.zones.values()) before.set(g, g.children.length);
     const sc0 = W.scene.children.length, ex0 = W.exterior.children.length;
     // listeners of the previous build of this module are replaced
     W.updaters = W.updaters.filter((f) => !m.upd.includes(f));
     W._timeListeners = W._timeListeners.filter((f) => !m.time.includes(f));
     m.upd = []; m.time = [];
-    const onUpdate = W.onUpdate, onTime = W.onTimeChange;
-    W.onUpdate = (fn) => { m.upd.push(fn); onUpdate.call(W, fn); };
-    W.onTimeChange = (fn) => { m.time.push(fn); onTime.call(W, fn); };
-    const saved = {};
-    if (!full) {
-      for (const k of REG_STUBS) W[k] = k === 'markForBake' ? (g) => g : () => ({ x0: 0, x1: 0, y0: 0, y1: 0, z0: 0, z1: 0, s: 0, tag: null });
-      for (const k of STATE_KEYS) { saved[k] = [Object.prototype.hasOwnProperty.call(W, k), W[k]]; delete W[k]; }
-    }
-    W.colliderTag = m.id;
+    const onUpdate = W.onUpdate, onTime = W.onTimeChange, zone = W.zone;
+    const real = {}, mine = {}, shadows = new Map();
+    const stub = () => ({ x0: 0, x1: 0, y0: 0, y1: 0, z0: 0, z1: 0, s: 0, tag: null });
+    const tag0 = W.colliderTag;
+    const patch = () => {
+      W.colliderTag = m.id;
+      if (full) {
+        W.onUpdate = (fn) => { m.upd.push(fn); onUpdate.call(W, fn); };
+        W.onTimeChange = (fn) => { m.time.push(fn); onTime.call(W, fn); };
+        return;
+      }
+      W.onUpdate = (fn) => { m.upd.push(fn); };
+      W.onTimeChange = (fn) => { m.time.push(fn); fn(W.state.night); };
+      for (const k of REG_STUBS) W[k] = k === 'markForBake' ? (g) => g : stub;
+      for (const k of STATE_KEYS) {
+        real[k] = [Object.prototype.hasOwnProperty.call(W, k), W[k]];
+        if (k in mine) W[k] = mine[k]; else delete W[k];
+      }
+      W.zone = (deck, x) => {
+        const g = zone.call(W, deck, x);
+        if (keep && keep.has(g)) return g;
+        let sh = shadows.get(g);
+        if (!sh) { sh = new g.constructor(); sh.name = g.name; sh.userData = { ...g.userData, chunks: undefined, batches: undefined }; shadows.set(g, sh); }
+        return sh;
+      };
+    };
+    const unpatch = () => {
+      delete W.onUpdate; delete W.onTimeChange;
+      W.colliderTag = tag0;
+      if (full) return;
+      for (const k of REG_STUBS) delete W[k];
+      for (const k of STATE_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(W, k)) mine[k] = W[k]; else delete mine[k];
+        const [own, v] = real[k]; if (own) W[k] = v; else delete W[k];
+      }
+      delete W.zone;
+      // a rebuild must not show anything outside the zones (the first build already added it)
+      for (let i = W.scene.children.length - 1; i >= sc0; i--) W.scene.children[i].parent = null;
+      W.scene.children.length = Math.min(W.scene.children.length, sc0);
+      for (let i = W.exterior.children.length - 1; i >= ex0; i--) W.exterior.children[i].parent = null;
+      W.exterior.children.length = Math.min(W.exterior.children.length, ex0);
+    };
     let res;
+    m.mod ??= await m.load();
+    patch();
+    this._swap = full ? null : { out: unpatch, in: patch };
     try {
-      m.mod ??= await m.load();
       res = await m.mod.build(W);
     } finally {
-      delete W.onUpdate; delete W.onTimeChange;
-      if (!full) {
-        for (const k of REG_STUBS) delete W[k];
-        for (const k of STATE_KEYS) { const [own, v] = saved[k]; if (own) W[k] = v; else delete W[k]; }
-        // a rebuild must not add anything outside the zones (the first build already did)
-        for (let i = W.scene.children.length - 1; i >= sc0; i--) W.scene.children[i].parent = null;
-        W.scene.children.length = Math.min(W.scene.children.length, sc0);
-        for (let i = W.exterior.children.length - 1; i >= ex0; i--) W.exterior.children[i].parent = null;
-        W.exterior.children.length = Math.min(W.exterior.children.length, ex0);
-      }
+      this._swap = null;
+      unpatch();
+    }
+    if (!full) { // complete: now its per-frame code may run
+      for (const fn of m.upd) onUpdate.call(W, fn);
+      for (const fn of m.time) W._timeListeners.push(fn);
     }
     m.update = typeof res?.update === 'function' ? res.update : null;
-    for (const g of W.zones.values()) {
-      const n0 = before.get(g) ?? 0;
-      if (g.children.length > n0 && full) m.zones.add(g);
-      if (!(keep && keep.has(g))) W.dropBuilt(g, n0);
+    if (full) {
+      for (const g of W.zones.values()) {
+        const n0 = before.get(g) ?? 0;
+        if (g.children.length > n0) m.zones.add(g);
+        if (!(keep && keep.has(g))) W.dropBuilt(g, n0);
+      }
     }
     this.flush();
     this.stats.builds++;
+  }
+
+  /** The slice is used up: give the frame back, continue after the next one was drawn (or at once when rushing). */
+  async _pause() {
+    const S = this.world.slicer, sw = this._swap;
+    const over = now() - S.until;
+    if (over > this.stats.maxOver) this.stats.maxOver = Math.round(over);
+    sw?.out();
+    if (this.rush || typeof document === 'undefined' || document.hidden || typeof requestAnimationFrame !== 'function') await yieldTask();
+    else await new Promise((r) => { let d = false; const go = () => { if (!d) { d = true; r(); } }; requestAnimationFrame(go); setTimeout(go, 150); });
+    sw?.in();
+    S.until = now() + (this.rush ? 30 : this.sliceMs);
   }
 
   /** Dry pass over all streamable modules (logical data for the whole ship). */
@@ -145,18 +199,21 @@ export class DeckStreamer {
   // ------------------------------------------------------------------ loading / eviction
 
   /** Build + bake the given zones (all modules that feed them, in build order). */
-  async load(zones, { veil = false, label = '' } = {}) {
+  async load(zones, { veil = false, rush = veil, label = '' } = {}) {
     const want = new Set([...zones].filter((g) => !this.loaded.has(g)));
     if (!want.size) return;
     this.busy = true;
+    this.rush = rush;
     const t0 = now();
     if (veil) this._showVeil(label);
+    const W = this.world;
+    W.slicer = { until: now() + (rush ? 30 : this.sliceMs), pause: () => this._pause() };
     try {
       for (const g of want) g.userData.loading = true;
       const mods = this.mods.filter((m) => [...m.zones].some((g) => want.has(g)));
       for (let i = 0; i < mods.length; i++) {
         this._setVeil((i + 0.2) / (mods.length + 1));
-        await yieldTask();
+        await W.tick();
         await this._run(mods[i], false, want);
       }
       await this.world.bakeZones([...want], { onProgress: (f) => this._setVeil((mods.length + f) / (mods.length + 1)) });
@@ -167,12 +224,14 @@ export class DeckStreamer {
       this._failUntil = now() / 1000 + 5;
       this.onError?.(e);
     } finally {
+      W.slicer = null;
       for (const g of want) g.userData.loading = false;
       // now visible: listeners (lamp shadows) refresh what they rendered while the zones were hidden
       for (const g of want) if (this.loaded.has(g)) this.world._zoneChanged(g, true);
       this.busy = false;
       this.stats.lastMs = Math.round(now() - t0);
-      if (veil) this._hideVeil();
+      if (veil || this.rush) this._hideVeil();
+      this.rush = false;
       this._account();
     }
   }
@@ -192,8 +251,10 @@ export class DeckStreamer {
       if (total <= budget) break;
       if ((this.used.get(g) || 0) >= old && total <= budget * 1.3) break;
       total -= g.userData.bytes || 0; out.push(g);
+      if (out.length >= 2 && !this.blocking) break; // a few zones per frame: disposing a whole deck at once stalls
     }
     if (!out.length) return;
+    this._evT = 0; // more to do: continue in the next frame
     this.world.unloadZones(out);
     for (const g of out) { this.loaded.delete(g); this.used.delete(g); }
     // modules with nothing resident any more: drop their per-frame code
@@ -215,7 +276,14 @@ export class DeckStreamer {
   /** Per frame: module animations of resident modules + scheduling of loads. */
   update(dt, t, p) {
     for (const m of this.mods) if (m.update) { try { m.update(dt, t); } catch (e) { if (!m.err) { m.err = 1; console.error('[stream] update', m.id, e); } } }
-    if (this.busy) return;
+    if (this.busy) {
+      // the player got ahead of a background load (teleport, fast stairs): finish it at full speed behind the veil
+      if (!this.rush) {
+        const own = deckAtY(p.y - 1.6);
+        for (const g of this.zonesByDeck[own] || []) if (!this.loaded.has(g)) { this.rush = true; this.blocking = true; this._showVeil(own); break; }
+      }
+      return;
+    }
     const tNow = now() / 1000;
     if (tNow < (this._failUntil || 0)) return;
     // the wanted set is re-evaluated when the camera moved a bit or every 0.3 s (no per-frame garbage)
@@ -242,8 +310,9 @@ export class DeckStreamer {
     let nMiss = 0;
     for (const g of set) if (!this.loaded.has(g)) nMiss++;
     if (!nMiss) { if (tNow - (this._evT || 0) > 1) { this._evT = tNow; this.evict(set); } return; }
+    if (!this._evT) { this._evT = tNow; this.evict(set); return; } // finish evicting before the next build
     const missing = [...set].filter((g) => !this.loaded.has(g));
-    if (this._idle < 0.25 || (this._still < 0.2 && this._idle < 0.6)) return;
+    if (this._idle < 0.15) return;
     this._idle = 0;
     // one module per slot: the module feeding the missing zone closest to the player's deck (neighbours first)
     const oi = DECK_ORDER.indexOf(own);
@@ -255,7 +324,7 @@ export class DeckStreamer {
     if (!m) return;
     const zones = [...m.zones].filter((g) => miss.has(g));
     // its zones also need every other module feeding them: load them together
-    this.load(zones).then(() => this.evict(set));
+    this.load(zones).then(() => { this.blocking = false; this.evict(set); });
   }
 
   // ------------------------------------------------------------------ veil

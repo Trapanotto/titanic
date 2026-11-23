@@ -32,6 +32,7 @@ const T = {
 };
 
 export async function build(world) {
+  await world.tick();
   buildDeckShell(world, deck);
   const plan = createDeckPlan(world, deck, { wall: 'whitePanel', floor: 'carpetRed' });
 
@@ -62,15 +63,19 @@ export async function build(world) {
     }
   };
 
+  await world.tick();
   // ============================================================== x 37.5..48  forward Grand Staircase, lifts, entrance halls
   const LF = { x0: 37.5, x1: 48, z0: -CO, z1: CO };
+  await world.tick();
   plan.room({
     id: 'B-treppe-v', name: 'Große Treppe (vorn) – B-Deck', type: 'lobby', stairs: true, ...LF, wall: 'oakPanel', floor: 'linoCream', lamp: 'bowl',
     teleport: { name: 'Große Treppe – B-Deck', group: '1. Klasse', x: 45.0, z: 0, yaw: Math.PI },
     info: { title: 'Große Treppe – B-Deck', x: 42.0, z: 5.4, radius: 5, text: T.grandFwd },
     furnish: () => H.grandLobby(plan, LF),
   });
+  await world.tick();
   for (const s of [-1, 1]) { plan.opening(LF.x1, s * CI, LF.x1, s * CO); plan.opening(LF.x0, s * CI, LF.x0, s * CO); }
+  await world.tick();
   for (const s of [-1, 1]) {
     const R = { x0: 37.5, x1: 46, ...zr(s, CO, 99) };
     room(`vest-${s < 0 ? 'bb' : 'stb'}`, `Eingangshalle 1. Klasse (${SN(s)})`, R.x0, R.x1, R.z0, R.z1, () => H.vestibule(plan, R, s),
@@ -80,13 +85,17 @@ export async function build(world) {
         info: s > 0 ? { title: 'Eingangshallen der Ersten Klasse (B-Deck)', x: 42.4, z: 11.0, radius: 3.5, text: T.vest } : undefined });
   }
 
+  await world.tick();
   // ============================================================== x 46..77.85  forward staterooms B 1 – B 32
   for (const s of [-1, 1]) {
     gang(`gang-v-${s < 0 ? 'bb' : 'stb'}`, `Kabinengang vorn (${SN(s)})`, 48, 76.25, ...Object.values(zr(s, CI, CO)), {
       handrail: true, teleport: { name: `Kabinengang vorn (${SN(s)})`, group: '1. Klasse', x: 66.5, z: s * CC, yaw: 0 } });
   }
+  await world.tick();
   gang('quer-v', 'Querflur am Vorderende', 76.25, XF, -CO, CO, {});
+  await world.tick();
   gang('quer-f1', 'Querflur vor Schornsteinschacht 1', 59.5, 61.1, -CI, CI, {});
+  await world.tick();
   for (const s of [-1, 1]) {
     const odd = s < 0 ? 1 : 0; // port: odd numbers, starboard: even numbers
     const cs = s < 0 ? 'stbd' : 'port', is = s < 0 ? 'port' : 'stbd';
@@ -95,11 +104,16 @@ export async function build(world) {
     cabins({ x0: 52.5, x1: 59.5, ...zr(s, 3, CI), count: 2, side: is, start: 30 - odd });                 // beside funnel casing 1
     cabins({ x0: 48, x1: 52.5, ...zr(s, 0, CI), count: 1, side: is, start: 32 - odd });                   // behind the lift shafts
   }
+  await world.tick();
   room('bad-v', 'Badezimmer (vorn)', 61.1, 68.675, 0, 3, { preset: 'bathroom', shower: true }, [dA(1.5)], WET);
+  await world.tick();
   room('wc-v', 'Herrentoiletten (vorn)', 61.1, 68.675, -3, 0, 'wc', [dA(-1.5)], WET);
+  await world.tick();
   room('anrichte-v', 'Anrichte der Kabinenstewards (vorn)', 68.675, 76.25, 0, 3, 'pantry', [dF(1.5)], { ...SVC, floor: 'tile' });
+  await world.tick();
   room('waesche-v', 'Wäschekammer (vorn)', 68.675, 76.25, -3, 0, 'linen', [dF(-1.5)], SVC);
 
+  await world.tick();
   // ============================================================== x 14..37.5  Parlour Suites + private promenades
   const SUITE = {
     1: { n: [52, 54, 56], who: 'Ismay', tele: 'Parlour-Suite B52–56 (Ismay)', prom: 'Privates Promenadendeck',
@@ -111,6 +125,7 @@ export async function build(world) {
       bedF: { wall: 'lxvB', floor: 'carpetBlue', fo: { sty: 'lxv', cover: 'fabricBlue' } },      // Louis XV
       bedA: { wall: 'renB', floor: 'carpetRed', fo: { sty: 'renaiss', cover: 'fabricRed' } } },   // Italian Renaissance
   };
+  await world.tick();
   for (const s of [1, -1]) {
     const S = SUITE[s], band = zr(s, CO, PZ), full = zr(s, CO, 99), cs = s < 0 ? 'stbd' : 'port', ps = s < 0 ? 'port' : 'stbd';
     const zi = s * 8.5; // interconnecting doors close to the corridor wall
@@ -137,12 +152,15 @@ export async function build(world) {
       furnish: (ctx) => H.privatePromenade(ctx, RP, s, [34.0, 29.5, 23.0]) });
   }
 
+  await world.tick();
   // ============================================================== x 2..37.5  corridors and staterooms around funnels 2 and 3
   for (const s of [-1, 1]) {
     gang(`gang-m-${s < 0 ? 'bb' : 'stb'}`, `Gang an den Parlour-Suiten (${SN(s)})`, 2, 37.5, ...Object.values(zr(s, CI, CO)), {
       handrail: true, teleport: { name: `Kabinengang mittschiffs (${SN(s)})`, group: '1. Klasse', x: 12.0, z: s * CC, yaw: 0 } });
   }
+  await world.tick();
   gang('quer-m', 'Querflur zwischen den Schornsteinschächten', 22.2, 23.8, -CI, CI, {});
+  await world.tick();
   for (const s of [-1, 1]) {
     const odd = s < 0 ? 1 : 0, is = s < 0 ? 'port' : 'stbd', cs = s < 0 ? 'stbd' : 'port';
     cabins({ x0: 30.5, x1: 37.5, ...zr(s, 3, CI), count: 2, side: is, start: 60 - odd });   // B 57/58 – B 59/60 beside funnel 2
@@ -152,23 +170,32 @@ export async function build(world) {
     cabins({ x0: 8.5, x1: 15.5, ...zr(s, 3, CI), count: 2, side: is, start: 78 - odd });   // beside funnel 3
     cabins({ x0: 2, x1: 8.5, ...zr(s, 0, CI), count: 2, side: is, start: 82 - odd });
   }
+  await world.tick();
   room('anrichte-m', 'Anrichte der Kabinenstewards (mittschiffs)', 23.8, 30.5, 0, 3, 'pantry', [dA(1.5)], { ...SVC, floor: 'tile' });
+  await world.tick();
   room('waesche-m', 'Wäschekammer (mittschiffs)', 23.8, 30.5, -3, 0, 'linen', [dA(-1.5)], SVC);
+  await world.tick();
   room('bad-m', 'Badezimmer (mittschiffs)', 15.5, 22.2, 0, 3, { preset: 'bathroom', shower: true }, [dF(1.5)], WET);
+  await world.tick();
   room('wc-m', 'Damentoiletten (mittschiffs)', 15.5, 22.2, -3, 0, 'wc', [dF(-1.5)], WET);
 
+  await world.tick();
   // ============================================================== x -6.5..2  aft Grand Staircase
   const LA = { x0: -6.5, x1: 2, z0: -CO, z1: CO };
+  await world.tick();
   plan.room({
     id: 'B-treppe-a', name: 'Große Treppe (achtern) – B-Deck', type: 'lobby', stairs: true, ...LA, wall: 'oakPanel', floor: 'linoCream', lamp: 'bowl',
     teleport: { name: 'Große Treppe (achtern) – B-Deck', group: '1. Klasse', x: 0.9, z: 0, yaw: Math.PI },
     info: { title: 'Hintere Große Treppe – B-Deck', x: -1.5, z: 5.5, radius: 4, text: T.grandAft },
     furnish: () => H.aftLobby(plan, LA),
   });
+  await world.tick();
   for (const s of [-1, 1]) { plan.opening(LA.x1, s * CI, LA.x1, s * CO); plan.opening(LA.x0, s * 3, LA.x0, s * CO); }
+  await world.tick();
   for (const s of [-1, 1]) cabins({ x0: -6.5, x1: 2, ...zr(s, CO, 99), count: 2, side: s < 0 ? 'stbd' : 'port', start: 86 - (s < 0 ? 1 : 0) }); // B 83 – B 86
 
   // ============================================================== x -13.5..-6.5  restaurant reception (either side of funnel casing 4)
+  await world.tick();
   for (const s of [-1, 1]) {
     const R = { x0: -13.5, x1: -6.5, ...zr(s, 3, 99) };
     room(s < 0 ? 'empfang-bb' : 'empfang-stb', s < 0 ? 'Empfangsraum des Restaurants' : 'Vorraum zum Café Parisien', R.x0, R.x1, R.z0, R.z1, (ctx) => H.reception(ctx, R, s),
@@ -178,8 +205,10 @@ export async function build(world) {
         info: s < 0 ? { title: 'Empfangsraum des À-la-carte-Restaurants', text: T.reception } : undefined });
   }
 
+  await world.tick();
   // ============================================================== x -24..-13.5  À la carte restaurant, Café Parisien
   const RR = { x0: -24, x1: -13.5, z0: -99, z1: 8.4 };
+  await world.tick();
   plan.room({
     id: 'B-restaurant', name: 'À-la-carte-Restaurant', type: 'restaurant', ...RR, wall: 'ritz', floor: BM().roseCarpet, lamp: false, group: '1. Klasse',
     doors: [dS(-18.75, { w: 1.6, leaf: false })],
@@ -188,6 +217,7 @@ export async function build(world) {
     furnish: (ctx) => H.restaurant(ctx, RR),
   });
   const RC = { x0: -36, x1: -13.5, z0: 8.4, z1: 99 };
+  await world.tick();
   plan.room({
     id: 'B-cafe', name: 'Café Parisien', type: 'cafe', ...RC, wall: 'cafe', floor: 'linoCream', lamp: 'bowl', group: '1. Klasse',
     doors: [dA(11.0)],
@@ -196,15 +226,20 @@ export async function build(world) {
     furnish: (ctx) => H.cafe(ctx, RC),
   });
 
+  await world.tick();
   // ============================================================== x -38.5..-24  restaurant galley, pantry, staff (engine casing in the middle)
   room('anrichte-r', 'Anrichte des Restaurants', -30, -24, 3, 8.4, 'pantry', [dF(5.7, { w: 1.0 }), dS(-27)], { ...SVC, floor: 'tile' });
+  await world.tick();
   room('personal-r', 'Aufenthaltsraum des Restaurantpersonals', -36, -30, 3, 8.4, { preset: 'mess' }, [dA(5.7), dF(5.7)], { ...SVC, type: 'crew', group: 'Besatzung' });
+  await world.tick();
   room('kueche-r', 'Küche des À-la-carte-Restaurants', -38.5, -24, -99, -3, 'galley', [dF(-8.5, { w: 1.2 }), dS(-37.25)], {
     ...WET, type: 'galley', lamp: 'dome', group: 'Besatzung',
     teleport: { name: 'Küche des À-la-carte-Restaurants', group: 'Besatzung' },
     info: { title: 'Küche des À-la-carte-Restaurants', text: T.galley } });
+  await world.tick();
   gang('gang-personal', 'Personalgang hinter dem Maschinenschacht', -38.5, -36, -3, 99, { wall: 'paintWhite', floor: 'linoRed', lamp: 'dome' });
 
+  await world.tick();
   // ============================================================== x -47.5..-38.5  2nd class staircase ('second') + neighbours
   plan.room({
     id: 'B-treppe-2', name: 'Treppenhaus 2. Klasse – B-Deck', type: 'lobby', stairs: true, cls: 'second', x0: -47.5, x1: -38.5, z0: -4.5, z1: 4.5,
@@ -213,23 +248,33 @@ export async function build(world) {
     info: { title: 'Treppenhaus der Zweiten Klasse (B-Deck)', x: -43, z: 3.2, radius: 3.5, text: T.second },
     furnish: () => { for (const s of [-1, 1]) H.stairBench(plan, -40.9, s * 4.15, s > 0 ? H.NZ : H.PZ); },
   });
+  await world.tick();
   room('steward-2', 'Stewardraum 2. Klasse', -47.5, -38.5, 4.5, 9, 'office', [dP(-43)], { ...SVC, cls: 'second', group: 'Besatzung' });
+  await world.tick();
   room('wc-2r', 'Herrentoiletten am Rauchsalon', -47.5, -38.5, 9, 99, 'wc', [dA(11.5)], { ...WET, cls: 'second' });
+  await world.tick();
   room('umkleide-r', 'Umkleideraum des Restaurantpersonals', -47.5, -38.5, -8.5, -4.5, H.lockerRoom, [dF(-6.5)], { ...SVC, type: 'crew', group: 'Besatzung' });
+  await world.tick();
   room('vorrat-r', 'Vorratskammer des Restaurants', -47.5, -38.5, -99, -8.5, 'store', [dF(-11.2)], { ...SVC, type: 'store' });
 
+  await world.tick();
   // ============================================================== x -59..-47.5  2nd class smoking room and bar
   const RS = { x0: -59, x1: -47.5, z0: -8.5, z1: 99 };
+  await world.tick();
   plan.room({
     id: 'B-rauchsalon-2', name: 'Rauchsalon 2. Klasse', type: 'saloon', cls: 'second', ...RS, wall: 'oakLXVI', floor: 'linoRed', lamp: false, group: '2. Klasse',
     teleport: { name: 'Rauchsalon 2. Klasse', group: '2. Klasse', x: -58.3, z: 0, yaw: 0 },
     info: { title: 'Rauchsalon der Zweiten Klasse', x: -53.25, z: 3.7, radius: 6, text: T.smoke },
     furnish: (ctx) => H.smokingRoom(ctx, RS),
   });
+  await world.tick();
   room('bar-2', 'Bar 2. Klasse', -53, -47.5, -99, -8.5, (ctx) => H.barRoom(ctx, -51.6), [dS(-48.6)], { type: 'service', cls: 'second', wall: 'oak', floor: 'linoRed' });
+  await world.tick();
   H.hatch(plan, -52.6, -50.6, -8.5, { neg: 'oak', pos: 'oak', frame: 'oak' });
+  await world.tick();
   room('barlager-2', 'Vorratsraum der Bar', -59, -53, -99, -8.5, 'store', [dS(-56)], { ...SVC, type: 'store' });
 
+  await world.tick();
   // ============================================================== x -71.85..-59  aft 2nd class staircase ('secondAft'), exit to the open deck
   const aftWalls = noSide('aft'); // the aft end wall belongs to the exterior module (doors to the open B deck at z = ±5)
   plan.room({
@@ -239,6 +284,7 @@ export async function build(world) {
     info: { title: 'Hinteres Treppenhaus der Zweiten Klasse', x: -69.5, z: 2.8, radius: 3.5, text: T.secondAft },
     furnish: () => { for (const s of [-1, 1]) H.stairBench(plan, -65.5, s * 6.15, s > 0 ? H.NZ : H.PZ); },
   });
+  await world.tick();
   for (const s of [-1, 1]) {
     const z = zr(s, 6.5, 99), ds = s < 0 ? dS : dP;
     room(s < 0 ? 'wc-2-herren' : 'wc-2-damen', s < 0 ? 'Herrentoiletten 2. Klasse' : 'Damentoiletten 2. Klasse', XA, -65.5, z.z0, z.z1, 'wc', [ds(-68.7)], { ...WET, cls: 'second', walls: aftWalls });
@@ -246,7 +292,7 @@ export async function build(world) {
     else room('decksstore', 'Decksstore (Liegestühle und Decken)', -65.5, -59, z.z0, z.z1, 'store', [ds(-62.2)], { ...SVC, type: 'store' });
   }
 
-  const res = plan.finish();
+  const res = await plan.finishAsync();
   if (res.problems.length) console.warn(`[deck B] ${res.problems.length} kit problems`);
   return {};
 }

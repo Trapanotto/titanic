@@ -275,6 +275,23 @@ class DeckPlan {
   // -------------------------------------------------------------- finish
 
   finish() {
+    const it = this._finishSteps();
+    for (;;) { const r = it.next(); if (r.done) return r.value; }
+  }
+
+  /** finish() in time slices (deck streaming): hands the frame back between rooms via world.tick(). */
+  async finishAsync() {
+    const it = this._finishSteps(), w = this.world;
+    for (;;) {
+      const r = it.next();
+      if (r.done) return r.value;
+      const p = w.tick?.();
+      if (p) await p;
+    }
+  }
+
+  /** The work of finish() as a generator: yields after every wall line, room and block of wall faces. */
+  *_finishSteps() {
     if (this._done) return { rooms: this.rooms, problems: this.problems };
     this._done = true;
     const { deck, world, batch: b, y: Y } = this, top = Y + this.h;
@@ -302,6 +319,7 @@ class DeckPlan {
     let nWalls = 0, nDoors = 0;
 
     for (const l of lines.values()) {
+      yield;
       // elementary intervals → runs
       const pts = [...new Set(l.edges.flatMap((e) => [e.a, e.b]).concat(l.open.flat()))].sort((p, q) => p - q);
       const runs = [];
@@ -367,6 +385,7 @@ class DeckPlan {
     const upHoles = this.solids; // ceiling openings above the flights that rise from this deck
     world.rooms ??= [];
     for (const r of this.rooms) {
+      yield;
       const fm = r.floor ?? this.def.floor;
       if (fm) this._overlay(matOf(fm), r, Y + 0.005, false, r.stairs ? this.holes : []);
       if (r.ceiling) this._overlay(matOf(r.ceiling), r, top - 0.005, true, r.stairs ? upHoles : []);
@@ -404,10 +423,18 @@ class DeckPlan {
     }
     // wall faces (deferred so hand-detailed rooms can be recognised), then corridor fittings and porthole curtains
     const jobs = this._jobs ?? [];
-    for (const j of jobs) this._emit(j, !!(j.info.room && [...j.info.room].some((q) => q._detailed)));
+    yield;
+    for (let i = 0; i < jobs.length; i++) {
+      const j = jobs[i];
+      if ((i & 7) === 7) yield;
+      this._emit(j, !!(j.info.room && [...j.info.room].some((q) => q._detailed)));
+    }
     this._jobs = [];
+    yield;
     this._corridorDetails(jobs);
+    yield;
     this._portCurtains();
+    yield;
     b.flush();
     return { rooms: this.rooms, walls: nWalls, doors: nDoors, problems: this.problems };
   }
