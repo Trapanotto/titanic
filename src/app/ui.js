@@ -69,6 +69,9 @@ export class UI {
     if (this.startEl) {
       this.startEl.addEventListener('click', () => { this.entered = true; this.controls?.requestLock(); this._refreshOverlay(); });
       this.startEl.addEventListener('touchend', (e) => { e.preventDefault(); this.entered = true; this.enableTouch(); }, { passive: false });
+      window.addEventListener('keydown', (e) => {
+        if (this.started && !this.entered && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); this.startEl.click(); }
+      });
     }
   }
 
@@ -102,14 +105,16 @@ export class UI {
       setTimeout(() => { this.loadingEl.hidden = true; }, 900);
     }
     this.root.classList.add('live');
-    if (this.noLock) this.entered = true;
+    // desktop: a start button with the three things one needs to know; phones and tablets go straight in
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    if (this.noLock || coarse || this.controls?.touch) this.entered = true;
     this._refreshOverlay();
   }
 
   // ------------------------------------------------------------------ state
 
   /** True while the player must not move / look (modal open or still loading). */
-  isBlocked() { return this.modal !== null || !this.started; }
+  isBlocked() { return this.modal !== null || !this.started || !this.entered; }
 
   enableTouch() {
     if (this.controls) this.controls.touch = true;
@@ -131,11 +136,8 @@ export class UI {
       if (!this.startEl) return;
       const c = this.controls;
       const free = !c || c.locked || c.noLock || c.touch;
-      const show = false; // start directly: no click-to-start / pause overlay (controls lock the pointer on first input)
-      this.startEl.hidden = !show;
-      this.startEl.classList.toggle('paused', this.entered);
-      const title = $('start-title');
-      if (title) title.textContent = this.entered ? 'Pause – klicken, um weiterzugehen' : 'Klicken, um an Bord zu gehen';
+      // only once, after loading on a desktop; no pause overlay afterwards
+      this.startEl.hidden = !(this.started && !this.entered);
     };
     if (delay) this._overlayTimer = setTimeout(apply, delay); else apply();
   }

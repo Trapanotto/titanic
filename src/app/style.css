@@ -55,11 +55,16 @@ kbd {
   z-index: 20; cursor: pointer; pointer-events: auto;
   background: radial-gradient(ellipse at center, rgba(10, 20, 34, 0.5), rgba(5, 11, 20, 0.86));
 }
-#start-title { margin: 0 0 6px; font-weight: 400; font-size: clamp(24px, 4vw, 40px); letter-spacing: 0.06em; }
-#start .subtitle { margin: 0 0 4px; }
-.start-keys { display: grid; grid-template-columns: auto auto; gap: 6px 16px; text-align: left; font-size: 14.5px; color: var(--cream-dim); }
-.start-keys b { font-weight: 400; color: var(--brass-hi); text-align: right; }
-@media (min-width: 760px) { .start-keys { grid-template-columns: auto auto auto auto; } }
+#start-title { margin: 0 0 26px; font-weight: 400; font-size: clamp(30px, 5vw, 54px); letter-spacing: 0.12em; }
+#start-btn {
+  font: 19px var(--serif); letter-spacing: 0.08em; color: #1a1206; cursor: pointer; padding: 13px 34px;
+  background: linear-gradient(180deg, var(--brass-hi), var(--brass)); border: 1px solid var(--brass-hi); border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+#start-btn:hover { filter: brightness(1.08); }
+#start-btn:focus-visible { outline: 2px solid var(--cream); outline-offset: 3px; }
+.start-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 26px; margin-top: 24px; font-size: 14.5px; color: var(--cream-dim); }
+.start-keys b { font-weight: 400; color: var(--brass-hi); margin-right: 6px; }
 
 /* ---------- HUD ---------- */
 .hud { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.6); }
