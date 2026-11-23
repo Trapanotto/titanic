@@ -14,4 +14,5 @@ export const MODULES = [
   { id: 'G', label: 'G-Deck', load: () => import('./decks/g.js') },
   { id: 'orlop', label: 'Orlop-Deck', load: () => import('./decks/orlop.js') },
   { id: 'tank', label: 'Kessel & Maschinen', load: () => import('./decks/tank.js') },
+  { id: 'people', label: 'Passagiere & Besatzung', load: () => import('./people/index.js') },
 ];
