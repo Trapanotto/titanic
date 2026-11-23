@@ -375,8 +375,12 @@ function placePlayer() {
   }
   if (!placed) {
     const t = tps.find((x) => x.name.includes('Bootsdeck')) || tps[0];
-    if (t) player.teleport(t);
-    else { player.setFlyPose(60, 45, 60); player.lookAt(0, 20, 0); }
+    if (t) {
+      // not on top of an info point: step along the deck until the nearest marker is out of reach of the E bar
+      const clear = (x) => world.infos.every((i) => Math.hypot(i.x - x, i.z - t.z) > 4.5 || Math.abs(i.y - DECK_Y[t.deck] - 1.4) > 3);
+      const dx = [0, -5, 5, -7, 7, -9, 9, -12, 12].find((d) => clear(t.x + d)) ?? 0;
+      player.teleport(dx ? { ...t, x: t.x + dx } : t);
+    } else { player.setFlyPose(60, 45, 60); player.lookAt(0, 20, 0); }
   }
   if (placed && !pos) {
     if (yaw !== undefined && Number.isFinite(yaw)) player.yaw = yaw;
