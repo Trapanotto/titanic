@@ -268,7 +268,7 @@ function nextPaint() {
   });
 }
 
-const STREAMABLE = (m) => !['environment', 'exterior', 'fittings', 'people'].includes(m.id);
+const STREAMABLE = (m) => !['environment', 'exterior', 'fittings'].includes(m.id);
 
 async function buildModules() {
   const only = params.get('only')?.split(',').map((s) => s.trim()).filter(Boolean);
