@@ -196,7 +196,7 @@ export class DeckStreamer {
     if (this.cfg.wells) {
       // weak tiers ('near'): only the deck directly above and below, only the zones the well itself is in – enough
       // to close the view through the stair opening (otherwise one looks through the empty ship down to the sea)
-      const near = this.cfg.wells === 'near', m = near ? 5 : 8, zm = near ? 1 : 12;
+      const near = this.cfg.wells === 'near', m = near ? 9 : 8, zm = near ? 1 : 12;
       for (const o of this._openingList()) {
         if (p.x < o.x0 - m || p.x > o.x1 + m || p.z < o.z0 - m || p.z > o.z1 + m) continue;
         const lo = DECK_Y[o.decks[0]] - 0.5, hi = deckAboveY(o.decks[o.decks.length - 1]) + 2;

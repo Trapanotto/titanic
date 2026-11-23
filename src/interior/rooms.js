@@ -123,7 +123,7 @@ function doorLeaf(w, h, style, variant = '') {
       for (const s of faces) { p.bb(mats.steelDark, w - 0.08, 0.03, 0.012, w / 2, h * 0.32, s * 0.026, 0.004); p.bb(mats.steelDark, w - 0.08, 0.03, 0.012, w / 2, h * 0.7, s * 0.026, 0.004); }
       for (const s of faces) for (let k = 0; k < 3; k++) p.b(mats.iron, 0.06, 0.04, 0.03, w - 0.05, 0.3 + k * 0.6, s * 0.03);
     } else if (style === 'pine') {
-      for (const s of faces) { for (let i = 1; i < 5; i++) p.b(m, 0.006, h - 0.04, 0.004, (w * i) / 5, 0.02, s * 0.022); p.b(m, w - 0.06, 0.1, 0.012, w / 2, h * 0.45, s * 0.026); p.b(m, w - 0.06, 0.1, 0.012, w / 2, 0.15, s * 0.026); }
+      for (const s of faces) { for (let i = 1; i < 5; i++) p.b(m, 0.006, h - 0.04, 0.004, (w * i) / 5, 0.02, s * 0.0235); p.b(m, w - 0.06, 0.1, 0.012, w / 2, h * 0.45, s * 0.026); p.b(m, w - 0.06, 0.1, 0.012, w / 2, 0.15, s * 0.026); }
     } else {
       // stiles & rails frame the panels: 2 columns × (glazed top | 2 tall + 2 short) panels
       const st = 0.1, cols = w > 0.7 ? 2 : 1, pw = (w - 2 * st - (cols - 1) * 0.08) / cols;
@@ -134,15 +134,15 @@ function doorLeaf(w, h, style, variant = '') {
           for (const [y0, y1, k] of rows) {
             const ph = y1 - y0, yc = (y0 + y1) / 2;
             if (k === 'g') { if (s > 0) { p.b(mats.glass, pw, ph, 0.006, zc, y0, 0); for (const t of [1 / 3, 2 / 3]) p.b(m, 0.016, ph, 0.03, zc - pw / 2 + pw * t, y0, 0); } p.bb(m, pw + 0.02, 0.02, 0.012, zc, y0 - 0.01, s * 0.026, 0.004); p.bb(m, pw + 0.02, 0.02, 0.012, zc, y1 - 0.01, s * 0.026, 0.004); }
-            else if (k === 'l') { p.b(kitMats.louvre, pw, ph, 0.004, zc, y0, s * 0.021); }
-            else { const f = p.fp(m, pw, ph, 0, yc, 0, 0.009, Math.min(0.045, pw * 0.2)); f.position.set(zc, yc, s * 0.021); f.rotation.y = s > 0 ? -Math.PI / 2 : Math.PI / 2; }
+            else if (k === 'l') { p.b(kitMats.louvre, pw, ph, 0.004, zc, y0, s * 0.0245); }
+            else { const f = p.fp(m, pw, ph, 0, yc, 0, 0.009, Math.min(0.045, pw * 0.2)); f.position.set(zc, yc, s * 0.0235); f.rotation.y = s > 0 ? -Math.PI / 2 : Math.PI / 2; }
           }
         }
       }
     }
     // knob with rose and escutcheon on both faces, three hinges on the hinge edge
     for (const s of faces) {
-      p.b(knobMat, 0.05, 0.16, 0.004, w - 0.075, h * 0.47 - 0.08, s * 0.023);
+      p.b(knobMat, 0.05, 0.16, 0.004, w - 0.075, h * 0.47 - 0.08, s * 0.0245);
       const k = p.lathe(knobMat, [[0, 0], [0.014, 0], [0.007, 0.035], [0.026, 0.055], [0, 0.078]], w - 0.075, h * 0.47, s * 0.023, 7); k.rotation.x = s * Math.PI / 2;
     }
     for (const y of [0.2, h - 0.25]) p.b(knobMat, 0.02, 0.1, 0.02, 0.0, y, 0.025);
@@ -151,17 +151,17 @@ function doorLeaf(w, h, style, variant = '') {
     if (fine >= 1) {
       p.b(knobMat, 0.02, 0.1, 0.02, 0.0, h * 0.5 - 0.05, 0.025); // third hinge
       if (style === 'pine') for (const s of faces) { // ledged & braced: diagonal brace between the two lower ledges
-        const dx = w - 0.16, dy = h * 0.45 - 0.25, br = p.b(m, 0.09, Math.hypot(dx, dy), 0.012, 0, 0, 0);
-        br.position.set(w / 2, (0.25 + h * 0.45) / 2, s * 0.026); br.rotation.z = -Math.atan2(dx, dy);
+        const dx = w - 0.16, dy = h * 0.45 - 0.25, br = p.b(m, 0.09, Math.hypot(dx, dy), 0.008, 0, 0, 0);
+        br.position.set(w / 2, (0.25 + h * 0.45) / 2, s * 0.0255); br.rotation.z = -Math.atan2(dx, dy);
       }
-      else if (!steel) for (const s of faces) p.b(knobMat, 0.05, 0.24, 0.003, w - 0.075, h * 0.47 + 0.14, s * 0.0225); // finger plates
+      else if (!steel) for (const s of faces) p.b(knobMat, 0.05, 0.24, 0.003, w - 0.075, h * 0.47 + 0.17, s * 0.0245); // finger plates
     }
     if (fine >= 2) {
       for (const y of [0.2, h * 0.5 - 0.05, h - 0.25]) p.c(knobMat, 0.011, 0.12, 0.0, y - 0.01, 0.03, 6); // hinge knuckles
-      if (!steel) for (const s of faces) { p.b(knobMat, 0.016, 0.03, 0.004, w - 0.075, h * 0.47 - 0.065, s * 0.0255); } // key escutcheon
+      if (!steel) for (const s of faces) { p.b(knobMat, 0.016, 0.03, 0.004, w - 0.075, h * 0.47 - 0.065, s * 0.0275); } // key escutcheon
     }
     if (fine >= 3 && steel) for (const s of faces) { // rivets round the stiffened edge
-      for (let y = 0.12; y < h - 0.08; y += 0.24) for (const a of [0.035, w - 0.035]) p.b(mats.iron, 0.018, 0.018, 0.008, a, y, s * 0.025);
+      for (let y = 0.12; y < h - 0.08; y += 0.24) for (const a of [0.035, w - 0.035]) p.b(mats.iron, 0.018, 0.018, 0.008, a, y, s * 0.0265);
     }
     t = P._bakeTemplate(p.g);
     leafCache.set(key, t);
@@ -573,7 +573,7 @@ class DeckPlan {
         const cand = [(lo + hi) / 2, hi - 0.45, lo + 0.45].find((a) => ok(a, 0.19, TOP - 0.36, TOP - 0.2, 0.35));
         if (cand !== undefined) {
           box(posh ? mats.brass : mats.paintWhite, cand - 0.17, cand + 0.17, TOP - 0.355, TOP - 0.205, 0.012);
-          b.poly(kitMats.louvre, [at(cand - 0.145, TOP - 0.335, 0.0125), at(cand + 0.145, TOP - 0.335, 0.0125), at(cand + 0.145, TOP - 0.225, 0.0125), at(cand - 0.145, TOP - 0.225, 0.0125)], O);
+          b.poly(kitMats.louvre, [at(cand - 0.145, TOP - 0.335, 0.016), at(cand + 0.145, TOP - 0.335, 0.016), at(cand + 0.145, TOP - 0.225, 0.016), at(cand - 0.145, TOP - 0.225, 0.016)], O);
         }
       }
       // moulded ceiling frame in 1st / 2nd class cabins and suites
