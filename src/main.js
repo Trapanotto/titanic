@@ -47,7 +47,7 @@ const MEMORY_FAIL = 'Dieses Gerät hat nicht genug Arbeits- oder Grafikspeicher 
 const canvas = document.getElementById('view');
 const scene = new THREE.Scene();
 const world = new World(scene);
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / Math.max(1, window.innerHeight), 0.08, 6000);
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / Math.max(1, window.innerHeight), 0.15, 6000); // near 0.15: twice the depth precision of 0.08 (less z-fighting), still inside the player's 0.3 m radius
 world.camera = camera;
 world.renderer = null;
 
@@ -93,7 +93,7 @@ const NO_WEBGL2 = 'Dein Browser oder deine Grafikkarte unterstützt WebGL 2 nich
 let renderer = null, post = null;
 try {
   if (!caps && !hasWebGL2()) throw new Error('no webgl2');
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: TIER.antialias, powerPreference: TIER.power || 'default' });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: TIER.antialias, powerPreference: TIER.power || 'default', stencil: true }); // stencil: phones then give a 24-bit depth buffer instead of 16 bit (z-fighting)
   ui.renderer = renderer;
   guard.beat(TIER.name);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, TIER.maxPixelRatio, coarse ? 1.5 : 2)); // phones: cap the pixel ratio
