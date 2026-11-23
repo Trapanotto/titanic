@@ -1,3 +1,4 @@
+import { ENGINE } from '../core/engine.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mats } from '../core/materials.js';
@@ -129,6 +130,6 @@ export function buildStern(world, parent) {
   });
 
   return {
-    update(dt) { for (const p of props) p.m.rotation.x += dt * p.speed; },
+    update(dt) { for (const p of props) p.m.rotation.x += dt * p.speed * ENGINE.speed; },
   };
 }

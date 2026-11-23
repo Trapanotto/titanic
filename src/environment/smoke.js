@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { FUNNELS, DECK_Y } from '../core/constants.js';
 import { SHIP_SPEED } from './ocean.js';
+import { ENGINE } from '../core/engine.js';
 
 // Funnel smoke: stateless GPU particles (one Points draw call). Every particle's position is a pure
 // function of time, so there are no per-frame buffer uploads.
@@ -105,7 +106,7 @@ export function createSmoke(shared, world) {
       if (world.renderer) h = world.renderer.getDrawingBufferSize(size).y;
       const fov = camera && camera.isPerspectiveCamera ? camera.fov : 70;
       uniforms.uScale.value = h / (2 * Math.tan((fov * Math.PI) / 360));
-      uniforms.uOpacity.value = 0.13 - 0.1 * n;        // barely visible at night
+      uniforms.uOpacity.value = (0.13 - 0.1 * n) * (0.3 + 0.7 * ENGINE.speed);        // barely visible at night
       const c = 0.12 - 0.11 * n;                        // coal smoke: brown-grey, lit by the sun
       uniforms.uColor.value.setRGB(c * 1.05, c, c * 0.95);
     },

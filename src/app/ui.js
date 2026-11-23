@@ -17,7 +17,8 @@ const HELP = [
   ['J', 'Minikarte ein/aus'],
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
-  ['E', 'Info lesen (in der Nähe einer Marke)'],
+  ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Telegraf, Steuerrad, Glocke, Pfeife, Morsetaste)'],
+  ['T', 'Ton an/aus'],
   ['Klick / Antippen', 'Info-Marke direkt öffnen'],
   ['1 – 9', 'Schnellreise zu Höhepunkten'],
   ['P', 'Leistungsanzeige (FPS, Zeichenaufrufe, Dreiecke, Speicher)'],
@@ -190,6 +191,7 @@ export class UI {
       case 'plan': if (this.modal === 'plan') this.closeModal(); else { this._open('plan'); this.plan.open(); } break;
       case 'info':
         if (this.modal === 'info') this.closeModal();
+        else if (!this.modal && p.mode === 'walk' && this.interact?.nearest >= 0) this.interact.run();
         else if (!this.modal && p.mode === 'walk' && this.info.nearest >= 0) this.openInfo(this.info.nearest);
         break;
       case 'night': if (this.modal !== 'plan') { this.world.setNight(!this.world.state.night); this.toast(this.world.state.night ? 'Nacht' : 'Tag', 1.5); } break;
@@ -199,6 +201,7 @@ export class UI {
         break;
       case 'flyspeed': this.toast(`Fluggeschwindigkeit × ${p.changeFlySpeed(arg).toFixed(2)}`, 1.2); break;
       case 'fps': this._fps.on = !this._fps.on; this.fpsEl.hidden = !this._fps.on; this._fps.frames = 0; this._fps.t0 = 0; if (this._fps.on) this.fpsEl.textContent = '…'; break;
+      case 'sound': if (this.sound) this.toast(this.sound.toggle() ? 'Ton an' : 'Ton aus', 1.5); break;
       case 'bob': p.headBob = !p.headBob; this.toast(p.headBob ? 'Kopfwippen an' : 'Kopfwippen aus', 1.5); break;
       case 'quick': { const t = this.quick[arg - 1]; if (!this.modal && t) this.teleportTo(t); break; }
       case 'touchmode': this.entered = true; this.enableTouch(); break;
@@ -305,10 +308,13 @@ export class UI {
     const head = a <= 45 ? 'Blick zum Bug' : a >= 135 ? 'Blick zum Heck' : deg > 0 ? 'Blick nach Backbord' : 'Blick nach Steuerbord';
     if (head !== L.head) { L.head = head; this.headEl.textContent = head; }
 
-    const near = this.modal ? -1 : this.info.nearest;
+    const use = this.modal ? -1 : (this.interact?.nearest ?? -1);
+    const info = this.modal || use >= 0 ? -1 : this.info.nearest;
+    const near = use >= 0 ? this.interact.label(use) : info; // things to operate come before the info of the same spot
     if (near !== L.prompt) {
       L.prompt = near;
-      if (near >= 0) { this.promptText.textContent = 'Info: ' + this.info.items[near].info.title; this.promptEl.classList.add('show'); }
+      if (use >= 0) { this.promptText.textContent = near; this.promptEl.classList.add('show'); }
+      else if (info >= 0) { this.promptText.textContent = 'Info: ' + this.info.items[info].info.title; this.promptEl.classList.add('show'); }
       else this.promptEl.classList.remove('show');
     }
     const total = this.info.items.length, found = this.info.foundCount;
@@ -376,9 +382,10 @@ export class UI {
     };
     tbtn('▲', 'Springen / Steigen', () => { if (this.player.mode === 'fly') this.controls.touchVertical(1); else this.controls.touchJump(); }, () => this.controls.touchVertical(0));
     tbtn('▼', 'Sinken', () => { if (this.player.mode === 'fly') this.controls.touchVertical(-1); }, () => this.controls.touchVertical(0));
-    tbtn('Flug', 'Flugmodus', () => this.action('fly'));
+    tbtn('Fliegen', 'Flugmodus', () => this.action('fly'));
     tbtn('Karte', 'Karte', () => this.action('plan'));
     tbtn('☾', 'Tag / Nacht', () => this.action('night'));
+    tbtn('♪', 'Ton an / aus', () => this.action('sound'));
     tbtn('?', 'Hilfe', () => this.action('help'));
     touch.append(this.stickEl, btns);
 

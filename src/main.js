@@ -10,6 +10,8 @@ import { PostPipeline, QUALITY_LEVELS } from './app/post.js';
 import { TIER, TIERS, setTier, detectTier, probeCaps, applyDebugCaps, lowerTier, crashGuard } from './core/tier.js';
 import { DeckStreamer } from './app/stream.js';
 import { MirrorView } from './app/mirrors.js';
+import { Sound } from './app/audio.js';
+import { Interact } from './app/interact.js';
 
 const params = new URLSearchParams(location.search);
 const flag = (name) => { const v = params.get(name); return v !== null && v !== '0' && v !== 'false'; };
@@ -137,6 +139,10 @@ let streamer = null;
 let mirrorView = null;
 try { if (renderer) mirrorView = debug.mirrors = new MirrorView(world, scene, TIER); } catch (e) { console.warn('[app] Spiegel', e); }
 
+const sound = (ui.sound = debug.sound = new Sound(world, player));
+let interact = null;
+try { interact = ui.interact = debug.interact = new Interact(world, scene, sound, (t, s) => ui.toast(t, s)); } catch (e) { console.warn('[app] Bedienpunkte', e); }
+
 function step(dt) {
   time += dt;
   controls.apply();
@@ -149,6 +155,8 @@ function step(dt) {
   } catch (e) {
     if (loopErrors++ < 5) console.error('[app] Fehler in einem update()', e);
   }
+  interact?.update(dt, player.pos, player.mode);
+  sound.update(dt);
   ui.update(dt, time);
   if (!contextLost) { mirrorView?.update(camera); if (post) post.render(dt); else renderer.render(scene, camera); }
 }

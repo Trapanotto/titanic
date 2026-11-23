@@ -112,13 +112,14 @@ export const telegraph = def('telegraph', [0.5, 0.45, 1.3], (p) => {
   }
   p.lathe(M.brass, [[0, 0], [0.06, 0], [0.05, 0.04], [0, 0.06]], 0, 1.31, 0, 12);
 });
-export const shipsWheel = def('shipsWheel', [1.25, 0.5, 1.6], (p) => {
+export const shipsWheel = def('shipsWheel', [1.25, 0.5, 1.6], (p, o) => {
   // telemotor pedestal (brass) on a teak plinth, wheel facing +x
   p.bb(M.oak, 0.5, 0.08, 0.5, -0.1, 0, 0, 0.01);
   p.lathe(M.brass, [[0, 0], [0.16, 0], [0.16, 0.03], [0.11, 0.08], [0.09, 0.4], [0.11, 0.7], [0.13, 0.8], [0.1, 0.84], [0.13, 0.9], [0.14, 1.02], [0.1, 1.06], [0, 1.06]], -0.1, 0.08, 0, 18);
   p.lathe(M.glass, [[0, 0], [0.11, 0], [0.11, 0.03], [0, 0.04]], -0.1, 1.14, 0, 16);
   p.cx(M.brass, 0.05, 0.25, 0.04, 0.98, 0, 12);
   const wx = 0.16, wy = 0.98;
+  if (o.live) { p.latheX(M.brass, [[0, 0], [0.09, 0], [0.1, 0.02], [0.08, 0.06], [0.05, 0.08], [0, 0.09]], wx - 0.04, wy, 0, 18); return; } // the wheel itself turns (app/interact.js)
   p.t(M.woodDark, 0.42, 0.026, wx, wy, 0, 'x', 40, 7); p.t(M.brass, 0.4, 0.008, wx + 0.02, wy, 0, 'x', 40, 4);
   p.latheX(M.brass, [[0, 0], [0.09, 0], [0.1, 0.02], [0.08, 0.06], [0.05, 0.08], [0, 0.09]], wx - 0.04, wy, 0, 18);
   for (let i = 0; i < 8; i++) {

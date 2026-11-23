@@ -5,6 +5,7 @@
 //   x -58..-68  electric engine room (dynamos), x -68..-104 shaft tunnels and stores (under the orlop deck)
 // Access from F deck by two steel stair towers under MACHINERY_ACCESS; watertight doors at tank-top level in every
 // bulkhead make the whole machinery length walkable.
+import { ENGINE } from '../core/engine.js';
 import { mats } from '../core/materials.js';
 import { MACHINERY_X, DECK_SEGMENTS } from '../core/constants.js';
 import {
@@ -226,7 +227,7 @@ export async function build(world) {
   await world.tick();
   await plan.finishAsync();
   return {
-    update(dt, t) { for (const f of anim) f(t); },
+    update(dt, t) { for (const f of anim) f(ENGINE.phase, t); }, // main engines follow the telegraph
   };
 
   function place2(w, prop, x, z, rot) { prop.position.set(x, Y, z); prop.rotation.y = rot; w.zone(DECK, x).add(prop); }

@@ -51,6 +51,7 @@ export const telegraph2 = def('abTelegraph', (o) => [0.5, 0.45, o.dock ? 1.15 : 
     p.add(dialGeo(R, 28, s > 0 ? 'z' : '-z'), face, 0, yc, s * 0.0925);
     p.t(B, R + 0.01, 0.014, 0, yc, s * 0.09, 'z', 28, 4);
     p.latheZ(mats.glass, [[0, 0], [R, 0], [R * 0.6, 0.02], [0, 0.025]], 0, yc, s * 0.094, 20, s);
+    if (o.live) continue; // handles and pointers are moving parts (app/interact.js)
     p.b(mats.iron, 0.012, R * 0.8, 0.004, 0, yc, s * 0.097).rotation.z = -0.5; // pointer
     if (!o.dock || s > 0) {
       const h = p.b(B, 0.03, 0.4, 0.02, 0.08, yc - 0.15, s * 0.125); h.rotation.z = -0.45;
@@ -319,10 +320,10 @@ export function furnishBridge(ctx) {
   reserveExtDoors(ctx);
   // gratings under the helmsman and the telegraphs
   for (const [x, z, w, dd] of [[70.0, 0, 1.4, 1.5], [72.2, -2.45, 2.6, 0.7], [72.2, 2.45, 2.6, 0.7]]) ctx.plan.prop(grating({ w, d: dd }), x, z, 0, { collide: false });
-  wput(ctx, shipsWheel(), 70.0, 0, 'fwd', { y: 0.045 });
+  wput(ctx, shipsWheel({ live: true }), 70.0, 0, 'fwd', { y: 0.045 });
   wput(ctx, binnacle2(), 71.35, 0, 'aft');
   for (const s of [-1, 1]) {
-    wput(ctx, telegraph2({}), 72.25, s * 1.5, 'aft', { y: 0.045 });          // main engine-order telegraphs
+    wput(ctx, telegraph2({ live: true }), 72.25, s * 1.5, 'aft', { y: 0.045 });          // main engine-order telegraphs
     wput(ctx, telegraph2({ dock: true }), 72.25, s * 3.4, 'aft', { y: 0.045 }); // docking / steering telegraphs
     wput(ctx, telegraph2({}), 71.9, s * 6.4, 'aft');                         // wing telegraphs at the open sides
     d.put(voicePipes({ n: 2 }), 72.4, s * 4.5, Math.PI, false);

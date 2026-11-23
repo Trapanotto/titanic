@@ -660,7 +660,7 @@ async function buildDynamoRoom(world, b, anim) {
     pipeRun(b, mats.paintWhite, [[-66.05, Y + 3.38, z], [-66.05, LOW - 0.4, z], [-60, LOW - 0.4, z]], 0.1, { seg: 8 });
     world.addCollider(-67.4, Y, z - 0.95, -61.0, Y + 3.4, z + 0.95);
     const g = addMesh(world, fw, -64.6, (m) => m.position.set(-64.6, Y + 1.25, z));
-    anim.push((t) => { g.rotation.x = t * 6.5; });
+    anim.push((t, real) => { g.rotation.x = real * 6.5; }); // dynamos run at their own speed
     // cables to the switchboard (from level 1: three-core bundle on clips and hangers)
     pipeRun(b, mats.rubber, [[-63.3, Y + 2.3, z], [-63.3, LOW - 0.25, z], [-58.4, LOW - 0.25, z]], 0.05, { seg: 6, flange: null });
     if (TIER.fine >= 1) {
