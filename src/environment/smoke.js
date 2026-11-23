@@ -14,6 +14,7 @@ uniform vec3 uTops[3];
 uniform float uTime;
 uniform float uScale;      // pixels per metre at 1 m distance
 uniform float uOpacity;
+uniform float uShip;      // 0..1: speed of the ship (the smoke trails aft with it)
 varying float vAlpha;
 varying float vAge;
 void main() {
@@ -25,7 +26,7 @@ void main() {
   vec2 rd = vec2(cos(ang), sin(ang));
   float spread = (0.5 + 1.5 * sqrt(age)) * (0.4 + 0.6 * aSeed.y);
   vec3 p = top;
-  p.x += rd.x * (0.9 * aSeed.y + spread * 0.5) - ${SHIP_SPEED.toFixed(1)} * (age - 1.6 * (1.0 - exp(-age / 1.6)));
+  p.x += rd.x * (0.9 * aSeed.y + spread * 0.5) - ${SHIP_SPEED.toFixed(1)} * uShip * (age - 1.6 * (1.0 - exp(-age / 1.6)));
   p.y += 11.0 * (1.0 - exp(-age / 2.5)) + 0.35 * age + sin(age * 0.7 + ang) * 0.08 * age;
   p.z += rd.y * (0.7 * aSeed.y + spread * 0.8) + sin(age * 0.5 + ang * 3.0) * 0.12 * age;
   vec4 mv = viewMatrix * vec4(p, 1.0);
@@ -74,7 +75,7 @@ export function createSmoke(shared, world) {
   });
   const uniforms = {
     uTops: { value: tops }, uTime: shared.uTime, uScale: { value: 800 },
-    uOpacity: { value: 0.16 }, uColor: { value: new THREE.Color(0.05, 0.05, 0.055) },
+    uOpacity: { value: 0.16 }, uShip: { value: 1 }, uColor: { value: new THREE.Color(0.05, 0.05, 0.055) },
   };
   const material = new THREE.ShaderMaterial({
     name: 'funnelSmoke', uniforms, vertexShader: VERT, fragmentShader: FRAG,
@@ -106,6 +107,7 @@ export function createSmoke(shared, world) {
       if (world.renderer) h = world.renderer.getDrawingBufferSize(size).y;
       const fov = camera && camera.isPerspectiveCamera ? camera.fov : 70;
       uniforms.uScale.value = h / (2 * Math.tan((fov * Math.PI) / 360));
+      uniforms.uShip.value = 0.12 + 0.88 * ENGINE.speed; // a light breeze remains
       uniforms.uOpacity.value = (0.13 - 0.1 * n) * (0.3 + 0.7 * ENGINE.speed);        // barely visible at night
       const c = 0.12 - 0.11 * n;                        // coal smoke: brown-grey, lit by the sun
       uniforms.uColor.value.setRGB(c * 1.05, c, c * 0.95);

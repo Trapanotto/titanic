@@ -190,3 +190,7 @@ export function isInterior(x, y, z) {
   if (y < DECK_Y.roof - 0.2) return BOAT_HOUSES.some((h) => x > h.x0 && x < h.x1 && az < h.hw);
   return false;
 }
+
+// Second-class lift: shaft in the forward landing of the second-class staircase, port of the centre line (below the
+// lift machinery room on the boat deck). Footprint of the shaft, gate on the +z face (towards the landing).
+export const LIFT2 = { x0: -39.78, x1: -38.62, z0: -1.62, z1: -0.6, decks: ['F', 'E', 'D', 'C', 'B', 'A', 'boat'] };

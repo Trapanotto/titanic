@@ -2,13 +2,18 @@
 // whistle pull and the Morse key in the Marconi room. The moving parts on the bridge (telegraph handles and pointers,
 // the wheel, the whistle pull) are separate meshes owned by this file – their props are baked without them.
 import * as THREE from 'three';
-import { DECK_Y } from '../core/constants.js';
+import { DECK_Y, LIFT2 } from '../core/constants.js';
 import { mats } from '../core/materials.js';
 import { ENGINE, ORDERS, stepEngine } from '../core/engine.js';
 import { leafMatrix } from '../core/doors.js';
 
-const LIFT_DECKS = ['E', 'D', 'C', 'B', 'A'];
-const LIFT_NAMES = { A: 'A-Deck', B: 'B-Deck', C: 'C-Deck', D: 'D-Deck', E: 'E-Deck' };
+const LIFT_NAMES = { A: 'A-Deck', B: 'B-Deck', C: 'C-Deck', D: 'D-Deck', E: 'E-Deck', F: 'F-Deck', boat: 'Bootsdeck' };
+// cx/cz: centre of the cage; stand: where the visitor steps out; rot: turns the cage (its gate is at -x); yaw: view towards the gate
+const L2X = (LIFT2.x0 + LIFT2.x1) / 2, L2Z = (LIFT2.z0 + LIFT2.z1) / 2;
+const LIFTS = [
+  ...[-1.6, 0, 1.6].map((z) => ({ decks: ['E', 'D', 'C', 'B', 'A'], cx: 46.45, cz: z, stand: [44.7, z], reach: [44.9, z], r: 0.85, rot: 0, yaw: Math.PI, scale: 1, dir: 1 })),
+  { decks: LIFT2.decks, cx: L2X, cz: L2Z, stand: [L2X, LIFT2.z1 + 0.75], reach: [L2X, LIFT2.z1 + 0.55], r: 0.8, rot: Math.PI / 2, yaw: -Math.PI / 2, scale: 0.72, dir: 1 },
+];
 const DOOR_CELL = 4;
 const _m = new THREE.Matrix4();
 
@@ -28,6 +33,7 @@ export class Interact {
     this.sound = sound;
     this.toast = toast;
     this.items = [];
+    this.lifts = LIFTS;
     this.nearest = -1;
     this._timer = 0;
     this._levers = [];
@@ -37,7 +43,6 @@ export class Interact {
     this._swing = new Set();   // doors in motion
     this._doorGrid = null;
     this.door = null;          // door in reach
-    this._liftDir = 1;
     this._ride = null;
     this.root = new THREE.Group();
     this.root.name = 'bridgeLive';
@@ -133,8 +138,8 @@ export class Interact {
       this.toast('„Eisberg direkt voraus!“ – Meldung des Ausgucks Frederick Fleet an die Brücke, 14. April 1912, 23:40 Uhr', 7);
     });
     // first-class lifts: gates on the aft side of the three shafts, E to A deck
-    for (const deck of LIFT_DECKS) for (const z of [-1.6, 0, 1.6]) {
-      add(44.9, DECK_Y[deck], z, 0.85, () => 'Aufzug zum ' + LIFT_NAMES[this._liftTarget(deck)], () => this._rideLift(deck, z, this._player));
+    for (const L of LIFTS) for (const deck of L.decks) {
+      add(L.reach[0], DECK_Y[deck], L.reach[1], L.r, () => 'Aufzug zum ' + LIFT_NAMES[this._liftTarget(L, deck)], () => this._rideLift(L, deck, this._player));
     }
     add(52.6, YB, 0.75, 1.6, () => 'Morsetaste: ' + (this._msg ? 'SOS' : 'CQD') + ' senden', () => {
       if (this._msg) { this.sound.morse('SOS SOS DE MGY'); this.toast('· · ·   – – –   · · ·   „SOS SOS DE MGY“: das neue Notzeichen, von der Titanic als eines der ersten Schiffe gesendet', 6); }
@@ -203,6 +208,11 @@ export class Interact {
   toggleDoor(d, pos, quiet) {
     if (d.open && this._inDoorway(d, pos)) { if (!quiet) this.toast('Du stehst in der Tür', 1.5); return; }
     d.open = !d.open;
+    if (!d.kind) { // hinged doors stay the way they were left (also after reloading the page)
+      const S = (this.world.doorSaved ??= new Set());
+      if (d.open === d.open0) S.delete(d.key); else S.add(d.key);
+      try { localStorage.setItem('titanic.tueren', JSON.stringify([...S].slice(0, 400))); } catch { /* private mode */ }
+    }
     if (d.open) d.col.y1 = -1e9; // passable as soon as it starts to swing
     // the leaves are instances in the meshes of their zone
     d._ims = d.leaves.map((L, li) => {
@@ -262,10 +272,10 @@ export class Interact {
 
   // ------------------------------------------------------------------ lifts (1st class, E to A deck)
 
-  _liftTarget(deck) {
-    const i = LIFT_DECKS.indexOf(deck);
-    if (i + this._liftDir < 0 || i + this._liftDir >= LIFT_DECKS.length) this._liftDir = -this._liftDir;
-    return LIFT_DECKS[i + this._liftDir];
+  _liftTarget(L, deck) {
+    const i = L.decks.indexOf(deck);
+    if (i + L.dir < 0 || i + L.dir >= L.decks.length) L.dir = -L.dir;
+    return L.decks[i + L.dir];
   }
 
   /** the travelling cage: panelled walls, lamp, folding gate towards the staircase (aft) */
@@ -285,12 +295,13 @@ export class Interact {
     return g;
   }
 
-  _rideLift(from, z, player) {
+  _rideLift(L, from, player) {
     if (this._ride) return;
-    const to = this._liftTarget(from);
+    const to = this._liftTarget(L, from);
     this._cageMesh();
-    this._ride = { t: 0, to, z, player, y0: DECK_Y[from], y1: DECK_Y[to], move: 3.6 };
-    player.yaw = Math.PI; player.pitch = 0; // facing the gate
+    this._ride = { t: 0, L, to, player, y0: DECK_Y[from], y1: DECK_Y[to], move: 3.6 };
+    this.cage.rotation.y = L.rot; this.cage.scale.set(L.scale, 1, L.scale);
+    player.yaw = L.yaw; player.pitch = 0; // facing the gate
     this.sound.lift(this._ride.move + 0.9);
     this.toast(`Aufzug · ${LIFT_NAMES[from]} → ${LIFT_NAMES[to]}`, 3);
   }
@@ -300,14 +311,14 @@ export class Interact {
     const r = this._ride;
     if (!r) return;
     r.t += dt;
-    const k = Math.min(1, Math.max(0, (r.t - 0.5) / r.move)), e = k * k * (3 - 2 * k), y = r.y0 + (r.y1 - r.y0) * e;
+    const L = r.L, k = Math.min(1, Math.max(0, (r.t - 0.5) / r.move)), e = k * k * (3 - 2 * k), y = r.y0 + (r.y1 - r.y0) * e;
     this.cage.visible = true;
-    this.cage.position.set(46.45, y + 0.02, r.z);
-    r.player.setFlyPose(46.5, y + 1.65, r.z);
+    this.cage.position.set(L.cx, y + 0.02, L.cz);
+    r.player.setFlyPose(L.cx, y + 1.65, L.cz);
     if (r.t > r.move + 1.0) {
       this.cage.visible = false;
       this._ride = null;
-      r.player.teleport({ deck: r.to, x: 44.7, y: DECK_Y[r.to], z: r.z, yaw: Math.PI });
+      r.player.teleport({ deck: r.to, x: L.stand[0], y: DECK_Y[r.to], z: L.stand[1], yaw: L.yaw + Math.PI });
       this.toast(LIFT_NAMES[r.to], 2);
     }
   }

@@ -154,9 +154,20 @@ function cabinFirst(ctx) {
 
 /** 1st class: shoes put out under the bed, carafe and toiletries on the washbasin, brushes and scent on the dressing
  * table, a newspaper on the bed, hat box, clothes on hooks, a suitcase */
+/** bedside rug in front of a bed or berth (record L): patterned centre with a plain border, lying on the floor */
+function rug(ctx, L, mat, border) {
+  if ((ctx.fine ?? -1) < 1) return;
+  on(ctx, L, () => {
+    const d = L.fp.d / 2;
+    if (!spot(ctx, d + 0.36, 0, 0.62)) return false;
+    ctx.bits((b, Q) => { bx(b, Q, border, d + 0.05, -0.47, d + 0.67, 0.47, 0, 0.008, 'xXYzZ'); bx(b, Q, mat, d + 0.1, -0.42, d + 0.62, 0.42, 0.008, 0.014, 'xXYzZ'); });
+  });
+}
+
 function clutterFirst(ctx, R) {
   const f = ctx.fine ?? -1, c = ctx.crng;
   if (f < 0) return;
+  rug(ctx, R.bed, M.carpetRed, M.fabricGold); rug(ctx, R.bed2, M.carpetBlue, M.fabricGold);
   for (const bed of [R.bed, R.bed2]) on(ctx, bed, () => { if (c() < 0.8) shoes(ctx, bed.fp.d / 2 - 0.16, 0.5 + c() * 0.2, 0, c() < 0.5 ? M.leather : M.woodDark); });
   if (f < 1) return;
   on(ctx, R.basin, () => { ctx.stow(P.carafe(), 0.02, 0.29, { y: 0.87 }); if (f >= 2) toiletries(ctx, 0.04, -0.25, 0.87, 1 + Math.floor(c() * 2), -1); });
@@ -215,6 +226,7 @@ function cabinSecond(ctx) {
   // clutter: shoes in front of the berth, soap and tooth mug, clothes and a book on the berths, luggage
   const f = ctx.fine ?? -1, c = ctx.crng;
   if (f < 0) return;
+  rug(ctx, R.berth, M.carpetBlue, M.linen);
   on(ctx, R.berth, () => { if (c() < 0.75 && spot(ctx, 0.56, 0.45, 0.3)) shoes(ctx, 0.56, 0.45, 0, c() < 0.6 ? M.leather : M.woodDark); });
   if (f < 1) return;
   on(ctx, R.wash, () => toiletries(ctx, 0.1, 0.245, 0.81, 0, 1));

@@ -46,6 +46,7 @@ export class World {
     this._grid = new Map();
     this._colliders = [];
     this.doors = new Map();   // key -> operable door (addDoor)
+    this.doorSaved = null;    // Set of door keys the visitor left in the other state (app: localStorage)
     this.uses = new Map();    // key -> thing that can be used (addUse)
     this._stamp = 0;
     this.colliderCount = 0;
@@ -417,9 +418,10 @@ export class World {
   addDoor(key, init) {
     let d = this.doors.get(key);
     if (d) return d;
-    d = { key, ...init, t: init.open ? 1 : 0 };
+    const open = this.doorSaved?.has(key) ? !init.open : init.open; // left differently on an earlier visit
+    d = { key, ...init, open, open0: init.open, t: open ? 1 : 0 };
     const [x0, y0, z0, x1, y1, z1] = init.box;
-    const b = (d.col = { x0, x1, y0, y1: init.open ? -1e9 : y1, z0, z1, s: 0, tag: 'door', top: y1 });
+    const b = (d.col = { x0, x1, y0, y1: open ? -1e9 : y1, z0, z1, s: 0, tag: 'door', top: y1 });
     for (let cx = Math.floor(b.x0 / CELL); cx <= Math.floor(b.x1 / CELL); cx++) {
       for (let cz = Math.floor(b.z0 / CELL); cz <= Math.floor(b.z1 / CELL); cz++) {
         const k = key2(cx, cz);

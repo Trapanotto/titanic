@@ -103,15 +103,18 @@ export async function run(d) {
     return { ok: stopped && still && runs, note: `steht: ${stopped && still}, läuft wieder: ${runs}` };
   });
 
-  await check('Aufzug fährt von D nach C', async () => {
-    await go('D', 44.75, 1.6);
-    interact._liftDir = 1;
-    interact._rideLift('D', 1.6, player);
-    const rode = !!interact._ride;
-    const done = await waitFor(() => !interact._ride, 40);
-    await settle();
-    return { ok: rode && done && player.mode === 'walk' && Math.abs(player.pos.y - DECK_Y.C) < 0.3, note: `angekommen auf Höhe ${player.pos.y.toFixed(1)} m` };
-  });
+  for (const [name, L, from, to] of [['Aufzug 1. Klasse fährt von D nach C', interact.lifts[0], 'D', 'C'], ['Aufzug 2. Klasse fährt von E nach D', interact.lifts[3], 'E', 'D']]) {
+    await check(name, async () => {
+      await go(from, L.reach[0], L.reach[1]);
+      const near = interact.nearest !== -1 && /Aufzug/.test(interact.label(interact.nearest));
+      L.dir = L.decks.indexOf(to) - L.decks.indexOf(from);
+      interact._rideLift(L, from, player);
+      const rode = !!interact._ride;
+      const done = await waitFor(() => !interact._ride, 40);
+      await settle();
+      return { ok: near && rode && done && player.mode === 'walk' && Math.abs(player.pos.y - DECK_Y[to]) < 0.3, note: `Gitter erreichbar: ${near}, angekommen auf Höhe ${player.pos.y.toFixed(1)} m` };
+    });
+  }
 
   // every deck: reachable, built, and how fast it draws here
   const decks = [...new Set(world.teleports.map((t) => t.deck))];

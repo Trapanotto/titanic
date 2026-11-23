@@ -1,7 +1,7 @@
 // Interior kit – all STAIRS of the ship (scene module) + floor-hole / keep-out helpers for deck layouts.
 import * as THREE from 'three';
 import { mats } from '../core/materials.js';
-import { DECK_Y, STAIRS, MACHINERY_ACCESS, SLAB, ceilingY } from '../core/constants.js';
+import { DECK_Y, STAIRS, MACHINERY_ACCESS, SLAB, ceilingY, LIFT2 } from '../core/constants.js';
 import { Batch, kitMats, overlap } from './batch.js';
 import { def, place } from './props-core.js';
 import { ceilingLight, ceilingRose, chandelier, pilaster, sconce } from './props-decor.js';
@@ -777,6 +777,39 @@ function buildImperial(world, st, B) {
 }
 
 /** Scene module: builds every staircase. */
+/**
+ * Second-class lift: on every deck an oak shaft enclosure in the corner of the landing – panelled dado, wrought-iron
+ * grille above, gilt folding gate towards the landing, floor indicator over the gate. The travelling cage belongs to
+ * the app (app/interact.js).
+ */
+function liftShaft(world, deck, b) {
+  const { x0, x1, z0, z1 } = LIFT2, Y = DECK_Y[deck], H = Math.min(2.34, ceilingY(deck) - Y - 0.02), oak = mats.oak, gold = mats.gold, iron = kitMats.ironwork;
+  const dado = 0.92, head = H - 0.14, t = 0.035;
+  for (const x of [x0, x1]) for (const z of [z0, z1]) b.post(oak, x, z, Y, Y + H, 0.07);
+  // head frame and plinth
+  b.box(oak, x0, Y + head, z0 - 0.02, x1, Y + H, z0 + 0.02); b.box(oak, x0, Y + head, z1 - 0.02, x1, Y + H, z1 + 0.02);
+  b.box(oak, x0 - 0.02, Y + head, z0, x0 + 0.02, Y + H, z1); b.box(oak, x1 - 0.02, Y + head, z0, x1 + 0.02, Y + H, z1);
+  b.box(oak, x0, Y + H - 0.03, z0, x1, Y + H, z1, 'yY');
+  // closed sides: panelled dado, grille above (aft, forward and outboard face)
+  const side = (xa, za, xb, zb) => {
+    const X = za === zb;
+    if (X) { b.box(oak, xa, Y, za - t / 2, xb, Y + dado, za + t / 2, 'zZY'); b.box(oak, xa + 0.1, Y + 0.14, za - t / 2 - 0.008, xb - 0.1, Y + dado - 0.12, za + t / 2 + 0.008, 'zZ'); b.wallX(iron, za, xa, xb, Y + dado, Y + head, 1); b.box(oak, xa, Y + dado, za - 0.025, xb, Y + dado + 0.04, za + 0.025); }
+    else { b.box(oak, xa - t / 2, Y, za, xa + t / 2, Y + dado, zb, 'xXY'); b.box(oak, xa - t / 2 - 0.008, Y + 0.14, za + 0.1, xa + t / 2 + 0.008, Y + dado - 0.12, zb - 0.1, 'xX'); b.wallZ(iron, xa, za, zb, Y + dado, Y + head, 1); b.box(oak, xa - 0.025, Y + dado, za, xa + 0.025, Y + dado + 0.04, zb); }
+  };
+  side(x0, z0, x1, z0); side(x0, z0, x0, z1); side(x1, z0, x1, z1);
+  // gate (+z face): gilt bars with rails, brass sill, indicator plate with a pointer
+  const n = 12;
+  for (let i = 0; i <= n; i++) { const x = x0 + 0.07 + ((x1 - x0 - 0.14) * i) / n; b.box(gold, x - 0.008, Y + 0.04, z1 - 0.008, x + 0.008, Y + head, z1 + 0.008, 'xXzZ'); }
+  for (const y of [0.14, 1.05, head - 0.1]) b.box(gold, x0 + 0.05, Y + y, z1 - 0.011, x1 - 0.05, Y + y + 0.022, z1 + 0.011);
+  b.box(mats.brass, x0 + 0.04, Y, z1 - 0.04, x1 - 0.04, Y + 0.012, z1 + 0.06, 'xXYzZ');
+  const xc = (x0 + x1) / 2;
+  b.box(mats.brass, xc - 0.16, Y + head + 0.02, z1 + 0.02, xc + 0.16, Y + H - 0.02, z1 + 0.03, 'xXyYZ');
+  b.box(mats.iron, xc - 0.006, Y + head + 0.04, z1 + 0.03, xc + 0.006, Y + H - 0.05, z1 + 0.034, 'xXYZ');
+  // call button
+  b.box(mats.brass, x1 - 0.02, Y + 1.18, z1 + 0.035, x1 + 0.03, Y + 1.3, z1 + 0.045, 'xXyYZ');
+  world.addCollider(x0 - 0.03, Y, z0 - 0.03, x1 + 0.03, Y + H, z1 + 0.03);
+}
+
 export async function build(world) {
   if (world._kitStairs) return {};
   world._kitStairs = true;
@@ -797,6 +830,11 @@ export async function build(world) {
       fixture(world, deck, st.x1 + 1, st.zc, cy, grand);
     }
   }
+
+  await world.tick();
+  for (const deck of LIFT2.decks) liftShaft(world, deck, B(deck));
+  world.addInfo({ title: 'Aufzug der 2. Klasse', x: (LIFT2.x0 + LIFT2.x1) / 2, y: DECK_Y.C + 1.5, z: LIFT2.z1 + 0.9, radius: 2.5,
+    text: 'Auch die Zweite Klasse hatte einen elektrischen Aufzug: Er lief im vorderen Treppenhaus der Zweiten Klasse vom F-Deck bis zum Bootsdeck hinauf. Auf den meisten Schiffen jener Zeit gab es Aufzüge – wenn überhaupt – nur in der Ersten Klasse. Die Antriebsmaschine stand in einem eigenen Raum auf dem Bootsdeck.' });
 
   // machinery access openings in the F-deck floor: railing on three sides (open at the +x end), slab rims
   const bf = B('F'), yf = DECK_Y.F, S = STYLE.steel;

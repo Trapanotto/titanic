@@ -1,3 +1,4 @@
+import { ENGINE } from '../core/engine.js';
 import * as THREE from 'three';
 import { TIER } from '../core/tier.js';
 import { SHIP, hullHalfWidth, DECK_Y } from '../core/constants.js';
@@ -552,7 +553,7 @@ export function createOcean(shared) {
     update(camPos, time, n, sunI = 3, pxScale = 800) {
       mesh.position.x = Math.round(camPos.x / CELL) * CELL;
       mesh.position.z = Math.round(camPos.z / CELL) * CELL;
-      uniforms.uDrift.value = time * SHIP_SPEED;
+      uniforms.uDrift.value = ENGINE.phase * SHIP_SPEED; // distance run: the sea stands still when the engines are stopped
       uniforms.uAmp.value = 1 - 0.88 * n;      // "like a mill pond" at night
       uniforms.uChop.value = 1 - 0.75 * n;
       uniforms.uWhitecap.value = 0.55 * (1 - n);

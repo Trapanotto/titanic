@@ -67,6 +67,7 @@ ui.controls = controls;
 
 const debug = (window.__titanic = { world, scene, camera, renderer: null, player, ui, controls, errors: [], ready: false, frame: null, params, tier: TIER });
 world.tier = TIER;
+try { world.doorSaved = new Set(JSON.parse(localStorage.getItem('titanic.tueren') || '[]')); } catch { world.doorSaved = new Set(); }
 world.dropRadius = TIER.dropRadius;
 world.insideExtFar = TIER.insideExtFar || 0;
 world.dropTinyInstances = !TIER.tinyInstances;
