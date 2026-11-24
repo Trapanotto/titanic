@@ -152,6 +152,7 @@ export class Boats {
     this.world.streamHold = !!this.rider;
     for (const [u, S] of this.live) {
       const st = S.q[0];
+      if (st) this.world.shadowBusy = 1; // its shadow on the ship's side follows (environment: sun shadow refresh)
       if (st?.fn) { S.q.shift(); st.fn(); }
       else if (st) {
         if (st.from === null) st.from = S[st.v];

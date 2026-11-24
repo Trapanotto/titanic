@@ -205,8 +205,10 @@ function autoQuality(raw) {
   a.fast = a.ema < 0.012 ? a.fast + raw : 0;
   const i = QUALITY_LEVELS.indexOf(post.quality);
   let q = null;
-  if (a.slow > 3 && i > 0) { q = QUALITY_LEVELS[i - 1]; a.downs++; }
-  else if (a.fast > 30 && a.downs > 0 && a.ups < 1 && i < QUALITY_LEVELS.length - 1) { q = QUALITY_LEVELS[i + 1]; a.ups++; }
+  // A change of preset rebuilds the render targets and recompiles every shader (a hitch of a second or more): it is
+  // the last resort – first the resolution goes down (above), and the preset is never raised again by itself.
+  const atMin = (post.resScale ?? 1) <= (TIER.minPixelRatio < 1 ? TIER.minPixelRatio + 0.01 : 1);
+  if (a.slow > 6 && atMin && i > 0) { q = QUALITY_LEVELS[i - 1]; a.downs++; }
   if (!q || !TIER.qualities.includes(q)) return;
   post.setQuality(q);
   a.cool = 6; a.slow = a.fast = 0; a.ema = 1 / 60;

@@ -79,7 +79,17 @@ export class Technik {
         const glow = new THREE.Mesh(this.box, this.fireM); glow.scale.set(0.004, 0.3, 0.38); glow.position.set(0.19, FY + 0.1, zf);
         const dark = new THREE.Mesh(this.box, mats.iron); dark.scale.set(0.006, 0.4, 0.48); dark.position.set(0.185, FY + 0.1, zf);
         const door = new THREE.Group(); door.position.set(0.19, FY + 0.1, zf - 0.24);
-        const leaf = new THREE.Mesh(this.box, mats.iron); leaf.scale.set(0.05, 0.38, 0.46); leaf.position.set(0.025, 0, 0.25); door.add(leaf);
+        // the leaf as cast (decks/tank-boilers.js fireDoor): frame ribs, air slide with its slots, knob, peep-hole cover, latch
+        const part = (mat, sx, sy, sz, x, y, z) => { const m = new THREE.Mesh(this.box, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); door.add(m); return m; };
+        part(mats.iron, 0.05, 0.38, 0.46, 0.025, 0, 0.25);
+        for (const [sy, sz, y, z] of [[0.04, 0.46, 0.17, 0.25], [0.04, 0.46, -0.17, 0.25], [0.3, 0.04, 0, 0.04], [0.3, 0.04, 0, 0.46]]) part(mats.iron, 0.025, sy, sz, 0.062, y, z);
+        part(mats.steelDark, 0.012, 0.1, 0.3, 0.056, 0.06, 0.25);
+        for (let k = 0; k < 6; k++) part(this.fireM, 0.004, 0.06, 0.016, 0.063, 0.06, 0.13 + k * 0.048);
+        part(mats.brass, 0.04, 0.028, 0.028, 0.08, 0.06, 0.4);
+        part(mats.iron, 0.01, 0.07, 0.07, 0.056, -0.08, 0.25);
+        for (const y of [-0.12, 0.12]) part(mats.iron, 0.015, 0.05, 0.22, 0.062, y, 0.1);
+        part(mats.iron, 0.03, 0.03, 0.16, 0.09, -0.01, 0.47);
+        part(mats.brass, 0.036, 0.036, 0.08, 0.11, -0.01, 0.55);
         g.add(dark, glow, door);
         this.root.add(g);
         F.g = g; F.door = door;

@@ -26,7 +26,7 @@ const HEMI_DAY = 0.5, HEMI_NIGHT = 0.5;
 const ENV_DAY = 0.95, ENV_NIGHT = 0.8, ENV_INSIDE = 0.26, ENV_MACHINE = 0.2;
 const FOG_DAY = 0.00016, FOG_NIGHT = 0.0004;
 const AMB_FIRST = 0.05, AMB_OTHER = 0.045, AMB_MACHINE = 0.035;
-const SHADOW_HALF = 55, SHADOW_DIST = 260, SHADOW_STEP = 3;
+const SHADOW_HALF = 55, SHADOW_DIST = 260, SHADOW_STEP = 9; // the map follows the camera in 9 m steps (3 m meant a full shadow pass every second or two of walking)
 const LAMP_EVERY = 0.12;
 // plain lamp lights + shadow-casting lamp lights (fixed counts, by device tier: 12 + 2 on desktop, 4 + 0 on phones; TIER.lamps is the total)
 const SH_POOL = Math.max(0, TIER.lampShadows ?? 2), POOL = Math.max(1, (TIER.lamps ?? 12) - SH_POOL);
@@ -233,12 +233,15 @@ export async function build(world) {
       sun.color.copy(dirKey ? STAR_COLOR : SUN_COLOR);
       need = true;
     }
+    // something big is moving outside (a lifeboat on its falls): refresh twice a second while it does
+    const busy = world.shadowBusy > 0;
+    if (busy) { world.shadowBusy -= dt; shadowTimer = Math.min(shadowTimer, 0.5); }
     shadowTimer -= dt;
     if (shadowTimer <= 0) need = true;
     // deep inside the hull the sun does not matter: skip the shadow-map pass, refresh once when it does again
     const skip = ins > 0.98 && daylight < 0.25;
     if (skip || hold) { if (need) shadowStale = true; }
-    else if (need || shadowStale) { sun.shadow.needsUpdate = true; shadowTimer = dirKey ? 1.5 : 0.5; shadowStale = false; }
+    else if (need || shadowStale) { sun.shadow.needsUpdate = true; shadowTimer = busy ? 0.5 : dirKey ? 6 : 4; shadowStale = false; } // slow refresh (was twice a second: a periodic hitch on desktops)
     const dayK = Math.max(0, 1 - 2 * n), nightK = Math.max(0, 2 * n - 1);
     sun.intensity = (SUN_INTENSITY * dayK + STAR_INTENSITY * nightK) * lerp(1, daylight * 0.5, ins);
     return SUN_INTENSITY * dayK;

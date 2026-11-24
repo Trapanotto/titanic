@@ -26,13 +26,13 @@ const SETTINGS = {
     stream: { neighbours: 1, wells: 'near', budgetMB: 110 },
   },
   mid: {
-    quality: 'mittel', qualities: ['niedrig', 'mittel', 'hoch'], antialias: true, maxPixelRatio: 2, minPixelRatio: 1,
+    quality: 'mittel', qualities: ['niedrig', 'mittel', 'hoch'], antialias: true, maxPixelRatio: 2, minPixelRatio: 0.7,
     power: 'high-performance', texMax: 512, detail: 0.6, fine: 2, dropRadius: 0, physical: true, lamps: 14, lampShadows: 2, sunShadow: 2048,
     particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 1, tinyInstances: true,
     stream: { neighbours: 1, wells: true, budgetMB: 160 },
   },
   high: {
-    quality: 'hoch', qualities: ['niedrig', 'mittel', 'hoch'], antialias: true, maxPixelRatio: 2, minPixelRatio: 1,
+    quality: 'hoch', qualities: ['niedrig', 'mittel', 'hoch'], antialias: true, maxPixelRatio: 2, minPixelRatio: 0.75,
     power: 'high-performance', texMax: 1024, detail: 1, fine: 3, dropRadius: 0, physical: true, lamps: 14, lampShadows: 2, sunShadow: 4096,
     particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 1, tinyInstances: true,
     stream: { neighbours: 1, wells: true, budgetMB: 200 },
