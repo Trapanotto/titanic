@@ -28,6 +28,17 @@ const DRAWERS = {
 const CABIN = new Set(['cabin', 'suite']);
 const SEATS = new Set(['sofa', 'settee', 'armchair', 'chairDining', 'swivelChair', 'bench', 'stool', 'barberChair', 'coolingCouch', 'abClubChair', 'abChesterfield',
   'dWickerChair', 'dChesterfield', 'dChairJac', 'dSwivel', 'fhChair3', 'fhLounger', 'bcChairLXVI', 'bcLounger', 'bcSlatBench', 'seat']);
+/** exercise machines of the gymnasium: eye height, how the rider is moved, what E says */
+const MACHINES = {
+  rowingMachine: { eye: 0.98, motion: 'row', label: 'Rudern' },
+  electricHorse: { eye: 1.78, motion: 'horse', label: 'Aufs elektrische Pferd steigen' },
+  electricCamel: { eye: 1.92, motion: 'camel', label: 'Aufs elektrische Kamel steigen' },
+  cycleMachine: { eye: 1.6, motion: 'cycle', label: 'Aufs Fahrrad steigen' },
+};
+// decks/f-hero.js swimmingBath: inside of the pool and its water line; decks/g.js: the squash court
+const POOL = { x0: 53.4, x1: 62.4, z0: 4.7, z1: 8.7, wl: DECK_Y.F + 0.84 };
+const COURT = { x0: 76.6, x1: 85.6, hw: 3.0, y: DECK_Y.G };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CLOCKS = new Set(['clockWall', 'mantelClock', 'abClock', 'honourGlory2']);
 const BOOKS = [
   'Ein abgegriffener Band aus der Bordbibliothek. Die Bücher konnte man sich beim Bibliothekssteward ausleihen; am Ende der Reise kamen sie zurück in den Schrank.',
@@ -87,6 +98,15 @@ export class Fixtures {
     if (u.kind === 'bathtub') {
       this.count.tub++;
       return { ...at(0, 0), r: 1.25, label: () => (this.tubs.get(u)?.target > TUB.lo ? 'Badewasser ablassen' : 'Badewasser einlassen'), act: () => this.toggleTub(u) };
+    }
+    if (MACHINES[u.kind]) {
+      const M = MACHINES[u.kind];
+      this.count.gym = (this.count.gym || 0) + 1;
+      return { x: u.x, y: floorOf(u.y + 0.1), z: u.z, r: 1.3, label: () => M.label, act: () => { this.sit(u, M.eye, { motion: M.motion, up: 'Absteigen' }); this.sound.machine(8); } };
+    }
+    if (u.kind === 'punchBag') {
+      this.count.gym = (this.count.gym || 0) + 1;
+      return { x: u.x, y: floorOf(u.y + 0.1), z: u.z, r: 1.1, label: () => 'Sandsack schlagen', act: () => { this.sound.thud(); this.sound.pock(0.02, 300); } };
     }
     if (SEATS.has(u.kind)) {
       this.count.seat++;
@@ -168,12 +188,35 @@ export class Fixtures {
 
   // ------------------------------------------------------------------ sitting
 
-  sit(u, eye) {
+  sit(u, eye, more = null) {
     const p = this._player;
     if (!p || this.seat) return;
-    this.seat = { u, eye, player: p, back: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw } };
+    this.seat = { u, eye, player: p, back: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw }, t: 0, ...more };
     p.setFlyPose(u.x, u.y + eye, u.z, u.rot || 0, 0);
-    this.toast('E oder F: aufstehen', 2.5);
+    this.toast(`E oder F: ${more?.up ? more.up.toLowerCase() : 'aufstehen'}`, 2.5);
+  }
+
+  /** into the swimming bath: the visitor floats at the water line and swims with the usual keys, inside the pool */
+  swim() {
+    const p = this._player;
+    if (!p || this.seat) return;
+    this.seat = { u: null, swim: true, up: 'Aus dem Becken steigen', player: p, back: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw }, t: 0 };
+    p.setFlyPose(POOL.x0 + 1.4, POOL.wl + 0.2, (POOL.z0 + POOL.z1) / 2, 0, 0);
+    this.sound.splash?.();
+    this.toast('Im Wasser. Schwimmen wie gehen · E oder F: aussteigen', 3.5);
+  }
+
+  /** squash: the ball to the front wall, back off the floor */
+  _serve() {
+    const p = this._player, Y = COURT.y;
+    if (!p) return;
+    const x0 = clamp(p.pos.x, COURT.x0 + 1, COURT.x1 - 2), z0 = clamp(p.pos.z, -2.4, 2.4), zw = (Math.random() - 0.5) * 4.6, yw = 0.8 + Math.random() * 1.6;
+    const m = new THREE.Mesh(this._ball ||= new THREE.SphereGeometry(0.022, 8, 6), this.M.dark);
+    this.root.add(m);
+    const pts = [[x0 + 0.5, Y + 1.0, z0], [COURT.x1 - 0.03, Y + yw, zw], [x0 + 1.5 + Math.random(), Y + 0.03, zw * 0.5 + z0 * 0.5], [x0 - 0.5, Y + 0.7, z0 + (Math.random() - 0.5)]];
+    this.sound.pock(0, 700); this.sound.pock(0.45, 1100); this.sound.pock(0.95, 500);
+    this.rally = (this.rally || 0) + 1;
+    this.flying.push({ m, t: 0, dur: 1.5, pts, arc: 0, done: () => { this.root.remove(m); this.toast(`Ballwechsel ${this.rally}`, 1.5); } });
   }
   stand() {
     const S = this.seat;
@@ -186,6 +229,9 @@ export class Fixtures {
 
   _games() {
     const cx = 0.5, BY = DECK_Y.boat;
+    // swimming bath (steps at the after end, ladder forward) and squash court
+    for (const x of [POOL.x0 - 1.3, POOL.x1 + 0.9]) this.addItem({ x, y: DECK_Y.F, z: 6.7, r: 1.6, label: () => 'Ins Becken steigen', act: () => this.swim() });
+    this.addItem({ x: (COURT.x0 + COURT.x1) / 2 - 1, y: COURT.y, z: 0, r: 3.2, low: true, label: () => 'Squash: Ball schlagen', act: () => this._serve() });
     const disc = new THREE.CylinderGeometry(0.075, 0.075, 0.026, 12), ring = new THREE.TorusGeometry(0.1, 0.016, 5, 14).rotateX(Math.PI / 2);
     for (const s of [-1, 1]) {
       const cz = s * (BOAT_HOUSES[1].hw + 2.9), qx = cx + 9.2;
@@ -355,12 +401,40 @@ export class Fixtures {
 
   update(dt, p, player) {
     this._player = player;
-    if (this.seat) { const S = this.seat; if (player.mode !== 'fly') this.stand(); else player.setFlyPose(S.u.x, S.u.y + S.eye, S.u.z); } // stays seated; F = up
+    if (this.seat) {
+      const S = this.seat;
+      S.t += dt;
+      if (player.mode !== 'fly') this.stand(); // F = up
+      else if (S.swim) {
+        // floats at the water line, kept inside the pool; the stroke makes the head rise and fall a little
+        const q = player.pos, moving = Math.hypot(q.x - (S.lx ?? q.x), q.z - (S.lz ?? q.z)) > 0.002;
+        const x = clamp(q.x, POOL.x0 + 0.75, POOL.x1 - 0.75), z = clamp(q.z, POOL.z0 + 0.75, POOL.z1 - 0.75);
+        player.setFlyPose(x, POOL.wl + 0.2 + Math.sin(S.t * (moving ? 5 : 1.6)) * (moving ? 0.05 : 0.025), z);
+        S.lx = x; S.lz = z; S.moving = moving;
+      } else {
+        let dx = 0, dy = 0, dz = 0;
+        const t = S.t;
+        if (S.motion === 'row') dx = -0.32 * (0.5 - 0.5 * Math.cos(t * 2.4));
+        else if (S.motion === 'horse') { dy = 0.11 * Math.sin(t * 6.5); dx = 0.05 * Math.sin(t * 6.5 + 1.2); }
+        else if (S.motion === 'camel') { dz = 0.1 * Math.sin(t * 2.6); dy = 0.06 * Math.sin(t * 5.2); dx = 0.07 * Math.sin(t * 2.6 + 0.8); }
+        else if (S.motion === 'cycle') { dy = 0.015 * Math.sin(t * 9); dz = 0.02 * Math.sin(t * 4.5); }
+        const c = Math.cos(S.u.rot || 0), s = Math.sin(S.u.rot || 0);
+        player.setFlyPose(S.u.x + c * dx + s * dz, S.u.y + S.eye + dy, S.u.z - s * dx + c * dz);
+        if (S.motion && S.t > (S.snd || 7.5)) { S.snd = S.t + 7.5; this.sound.machine(8); }
+      }
+    }
     if (!this._gamesDone && this.plates) { this._gamesDone = true; this._games(); }
     for (let i = this.flying.length - 1; i >= 0; i--) {
       const f = this.flying[i];
       if (f.t >= 1) continue;
       f.t = Math.min(1, f.t + dt / f.dur);
+      if (f.pts) { // a ball along its legs
+        const n = f.pts.length - 1, q = Math.min(n - 1e-6, f.t * n), i = Math.floor(q), k = q - i, A = f.pts[i], B = f.pts[i + 1];
+        f.m.position.set(A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k + 0.25 * 4 * k * (1 - k), A[2] + (B[2] - A[2]) * k);
+        if (f.t >= 1) f.done();
+        if (f.t >= 1) { this.flying.splice(i >= 0 ? this.flying.indexOf(f) : 0, 1); }
+        continue;
+      }
       const e = f.arc ? f.t : 1 - (1 - f.t) * (1 - f.t); // a slide slows down, a throw does not
       f.m.position.set(f.a[0] + (f.b[0] - f.a[0]) * e, f.a[1] + (f.b[1] - f.a[1]) * e + f.arc * 4 * f.t * (1 - f.t), f.a[2] + (f.b[2] - f.a[2]) * e);
       if (f.t >= 1) { f.done(); if (this.flying.length > 14) { const old = this.flying.shift(); this.root.remove(old.m); i--; } }
@@ -397,6 +471,7 @@ export class Fixtures {
       T.g.visible = near(u);
       if (filling) loud(u, 1); else if (draining) loud(u, 0.45);
     }
+    if (this.seat?.swim && this.seat.moving) noise = Math.max(noise, 0.45);
     this.sound.water(noise);
   }
 }

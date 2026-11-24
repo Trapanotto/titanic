@@ -346,7 +346,7 @@ export class Interact {
 
   label(i) {
     if (i === 'boat') return this.boats.riderLabel();
-    if (i === 'seat') return 'Aufstehen';
+    if (i === 'seat') return this.fixtures.seat?.up || 'Aufstehen';
     if (i !== 'door') return this.items[i]?.label() || '';
     const d = this.door, wt = d?.kind === 'wt';
     return (wt ? 'Schotttür ' : 'Tür ') + (d?.open ? 'schließen' : wt ? 'hochkurbeln' : 'öffnen');

@@ -405,6 +405,18 @@ export class Sound {
     this._burst(this.fx, t, seconds, 0.12, 'lowpass', 200, 0.8, this.brown);
   }
 
+  /** an electric exercise machine running: motor hum and the knock of its crank */
+  machine(seconds = 8) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._tone(this.fx, 58, t, seconds, 0.07, { type: 'sawtooth', cutoff: 300, attack: 0.4, sustain: true, release: 0.5 });
+    this._tone(this.fx, 117, t, seconds, 0.02, { type: 'triangle', attack: 0.4, sustain: true, release: 0.5 });
+    for (let i = 0; i < seconds / 0.42; i++) this._burst(this.fx, t + 0.3 + i * 0.42, 0.05, 0.12, 'lowpass', 500, 1, this.brown);
+  }
+
+  /** squash ball: racquet, wall, floor */
+  pock(at = 0, f = 900) { if (this.ready) { const t = this.ctx.currentTime + at; this._burst(this.fx, t, 0.035, 0.35, 'bandpass', f, 2.5); this._tone(this.fx, f * 0.5, t, 0.06, 0.05, { type: 'sine', attack: 0.002 }); } }
+
   /** tap: squeak of the valve */
   tap(on) {
     if (!this.ready) return;

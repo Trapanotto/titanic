@@ -767,7 +767,7 @@ function seenThroughOpening(c, open, p, ys) {
   return false;
 }
 // Furniture that can be operated (app/fixtures.js): registered with place, direction and options when its zone is baked.
-const FIXTURES = new Set(['sofa', 'settee', 'armchair', 'chairDining', 'swivelChair', 'bench', 'stool', 'barberChair', 'coolingCouch', 'abClubChair', 'abChesterfield',
+const FIXTURES = new Set(['rowingMachine', 'electricHorse', 'electricCamel', 'cycleMachine', 'punchBag', 'sofa', 'settee', 'armchair', 'chairDining', 'swivelChair', 'bench', 'stool', 'barberChair', 'coolingCouch', 'abClubChair', 'abChesterfield',
   'dWickerChair', 'dChesterfield', 'dChairJac', 'dSwivel', 'fhChair3', 'fhLounger', 'bcChairLXVI', 'bcLounger', 'bcSlatBench',
   'clockWall', 'mantelClock', 'abClock', 'honourGlory2', 'bookcase', 'fireplace', 'chest', 'dressingTable', 'writingDesk', 'porthole', 'wardrobe', 'washbasinMarble', 'basinSmall', 'washstand', 'sink', 'bcVanity', 'bathtub', 'wc']);
 function noteFixture(world, g) {

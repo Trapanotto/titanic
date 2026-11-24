@@ -160,6 +160,27 @@ export async function run(d) {
     return { ok: sat && up && games === 4 && c.seat > 100, note: `${c.seat} Sitzplätze, ${c.clock} Uhren, ${c.book} Bücherschränke, ${c.fire} Kamine (geladene Decks), ${games} Spielpunkte · hingesetzt: ${sat}, aufgestanden: ${up}` };
   });
 
+  await check('Schwimmbad, Turngerät, Squash', async () => {
+    const F = interact.fixtures, t = world.teleports.find((x) => x.name === 'Schwimmbad');
+    player.teleport(t); await settle();
+    const x0 = player.pos.x;
+    F.swim(); await wait(0.3);
+    player.pos.x = 99; await wait(0.2); // swimming against the pool wall
+    const inPool = !!F.seat?.swim && player.mode === 'fly' && player.pos.x < 62 && Math.abs(player.pos.y + 1.65 - (DECK_Y.F + 1.04)) < 0.3;
+    interact.run('seat'); await wait(0.3);
+    const out = !F.seat && player.mode === 'walk' && Math.abs(player.pos.x - x0) < 0.3;
+    const gym = world.teleports.find((x) => /Turnhalle|Gymnas/.test(x.name));
+    let rode = null;
+    if (gym) {
+      player.teleport(gym); await settle();
+      for (let k = 0; k < 3; k++) { for (let j = 0; j < 6; j++) await frame(); await settle(); }
+      const m = [...world.uses.values()].find((u) => u.kind === 'electricHorse' || u.kind === 'rowingMachine' || u.kind === 'cycleMachine');
+      if (m) { const it = interact.items.find((i) => Math.abs(i.x - m.x) < 0.01 && Math.abs(i.z - m.z) < 0.01 && /steigen|Rudern/.test(i.label())); it.act(); await wait(0.4); rode = !!F.seat?.motion && player.mode === 'fly'; interact.run('seat'); await wait(0.3); rode = rode && !F.seat; }
+    }
+    const sq = interact.items.find((i) => /Squash/.test(i.label()));
+    return { ok: inPool && out && rode !== false && !!sq, note: `im Becken: ${inPool}, wieder draußen: ${out}, Turngerät: ${rode === null ? 'nicht gefunden' : rode}, ${F.count.gym || 0} Geräte (geladene Decks)` };
+  });
+
   await check('Kesselfeuertür, Hauptschalter', async () => {
     const T = interact.technik, t = world.teleports.find((x) => /Kesselraum 6/.test(x.name));
     player.teleport(t); await settle();
