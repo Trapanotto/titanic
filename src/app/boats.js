@@ -22,24 +22,52 @@ export class Boats {
     this.live = new Map(); // use -> state
     this.rope = new THREE.CylinderGeometry(1, 1, 1, 5);
     this.time = 0;
+    this.rider = null; // { u, S, player, back: {x, z} } while the visitor is in a boat
   }
 
-  item(u) {
+  /** two places to stand at a station: aft the davits are worked, forward one gets into the boat hanging outboard */
+  items(u) {
     const s = u.spec, inb = 2.6;
-    return {
-      x: u.x, y: u.y, z: u.z - s.side * inb, r: 2.3,
-      label: () => {
-        const S = this.live.get(u), ph = S ? S.phase : s.out ? 'out' : 'stowed';
-        if (S?.q.length) return 'Rettungsboot … (in Bewegung)';
-        return ph === 'stowed' ? 'Rettungsboot ausschwenken' : ph === 'out' ? 'Rettungsboot fieren' : 'Rettungsboot aufholen';
-      },
-      act: () => this.work(u),
+    const label = () => {
+      const S = this.live.get(u), ph = S ? S.phase : s.out ? 'out' : 'stowed';
+      if (S?.q.length) return 'Rettungsboot … (in Bewegung)';
+      return ph === 'stowed' ? 'Rettungsboot ausschwenken' : ph === 'out' ? 'Rettungsboot fieren' : 'Rettungsboot aufholen';
     };
+    const canBoard = () => { const S = this.live.get(u); return (S ? S.phase : s.out ? 'out' : 'stowed') === 'out' && !S?.q.length; };
+    const fwd = { x: u.x + 2.4, y: u.y, z: u.z - s.side * inb, r: 1.9 };
+    return [
+      { x: u.x - 2.4, y: u.y, z: u.z - s.side * inb, r: 1.9, label, act: () => this.work(u) },
+      { ...fwd, label: () => (canBoard() ? 'Ins Boot einsteigen' : label()), act: () => (canBoard() ? this.board(u, fwd) : this.work(u)) },
+    ];
+  }
+
+  /** get into the boat hanging outboard; from then on E works the falls, F gets out */
+  board(u, back) {
+    const S = this.live.get(u) || this._start(u);
+    if (!S || !this._player) return;
+    this.rider = { u, S, player: this._player, back };
+    const q = this._player.pos; this._player.setFlyPose(q.x, q.y + 1.7, q.z); // carried by the boat from the next frame on (walking again = F = getting out)
+    this.toast('Im Boot. E: fieren · F: aussteigen', 3.5);
+  }
+  riderLabel() {
+    const S = this.rider?.S;
+    if (!S) return '';
+    if (S.q.length) return 'Im Rettungsboot … (in Bewegung)';
+    return S.phase === 'down' ? 'Boot aufholen lassen' : 'Fieren lassen (F: aussteigen)';
+  }
+  riderAct() { if (this.rider) this.work(this.rider.u); }
+  _stepOff() {
+    const R = this.rider;
+    if (!R) return;
+    this.rider = null;
+    const s = R.u.spec;
+    if (R.S.y > 0) R.player.teleport({ deck: 'boat', x: R.back.x, y: DECK_Y.boat, z: R.back.z, yaw: s.side > 0 ? -Math.PI / 2 : Math.PI / 2 });
+    else { const p = R.player.pos; R.player.setFlyPose(p.x, p.y + 1.7, p.z); this.toast('Aus dem Boot – Flugmodus (F zum Landen an Deck)', 3); } // let go lower down: flying on from there
   }
 
   _start(u) {
     if (this.live.size >= MAX_LIVE) { this.toast('Erst ein anderes Boot wieder einholen.', 2.5); return null; }
-    const L = liveStation(u.spec), S = { u, L, phase: u.spec.out ? 'out' : 'stowed', y: L.by0, a: 0, q: [], t: 0, falls: [], screws: [] };
+    const L = liveStation({ ...u.spec, covered: false }), S = { u, L, phase: u.spec.out ? 'out' : 'stowed', y: L.by0, a: 0, q: [], t: 0, falls: [], screws: [] };
     const line = (r) => { const m = new THREE.Mesh(this.rope, mats.rope); m.scale.set(r, 1, r); L.g.add(m); return m; };
     for (let i = 0; i < 2; i++) { S.falls.push(line(0.02)); if (!L.out) { const m = new THREE.Mesh(this.rope, mats.iron); m.scale.set(0.03, 1, 0.03); L.g.add(m); S.screws.push(m); } }
     S.clusters = this.world.extAll.filter((c) => c.ec === u.id);
@@ -60,6 +88,7 @@ export class Boats {
     else if (S.phase === 'out') { step('y', Y_WATER, 18); S.next = 'down'; this.sound.davit(18); this.toast('Fieren! Das Boot geht zu Wasser.', 3); }
     else {
       step('y', S.L.out ? S.L.by0 : Y_SWING, 18);
+      S.q.push({ fn: () => { if (this.rider?.S === S) { this._stepOff(); this.toast('Wieder an Deck.', 2); } } }); // level with the deck: out of the boat
       if (!S.L.out) { step('a', 0, 6); step('y', S.L.by0, 2.5); }
       S.next = 'home'; this.sound.davit(S.L.out ? 18 : 26.5); this.toast('Das Boot wird aufgeholt.', 3);
     }
@@ -69,6 +98,7 @@ export class Boats {
   reset(u) {
     const S = this.live.get(u);
     if (!S) return;
+    if (this.rider?.S === S) { S.y = 1; this._stepOff(); }
     for (const c of S.clusters) c.off = false;
     this.root.remove(S.L.g);
     this.live.delete(u);
@@ -99,11 +129,15 @@ export class Boats {
     });
   }
 
-  update(dt) {
+  update(dt, player) {
     this.time += dt;
+    this._player = player;
+    if (this.rider && player.mode !== 'fly') this._stepOff(); // F: out of the boat
+    this.world.streamHold = !!this.rider;
     for (const [u, S] of this.live) {
       const st = S.q[0];
-      if (st) {
+      if (st?.fn) { S.q.shift(); st.fn(); }
+      else if (st) {
         if (st.from === null) st.from = S[st.v];
         st.t = Math.min(1, st.t + dt / st.dur);
         const e = st.t * st.t * (3 - 2 * st.t);
@@ -118,6 +152,13 @@ export class Boats {
         }
       }
       this._pose(S);
+    }
+    const R = this.rider;
+    if (R) {
+      // standing on the bottom boards amidships, free to look around
+      R.S.L.g.updateMatrixWorld(true);
+      _a.set(0.5, 1.82, 0).applyMatrix4(R.S.L.boat.matrixWorld);
+      R.player.setFlyPose(_a.x, _a.y, _a.z);
     }
   }
 }

@@ -172,7 +172,8 @@ export class Interact {
     for (let i = this._usesN; i < all.length; i++) {
       const u = all[i];
       if (u.kind === 'piano') this.items.push({ x: u.x, y: u.y, z: u.z, r: 1.3, label: () => 'Klavier spielen', act: () => this.sound.piano() });
-      else { const it = u.kind === 'lifeboat' ? this.boats.item(u) : this.fixtures.item(u); if (it) this.items.push(it); }
+      else if (u.kind === 'lifeboat') this.items.push(...this.boats.items(u));
+      else { const it = this.fixtures.item(u); if (it) this.items.push(it); }
     }
     this._usesN = all.length;
   }
@@ -341,12 +342,14 @@ export class Interact {
   }
 
   label(i) {
+    if (i === 'boat') return this.boats.riderLabel();
     if (i !== 'door') return this.items[i]?.label() || '';
     const d = this.door, wt = d?.kind === 'wt';
     return (wt ? 'Schotttür ' : 'Tür ') + (d?.open ? 'schließen' : wt ? 'hochkurbeln' : 'öffnen');
   }
 
   run(i = this.nearest) {
+    if (i === 'boat') { this.boats.riderAct(); return true; }
     if (i === 'door') { if (this.door) this.toggleDoor(this.door, this._pos); return true; }
     const it = this.items[i];
     if (!it) return false;
@@ -362,7 +365,7 @@ export class Interact {
     this._stepRide(dt);
     this._stepZoom(dt, player);
     this.fixtures.update(dt, feet);
-    this.boats.update(dt);
+    this.boats.update(dt, player);
     if (this.world.uses.size !== this._usesN) this._syncUses();
     if (this.world.doors.size !== this._doorsN) { this._doorsN = this.world.doors.size; this._plates(); }
     // moving parts (only near the bridge)
@@ -395,6 +398,6 @@ export class Interact {
       if (d < it.r * it.r && d < bd) { bd = d; best = i; }
     }
     this.door = best < 0 && mode === 'walk' && !this._ride ? this._findDoor(player) : null;
-    this.nearest = best >= 0 ? best : this.door ? 'door' : -1;
+    this.nearest = this.boats.rider ? 'boat' : best >= 0 ? best : this.door ? 'door' : -1;
   }
 }

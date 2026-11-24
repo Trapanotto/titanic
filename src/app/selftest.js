@@ -146,17 +146,20 @@ export async function run(d) {
     return { ok: opened && closed && runs && stops && fills && c.wc > 0, note: `${c.light} Lichtschalter, ${c.bell} Klingeln, ${c.drawer} Schubladen, ${c.porthole} Bullaugen · ` + `${c.wardrobe} Schränke, ${c.tap} Hähne, ${c.tub} Wannen, ${c.wc} Toiletten (geladene Decks) · Schrank auf/zu: ${opened && closed}, Hahn: ${runs && stops}, Wanne füllt: ${fills}` };
   });
 
-  await check('Rettungsboot schwenkt aus und lässt sich fieren', async () => {
+  await check('Rettungsboot: ausschwenken, einsteigen, fieren', async () => {
     const B = interact.boats, us = [...world.uses.values()].filter((u) => u.kind === 'lifeboat'), u = us.find((x) => !x.spec.out);
     if (us.length !== 16 || !u) return { ok: false, note: us.length + ' Stationen' };
     B.work(u);
     const S = B.live.get(u), hidden = S ? S.clusters.filter((c) => c.off).length : 0;
     const out = await waitFor(() => S.phase === 'out', 14);
-    B.work(u); await wait(2);
-    const lowering = S.y < 0.9 && S.q.length === 1;
-    B.reset(u);
-    const back = !B.live.size && !world.extAll.some((c) => c.off);
-    return { ok: hidden > 0 && out && lowering && back, note: `${us.length} Stationen · ausgeschwenkt: ${out}, fiert: ${lowering}, wieder verstaut: ${back}` };
+    B.board(u, { x: u.x + 2.4, z: u.z - u.spec.side * 2.6 }); await wait(0.3);
+    const aboard = !!B.rider && player.mode === 'fly';
+    const y0 = player.pos.y;
+    interact.run('boat'); await wait(2);
+    const lowering = S.y < 0.9 && S.q.length >= 1 && player.pos.y < y0 - 0.1;
+    B.reset(u); await wait(0.3);
+    const back = !B.live.size && !B.rider && !world.extAll.some((c) => c.off) && player.mode === 'walk' && Math.abs(player.pos.y - DECK_Y.boat) < 0.3;
+    return { ok: hidden > 0 && out && aboard && lowering && back, note: `${us.length} Stationen · ausgeschwenkt: ${out}, eingestiegen: ${aboard}, fiert mit Besucher: ${lowering}, wieder an Deck und verstaut: ${back}` };
   });
 
   // every deck: reachable, built, and how fast it draws here
