@@ -7,6 +7,7 @@ import { mats } from '../core/materials.js';
 import { ENGINE, ORDERS, stepEngine } from '../core/engine.js';
 import { leafMatrix } from '../core/doors.js';
 import { Fixtures } from './fixtures.js';
+import { Boats } from './boats.js';
 
 const LIFT_NAMES = { A: 'A-Deck', B: 'B-Deck', C: 'C-Deck', D: 'D-Deck', E: 'E-Deck', F: 'F-Deck', boat: 'Bootsdeck' };
 // cx/cz: centre of the cage; stand: where the visitor steps out; rot: turns the cage (its gate is at -x); yaw: view towards the gate
@@ -35,6 +36,7 @@ export class Interact {
     this.toast = toast;
     this.items = [];
     this.fixtures = new Fixtures(world, scene, sound, toast, (it) => this.items.push(it));
+    this.boats = new Boats(world, scene, sound, toast);
     this.lifts = LIFTS;
     this.nearest = -1;
     this._timer = 0;
@@ -170,7 +172,7 @@ export class Interact {
     for (let i = this._usesN; i < all.length; i++) {
       const u = all[i];
       if (u.kind === 'piano') this.items.push({ x: u.x, y: u.y, z: u.z, r: 1.3, label: () => 'Klavier spielen', act: () => this.sound.piano() });
-      else { const it = this.fixtures.item(u); if (it) this.items.push(it); }
+      else { const it = u.kind === 'lifeboat' ? this.boats.item(u) : this.fixtures.item(u); if (it) this.items.push(it); }
     }
     this._usesN = all.length;
   }
@@ -360,6 +362,7 @@ export class Interact {
     this._stepRide(dt);
     this._stepZoom(dt, player);
     this.fixtures.update(dt, feet);
+    this.boats.update(dt);
     if (this.world.uses.size !== this._usesN) this._syncUses();
     if (this.world.doors.size !== this._doorsN) { this._doorsN = this.world.doors.size; this._plates(); }
     // moving parts (only near the bridge)

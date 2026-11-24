@@ -61,11 +61,14 @@ function sweep(pts, rFn, rs = 6) {
   return g;
 }
 
+// The bake empties the geometries it merged; the working copies of the app (liveStation) are built into caches of
+// their own.
+let LIVE = '';
 const geoCache = new Map();
 /** Merged geometries per material for one boat type ({mat: geometry}). Keel at local y = 0. */
 function boatGeos(type, covered) {
   const { f, NS, NJ } = detail();
-  const key = type + (covered ? 'c' : 'o') + f;
+  const key = type + (covered ? 'c' : 'o') + f + LIVE;
   let G = geoCache.get(key);
   if (G) return G;
   const T = TYPES[type];
@@ -215,11 +218,16 @@ function makeBoat(type, covered) {
 
 // ---------- Welin quadrant davit ----------
 const davitCache = new Map();
-function davitGeos(out) {
+function davitGeos(out, part = 'all') {
   const f = TIER.fine, lo = f <= 1;
-  let D = davitCache.get(out + '_' + f);
+  part += LIVE;
+  let D = davitCache.get(out + '_' + f + part);
   if (D) return D;
-  const W = [], I = [], S = [], R = [], Br = [];
+  // 'base' (fixed), 'arm' (swings: arm, nut, upper block) and 'screw' (the spindle between them); 'all' = the baked davit
+  const mkSet = () => ({ W: [], I: [], S: [], R: [], Br: [] });
+  const sets = { base: mkSet(), arm: mkSet(), screw: mkSet() };
+  let { W, I, S, R, Br } = sets.base;
+  const use = (k) => { ({ W, I, S, R, Br } = sets[k]); };
   // base: deck plate, two cheek plates with a curved head, bolts
   W.push(boxG(0.46, 0.06, 1.45, 0, 0.03, 1.0));
   const cheek = new THREE.Shape();
@@ -245,6 +253,7 @@ function davitGeos(out) {
   I.push(boxG(0.1, 0.04, 1.1, 0, 0.1, 1.0)); // rack
   I.push(cylG([-0.22, 0.42, 1.22], [0.22, 0.42, 1.22], 0.055, 8));            // pivot pin
   // arm: tapered, curved
+  use('arm');
   const armPts = out
     ? [[0, 0.42, 1.22], [0, 1.0, 1.32], [0, 1.6, 1.48], [0, 2.2, 1.75], [0, 2.75, 2.15], [0, 3.2, 2.6], [0, 3.55, 3.0], [0, 3.8, 3.3], [0, 3.9, 3.45]]
     : [[0, 0.42, 1.22], [0, 1.0, 1.28], [0, 1.6, 1.27], [0, 2.2, 1.17], [0, 2.75, 0.92], [0, 3.2, 0.6], [0, 3.55, 0.22], [0, 3.72, -0.02], [0, 3.74, -0.14]];
@@ -255,10 +264,13 @@ function davitGeos(out) {
   I.push(new THREE.TorusGeometry(0.05, 0.012, 4, 8).rotateY(Math.PI / 2).translate(head[0], head[1] + 0.08, head[2]));
   // screw spindle with nut, bearing and crank handle
   const sp0 = [0, 0.62, 0.34], sp1 = out ? [0, 1.5, 1.42] : [0, 1.75, 1.2];
+  use('screw');
   I.push(cylG(sp0, sp1, 0.03, 6));
   const nc = lo ? 5 : 10;
   for (let k = 1; k < nc; k++) { const f = k / nc; I.push(cylG([0, sp0[1] + (sp1[1] - sp0[1]) * f, sp0[2] + (sp1[2] - sp0[2]) * f], [0, sp0[1] + (sp1[1] - sp0[1]) * (f + 0.02), sp0[2] + (sp1[2] - sp0[2]) * (f + 0.02)], 0.04, 6)); }
+  use('arm');
   S.push(boxG(0.16, 0.16, 0.2, sp1[0], sp1[1], sp1[2]));
+  use('base');
   W.push(boxG(0.3, 0.45, 0.12, 0, 0.28, 0.4));
   S.push(boxG(0.14, 0.14, 0.12, 0, 0.6, 0.34));
   I.push(cylG([0, 0.58, 0.3], [0, 0.58, 0.2], 0.02, 6));
@@ -269,28 +281,32 @@ function davitGeos(out) {
   I.push(boxG(0.06, 0.06, 0.4, 0.22, 0.42, 0.62)); I.push(boxG(0.05, 0.12, 0.05, 0.22, 0.36, 0.55)); I.push(boxG(0.05, 0.12, 0.05, 0.22, 0.36, 0.7));
   for (let k = 0; k < 3; k++) R.push(new THREE.TorusGeometry(0.21 - k * 0.02, 0.035, lo ? 4 : 5, lo ? 8 : 12).rotateX(Math.PI / 2).translate(0, (out ? 0.035 : 0.08) + k * 0.06, out ? -0.25 : 0.25)); // coil on the plate / on deck
   // upper (double) block with hook at the arm head
+  use('arm');
   const by = head[1] - 0.42;
   for (const s of [-1, 1]) W.push(boxG(0.025, 0.3, 0.17, s * 0.06, by, head[2]));
   I.push(cylG([-0.05, by, head[2]], [0.05, by, head[2]], 0.08, 10));
   I.push(cylG([0, by + 0.15, head[2]], [0, head[1] - 0.06, head[2]], 0.02, 5));
-  D = { paintWhite: merge(W), iron: merge(I), steelDark: merge(S), rope: merge(R), brass: merge(Br), head, by };
-  davitCache.set(out + '_' + f, D);
+  const pick = part.startsWith('all') ? ['base', 'arm', 'screw'] : [part.replace('L', '')];
+  const mg = (k) => { const l = pick.flatMap((q) => sets[q][k]); return l.length ? merge(l) : null; };
+  D = { paintWhite: mg('W'), iron: mg('I'), steelDark: mg('S'), rope: mg('R'), brass: mg('Br'), head, by, sp0, sp1 };
+  davitCache.set(out + '_' + f + part, D);
   return D;
 }
-function addDavit(g, xd, out) {
-  const D = davitGeos(out);
+function addDavit(g, xd, out, part = 'all', oy = 0, oz = 0) {
+  const D = davitGeos(out, part);
   for (const k of ['paintWhite', 'iron', 'steelDark', 'rope', 'brass']) {
-    const m = mk(D[k], mats[k], xd, 0, 0, k === 'paintWhite');
+    if (!D[k]) continue;
+    const m = mk(D[k], mats[k], xd, oy, oz, k === 'paintWhite');
     if (k !== 'paintWhite') m.castShadow = false;
     g.add(m);
   }
   return [xd, D.head[1], D.head[2], D.by];
 }
 
-let lowerBlockGeo = null;
+const lowerBlockGeos = {};
 function lowerBlock() {
-  if (lowerBlockGeo) return lowerBlockGeo;
-  lowerBlockGeo = {
+  if (lowerBlockGeos[LIVE]) return lowerBlockGeos[LIVE];
+  const lowerBlockGeo = lowerBlockGeos[LIVE] = {
     oak: merge([boxG(0.025, 0.26, 0.15, -0.045, 0, 0), boxG(0.025, 0.26, 0.15, 0.045, 0, 0)]),
     iron: merge([cylG([-0.035, 0.02, 0], [0.035, 0.02, 0], 0.07, 10), boxG(0.09, 0.03, 0.08, 0, -0.12, 0), cylG([0, -0.13, 0], [0, -0.28, 0], 0.018, 5), new THREE.TorusGeometry(0.06, 0.016, 4, 10, Math.PI * 1.4).translate(0, -0.34, 0)]), // box = strap between the cheeks carrying the hook
   };
@@ -301,8 +317,7 @@ export function buildBoats(world, parent) {
   const root = new THREE.Group(); root.name = 'lifeboats';
   parent.add(root);
   world.markForBake(root);
-  const ropes = new Wires(mats.rope, false);
-  const _v = new THREE.Vector3();
+  let nStation = 0;
 
   const station = ({ x, side, type = 'std', out = false, covered = true, collapsible = false }) => {
     const T = TYPES[type];
@@ -313,11 +328,12 @@ export function buildBoats(world, parent) {
     if (side < 0) g.scale.z = -1;
     root.add(g);
     g.updateMatrix();
-    const R = (ax, ay, az, bx, by, bz, r = 0.012) => {
-      _v.set(ax, ay, az).applyMatrix4(g.matrix); const a0 = _v.x, a1 = _v.y, a2 = _v.z;
-      _v.set(bx, by, bz).applyMatrix4(g.matrix);
-      ropes.seg(a0, a1, a2, _v.x, _v.y, _v.z, r);
-    };
+    // every station is a cluster of its own in the exterior bake: the app switches it off and puts a working copy
+    // in its place when the boat is swung out and lowered (liveStation, app/boats.js)
+    g.userData.extCluster = ++nStation;
+    world.addUse('lifeboat', x, BY, side * zc, { id: nStation, spec: { x, side, type, out, covered, collapsible } });
+    const ropes = new Wires(mats.rope, false);
+    const R = (ax, ay, az, bx, by, bz, r = 0.012) => ropes.seg(ax, ay, az, bx, by, bz, r);
     const boat = makeBoat(type, covered);
     const bz = out ? 3.3 : 0, by = out ? 0.3 : 0.6;
     boat.position.set(0, by, bz);
@@ -377,6 +393,7 @@ export function buildBoats(world, parent) {
       g.add(cb);
       for (const s of [-1, 1]) g.add(mk(new THREE.BoxGeometry(0.22, 0.2, Cc.B * 0.8), mats.pine, s * Cc.L * 0.28, 0.1, -0.62));
     }
+    g.add(ropes.build('boatFalls'));
     const c = STATION_COLLIDERS[x + ':' + side];
     world.addCollider(c[0], BY, c[2], c[1], c[4], c[3]);
     return g;
@@ -399,7 +416,6 @@ export function buildBoats(world, parent) {
     root.add(cb);
     for (const s of [-1, 1]) root.add(mk(new THREE.BoxGeometry(0.22, 0.24, 2.0), mats.pine, 62.2 + s * 2.3, RY + 0.12, side * 4.9));
   }
-  root.add(ropes.build('boatFalls'));
 
   world.addInfo({
     title: 'Rettungsboote',
@@ -414,11 +430,55 @@ export function buildBoats(world, parent) {
   return {};
 }
 
-let _knot = null, _chock = null, _slip = null;
+/** pivot of the davit arm (y, z in the station's own coordinates) */
+export const DAVIT_PIVOT = [0.42, 1.22];
+
+/**
+ * Working copy of a boat station for the app: the boat with its lower blocks and each davit arm are groups of their
+ * own (not baked), the falls are drawn by the app. Returns the parts and the measures the animation needs.
+ */
+export function liveStation(spec) {
+  LIVE = 'L';
+  try { return liveStation1(spec); } finally { LIVE = ''; }
+}
+function liveStation1({ x, side, type = 'std', out = false, covered = true, collapsible = false }) {
+  const T = TYPES[type], g = new THREE.Group(), zc = edge(x) - 2.06;
+  g.position.set(x, BY, side * zc);
+  g.rotation.y = -side * Math.atan(edgeSlope(x));
+  if (side < 0) g.scale.z = -1;
+  const by0 = out ? 0.3 : 0.6, bz0 = out ? 3.3 : 0, xd = T.L / 2 + 0.34, xh = T.L / 2 - 0.55, hook = T.D * 1.08;
+  const boat = new THREE.Group();
+  boat.position.set(0, by0, bz0);
+  boat.add(makeBoat(type, covered));
+  g.add(boat);
+  const LB = lowerBlock(), arms = [];
+  for (const s of [-1, 1]) {
+    addDavit(g, s * xd, out, 'base');
+    const arm = new THREE.Group();
+    arm.position.set(s * xd, DAVIT_PIVOT[0], DAVIT_PIVOT[1]);
+    addDavit(arm, 0, out, 'arm', -DAVIT_PIVOT[0], -DAVIT_PIVOT[1]);
+    g.add(arm); arms.push(arm);
+    for (const [k, m] of [['oak', mats.oak], ['iron', mats.iron]]) boat.add(mk(LB[k], m, s * xh, hook + 0.42, 0));
+    if (covered) boat.add(mk(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 6), mats.iron, s * xh, hook, 0));
+    else { const y0 = T.D * 0.2 * Math.pow(xh / (T.L / 2), 5) + 0.03; boat.add(mk(new THREE.CylinderGeometry(0.03, 0.03, hook + 0.15 - y0, 6), mats.iron, s * xh, (hook + 0.15 + y0) / 2, 0)); }
+  }
+  if (!out) for (const s of [-1, 1]) g.add(mk(CHOCK(), mats.pine, s * T.L * 0.27, 0, 0));
+  if (collapsible) {
+    const Cc = TYPES.coll, cb = makeBoat('coll', true);
+    cb.position.set(0, 0.2, -0.62);
+    g.add(cb);
+    for (const s of [-1, 1]) g.add(mk(new THREE.BoxGeometry(0.22, 0.2, Cc.B * 0.8), mats.pine, s * Cc.L * 0.28, 0.1, -0.62));
+  }
+  const D = davitGeos(out, 'arm');
+  return { g, boat, arms, out, by0, bz0, xd, xh, hookY: hook + 0.55, head: D.head, uby: D.by - 0.12, sp0: D.sp0, sp1: D.sp1 };
+}
+
+let _knot = null, _slip = null;
+const _chocks = {};
 function KNOT() { return (_knot ||= new THREE.SphereGeometry(0.03, 5, 3)); }
 function SLIP() { return (_slip ||= merge([boxG(0.12, 0.03, 0.2, 0, 0, 0), cylG([0, 0, 0], [0, 0.12, -0.04], 0.015, 4)])); }
 function CHOCK() {
-  if (_chock) return _chock;
+  if (_chocks[LIVE]) return _chocks[LIVE];
   const p = [boxG(0.24, 0.6, 0.5, 0, 0.3, 0), boxG(0.24, 0.12, 2.1, 0, 0.06, 0)];
   // side wedges standing on the base plank, their sloping tops bearing against the bilge of the boat
   // (profile matches the standard boat's section at the chock station t = ±0.54, keel resting at y = 0.6)
@@ -431,5 +491,5 @@ function CHOCK() {
     if (zs < 0) { w.scale(1, 1, -1); const ix = w.index; if (ix) { for (let i = 0; i < ix.count; i += 3) { const a = ix.getX(i + 1); ix.setX(i + 1, ix.getX(i + 2)); ix.setX(i + 2, a); } } else { const P = w.attributes.position; for (let i = 0; i < P.count; i += 3) for (const at of [P, w.attributes.normal, w.attributes.uv]) { if (!at) continue; for (let c = 0; c < at.itemSize; c++) { const t = at.array[(i + 1) * at.itemSize + c]; at.array[(i + 1) * at.itemSize + c] = at.array[(i + 2) * at.itemSize + c]; at.array[(i + 2) * at.itemSize + c] = t; } } } w.computeVertexNormals(); }
     p.push(w);
   }
-  return (_chock = merge(p));
+  return (_chocks[LIVE] = merge(p));
 }

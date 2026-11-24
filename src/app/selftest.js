@@ -146,6 +146,19 @@ export async function run(d) {
     return { ok: opened && closed && runs && stops && fills && c.wc > 0, note: `${c.light} Lichtschalter, ${c.bell} Klingeln, ${c.drawer} Schubladen, ${c.porthole} Bullaugen · ` + `${c.wardrobe} Schränke, ${c.tap} Hähne, ${c.tub} Wannen, ${c.wc} Toiletten (geladene Decks) · Schrank auf/zu: ${opened && closed}, Hahn: ${runs && stops}, Wanne füllt: ${fills}` };
   });
 
+  await check('Rettungsboot schwenkt aus und lässt sich fieren', async () => {
+    const B = interact.boats, us = [...world.uses.values()].filter((u) => u.kind === 'lifeboat'), u = us.find((x) => !x.spec.out);
+    if (us.length !== 16 || !u) return { ok: false, note: us.length + ' Stationen' };
+    B.work(u);
+    const S = B.live.get(u), hidden = S ? S.clusters.filter((c) => c.off).length : 0;
+    const out = await waitFor(() => S.phase === 'out', 14);
+    B.work(u); await wait(2);
+    const lowering = S.y < 0.9 && S.q.length === 1;
+    B.reset(u);
+    const back = !B.live.size && !world.extAll.some((c) => c.off);
+    return { ok: hidden > 0 && out && lowering && back, note: `${us.length} Stationen · ausgeschwenkt: ${out}, fiert: ${lowering}, wieder verstaut: ${back}` };
+  });
+
   // every deck: reachable, built, and how fast it draws here
   const decks = [...new Set(world.teleports.map((t) => t.deck))];
   let worst = 0;

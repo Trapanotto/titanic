@@ -338,6 +338,23 @@ export class Sound {
   /** light switch */
   click() { if (this.ready) { const t = this.ctx.currentTime; this._burst(this.fx, t, 0.02, 0.22, 'bandpass', 2400, 5); this._burst(this.fx, t + 0.03, 0.015, 0.1, 'bandpass', 1500, 4); } }
 
+  /** davits and falls at work: the pawl of the crank, the creak of the rope in the blocks */
+  davit(seconds) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, n = Math.floor(seconds / 0.16);
+    for (let i = 0; i < n; i++) this._burst(this.fx, t + i * 0.16, 0.025, 0.1, 'bandpass', 2100 + (i % 3) * 180, 5);
+    for (let i = 0; i < seconds / 1.3; i++) this._tone(this.fx, 150 + Math.random() * 60, t + i * 1.3 + Math.random() * 0.4, 0.5, 0.018, { type: 'sawtooth', cutoff: 700, attack: 0.15, sustain: true, release: 0.2, vibrato: true });
+  }
+
+  /** the boat takes the water */
+  splash() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, 1.4, 0.5, 'lowpass', 900, 0.6);
+    this._burst(this.fx, t + 0.05, 0.9, 0.35, 'bandpass', 2600, 0.6);
+    this._burst(this.fx, t, 0.5, 0.6, 'lowpass', 180, 0.8, this.brown);
+  }
+
   /** tap: squeak of the valve */
   tap(on) {
     if (!this.ready) return;

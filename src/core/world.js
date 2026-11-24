@@ -885,6 +885,9 @@ function* bakeGroupSteps(world, root, isZone, users = null) {
     const ia = I ? I.array : null;
     const nt = I ? Math.floor(I.count / 3) : Math.floor(nv / 3);
     let lastC = NaN, lastB = null;
+    // exterior: a group marked userData.extCluster = n keeps clusters of its own (the app can switch them off: c.off)
+    let ec = 0;
+    if (!isZone) for (let q = o.parent; q && q !== root; q = q.parent) if (q.userData.extCluster) { ec = q.userData.extCluster; break; }
     for (let t = 0; t < nt; t++) {
       if ((t & 8191) === 8191) yield 'tris';
       let a = ia ? ia[t * 3] : t * 3, b = ia ? ia[t * 3 + 1] : t * 3 + 1, c = ia ? ia[t * 3 + 2] : t * 3 + 2;
@@ -898,7 +901,7 @@ function* bakeGroupSteps(world, root, isZone, users = null) {
         // ship the hull below is never in view
         let cy = (tp[a * 3 + 1] + tp[b * 3 + 1] + tp[c * 3 + 1]) / 3;
         if (!identity) cy = _v.y;
-        cid = clampI(Math.floor((cx + 140) / 40), 0, 7) + 8 * (cy < EXT_BAND0 ? 0 : cy < EXT_BAND2 ? 1 : 2);
+        cid = clampI(Math.floor((cx + 140) / 40), 0, 7) + 8 * (cy < EXT_BAND0 ? 0 : cy < EXT_BAND2 ? 1 : 2) + 32 * ec;
       }
       if (0) cid = 0; // exterior: 40 m slices along the ship (clusters of one multi-draw batch: culled by the frustum and, on weak devices, cut off by distance while the visitor is inside)
       let B;
@@ -1226,7 +1229,7 @@ function extPart(B, root) {
   }
   const I0 = B.ix[0].n, I1 = B.ix[1].n, I2 = B.ix[2].n, ix = new Uint32Array(I0 + I1 + I2);
   ix.set(B.ix[0].a.subarray(0, I0), 0); ix.set(B.ix[1].a.subarray(0, I1), I0); ix.set(B.ix[2].a.subarray(0, I2), I0 + I1);
-  const part = { pos, nrm, uv, ix, nv, lod: [I0, I0 + I1, I0 + I1 + I2], band: B.cid >> 3, box: [x0, y0, z0, x1, y1, z1], material: B.material, cast: B.cast, receive: B.receive, order: B.order };
+  const part = { pos, nrm, uv, ix, nv, lod: [I0, I0 + I1, I0 + I1 + I2], band: (B.cid >> 3) & 3, ec: B.cid >> 5, box: [x0, y0, z0, x1, y1, z1], material: B.material, cast: B.cast, receive: B.receive, order: B.order };
   B.vtx = B.ix = null;
   return part;
 }
@@ -1245,7 +1248,7 @@ function makeExtBatch(world, parts) {
     const [x0, y0, z0, x1, y1, z1] = p.box;
     X0 = Math.min(X0, x0); Y0 = Math.min(Y0, y0); Z0 = Math.min(Z0, z0); X1 = Math.max(X1, x1); Y1 = Math.max(Y1, y1); Z1 = Math.max(Z1, z1);
     const n = p.ix.length;
-    clusters.push({ mesh: null, batch: null, zone: null, x0, x1, y0, y1, z0, z1, lod: p.lod[0] < n ? p.lod : null, n, start: io, on: true, band: p.band });
+    clusters.push({ mesh: null, batch: null, zone: null, x0, x1, y0, y1, z0, z1, lod: p.lod[0] < n ? p.lod : null, n, start: io, on: true, band: p.band, ec: p.ec, off: false });
     vo += p.nv; io += n;
     p.pos = p.nrm = p.uv = p.ix = null;
   }
@@ -1286,7 +1289,7 @@ function fillRanges(mesh, camera, geometry) {
     const P = fr.planes;
     for (let i = 0; i < cl.length; i++) {
       const c = cl[i];
-      if (!c.on) continue;
+      if (!c.on || c.off) continue;
       let inside = true;
       for (let k = 0; k < 6; k++) {
         const p = P[k], nn = p.normal;
