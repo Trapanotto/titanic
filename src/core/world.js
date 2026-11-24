@@ -856,6 +856,11 @@ function* bakeGroupSteps(world, root, isZone, users = null) {
     const rad = g.boundingSphere.radius * _m.getMaxScaleOnAxis();
     if (world.dropRadius && rad < world.dropRadius) continue; // weak devices: tiny clutter is left out entirely
     const bin = rad < LOD_TINY.r ? 2 : rad < LOD_SMALL.r ? 1 : 0;
+    if (world._props && isZone && o.parent.userData.prop && !o.parent.userData.logged) {
+      const g = o.parent; g.userData.logged = true; g.updateWorldMatrix(true, false);
+      const e = g.matrixWorld.elements;
+      world._props.push([g.userData.prop, e[12], e[13], e[14], g.userData.fp?.h ?? 0, root.userData.deck]);
+    }
     if (world._profile) { // ?profile=1: triangles per source (nearest named ancestors + material), see window.__titanic.world._profile
       let nm = '';
       for (let q = o, k = 0; q && q !== root && k < 2; q = q.parent) { const n = q.userData.prop || q.name; if (n) { nm = n + (nm ? '/' + nm : ''); k++; } }

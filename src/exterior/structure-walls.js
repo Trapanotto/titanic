@@ -153,7 +153,7 @@ function windowDetail(batch, P, fpiece, piece, { u0, u1, v0, v1, t, op, frameMat
   if (op.transom) { const tv = v0 + (v1 - v0) * 0.68; fpiece(u0 + fs, u1 - fs, tv - 0.022, tv + 0.022, wm - 0.025, wm + 0.025, frameMat); }
   if (op.bars) for (let k = 1; k < op.bars; k++) { const tv = v0 + ((v1 - v0) * k) / op.bars; fpiece(u0 + fs, u1 - fs, tv - 0.012, tv + 0.012, wm - 0.02, wm + 0.02, frameMat); }
   // sill (projecting, with a lip) and drip moulding
-  fpiece(u0 - 0.1, u1 + 0.1, v0 - 0.055, v0, -0.075, wm - 0.03, sillMat);
+  fpiece(u0 - 0.1, u1 + 0.1, v0 - 0.055, v0 + 0.004, -0.075, wm - 0.03, sillMat); // 4 mm proud of the bottom of the opening (no z-fighting with the reveal)
   fpiece(u0 - 0.1, u1 + 0.1, v0 - 0.075, v0 - 0.055, -0.075, -0.05, sillMat);
   if (v1 + fa + 0.06 < H) {
     fpiece(u0 - fa - 0.04, u1 + fa + 0.04, v1 + fa, v1 + fa + 0.035, -0.07, 0.005, matOut === mats.hullWhite ? mats.paintWhite : matOut);

@@ -408,7 +408,7 @@ export const kitMats = {
   fireRed: std({ color: 0xa31a16, roughness: 0.45, metalness: 0.1 }),
   ebony: std({ color: 0x15110e, roughness: 0.18, metalness: 0.1 }),
   ivy: std({ color: 0x2f6128, roughness: 0.75, side: THREE.DoubleSide }),
-  stencil: std({ map: T.stencil, roughness: 0.85 }),
+  stencil: std({ map: T.stencil, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 }),
   notice: std({ map: T.notice, roughness: 0.9 }),
   chart: std({ map: T.chart, roughness: 0.95 }),
   keys: std({ map: T.keys, roughness: 0.3 }),

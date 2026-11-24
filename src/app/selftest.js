@@ -234,6 +234,7 @@ export async function run(d) {
     });
   }
   add('Gerät', null, `Stufe ${d.tier.name} · langsamstes Deck ${worst.toFixed(1)} ms pro Bild` + (hidden() ? ' (Fenster verdeckt: nur Rechenzeit, ohne Grafikkarte)' : ` (${Math.round(1000 / Math.max(worst, 1))} Bilder/s)`));
+  try { const gl = renderer.getContext(); add('Tiefenpuffer', null, `${gl.getParameter(gl.DEPTH_BITS)} Bit` + (gl.getParameter(gl.DEPTH_BITS) < 24 ? ' – zu grob: nahe beieinander liegende Flächen flimmern auf diesem Gerät' : '')); } catch { /* no context */ }
   add('Ton', null, d.sound?.ctx ? (d.sound.muted ? 'ausgeschaltet' : 'bereit (' + d.sound.ctx.state + ')') : 'noch nicht gestartet (erst nach Klick oder Taste)');
 
   res.pass = rows.every((r) => r.ok !== false);

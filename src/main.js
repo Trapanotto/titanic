@@ -69,7 +69,7 @@ const debug = (window.__titanic = { world, scene, camera, renderer: null, player
 world.tier = TIER;
 try { world.doorSaved = new Set(JSON.parse(localStorage.getItem('titanic.tueren') || '[]')); } catch { world.doorSaved = new Set(); }
 world.dropRadius = TIER.dropRadius;
-if (flag('profile')) world._profile = new Map();
+if (flag('profile')) { world._profile = new Map(); world._props = []; }
 world.insideExtFar = TIER.insideExtFar || 0;
 world.dropTinyInstances = !TIER.tinyInstances;
 ui.tier = TIER;
@@ -153,6 +153,21 @@ function step(dt) {
   debug.time = time;
   controls.apply();
   player.update(dt);
+  // Near plane by situation: the depth buffer resolves 1/near times finer. Indoors things come close (0.15 m); on
+  // the open decks a little more room is safe; flying away from the ship the near plane follows the distance, so
+  // window frames, doors and rivets seen from afar no longer flicker (z-fighting).
+  {
+    const p = camera.position, st = world.state;
+    let near = 0.15;
+    if (!st.inside) {
+      near = 0.2;
+      if (player.mode === 'fly') {
+        const dx = Math.max(0, Math.abs(p.x) - 137), dz = Math.max(0, Math.abs(p.z) - 15.5), dy = Math.max(0, p.y - 64, 9.5 - p.y);
+        near = Math.min(25, Math.max(0.2, 0.3 * Math.hypot(dx, dy, dz)), Math.max(0.2, 0.5 * Math.abs(p.y - 10.5))); // (never cuts into the sea below)
+      }
+    }
+    if (Math.abs(near - camera.near) > camera.near * 0.04) { camera.near = near; camera.updateProjectionMatrix(); }
+  }
   world.updateVisibility(camera.position);
   try {
     world.update(dt, time);

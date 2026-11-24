@@ -388,7 +388,7 @@ export function bathVestibule(ctx) {
   ctx.fit(bench({ w: 1.6, mat: 'mahogany', iron: false }), ['right:mid', 'left:hi'], { collide: false });
   ctx.mount(mirrorWall({ w: 0.8, h: 1.0, frame: 'mahogany' }), 'far', ctx.W * 0.7, 1.6);
   ctx.mount(clockWall(), 'left', ctx.D * 0.5, 2.0);
-  if (ctx.fit(coatHooks({ n: 4, v: 2, mat: 'brass' }), ['near:hi'])) void 0;
+  ctx.mount(coatHooks({ n: 4, v: 2, mat: 'brass' }), 'near', ctx.W * 0.3, 1.75); // on the wall (it used to lie on the floor)
 }
 
 // ---------------------------------------------------------------- Turkish bath
