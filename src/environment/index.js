@@ -279,6 +279,7 @@ export async function build(world) {
   }
   const lampDeck = (L) => (inMachinery(L.x, L.y) ? 'tank' : deckAtY(L.y - 0.5));
 
+  let otherK = 0.5;
   function indexLamps() { // only when the number of lamps / rooms changed
     const lamps = world.lamps;
     lampCount = lamps.length;
@@ -308,11 +309,14 @@ export async function build(world) {
     const y0 = DECK_Y[camDeck] - 0.25, y1 = deckAboveY(camDeck) + 0.1;
     const vK = camDeck === 'tank' ? 1.5 : 4;            // other heights count several times as far (tall machinery spaces less)
     const skipExt = n > 0.5;                            // at night the exterior lamps come from the baked volume
+    let roomOff = false, roomOn = false;
     const j0 = bucketStart[bucketOf(cam.x - LAMP_SEARCH)], j1 = bucketStart[bucketOf(cam.x + LAMP_SEARCH) + 1];
     for (let j = j0; j < j1; j++) {
       const idx = bucketItems[j], L = lamps[idx];
       if (L.y < y0 || L.y > y1) continue;
       if (skipExt && lampExt[idx]) continue;
+      if (L.off) { if (camRoom >= 0 && lampRoom[idx] === camRoom) roomOff = true; continue; } // switched off by the visitor (app/fixtures.js)
+      if (camRoom >= 0 && lampRoom[idx] === camRoom) roomOn = true;
       const dx = L.x - cam.x, dy = (L.y - cam.y) * vK, dz = L.z - cam.z;
       let d = dx * dx + dy * dy + dz * dz;
       if (camRoom >= 0 && lampRoom[idx] !== camRoom) d *= OTHER_ROOM;
@@ -348,7 +352,9 @@ export async function build(world) {
     }
     nPending = 0;
     for (let q = 0; q < nBest && nPending < POOL; q++) if (!taken[q] && !isSh(bestI[q]) && !shOwned(bestI[q])) pending[nPending++] = bestI[q];
-    for (const s of slots) if (s.lamp >= 0) s.roomT = camRoom < 0 || lampRoom[s.lamp] === camRoom ? 1 : 0.5;
+    // the visitor's room with its lamps switched off: what comes in from the lamps of the other rooms is little
+    otherK = roomOff && !roomOn ? 0.07 : 0.5;
+    for (const s of slots) if (s.lamp >= 0) s.roomT = camRoom < 0 || lampRoom[s.lamp] === camRoom ? 1 : otherK;
   }
 
   function assign(s, idx) {
@@ -364,7 +370,7 @@ export async function build(world) {
     s.flick = tmpC.r > 0.9 && tmpC.b < 0.4 ? 1 : ((idx * 2654435761) >>> 0) % 11 === 0 ? 0.12 : 0;
     s.base = Number.isFinite(L.intensity) ? L.intensity : 1;
     if (s.flick === 1) s.base *= 1.6;
-    s.roomT = camRoom < 0 || lampRoom[idx] === camRoom ? 1 : 0.5;
+    s.roomT = camRoom < 0 || lampRoom[idx] === camRoom ? 1 : otherK;
     s.room = s.roomT;
     if (s.shadow) s.dirty = true;
   }

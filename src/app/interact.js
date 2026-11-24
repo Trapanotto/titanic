@@ -34,7 +34,7 @@ export class Interact {
     this.sound = sound;
     this.toast = toast;
     this.items = [];
-    this.fixtures = new Fixtures(world, scene, sound, toast);
+    this.fixtures = new Fixtures(world, scene, sound, toast, (it) => this.items.push(it));
     this.lifts = LIFTS;
     this.nearest = -1;
     this._timer = 0;

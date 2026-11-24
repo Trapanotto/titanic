@@ -767,7 +767,7 @@ function seenThroughOpening(c, open, p, ys) {
   return false;
 }
 // Furniture that can be operated (app/fixtures.js): registered with place, direction and options when its zone is baked.
-const FIXTURES = new Set(['wardrobe', 'washbasinMarble', 'basinSmall', 'washstand', 'sink', 'bcVanity', 'bathtub', 'wc']);
+const FIXTURES = new Set(['chest', 'dressingTable', 'writingDesk', 'porthole', 'wardrobe', 'washbasinMarble', 'basinSmall', 'washstand', 'sink', 'bcVanity', 'bathtub', 'wc']);
 function noteFixture(world, g) {
   g.userData.used = true;
   g.updateWorldMatrix(true, false);

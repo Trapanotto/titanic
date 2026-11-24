@@ -120,7 +120,7 @@ export async function run(d) {
     });
   }
 
-  await check('Schrank, Wasserhahn, Badewanne und Spülung bedienbar', async () => {
+  await check('Schrank, Schublade, Bullauge, Licht, Wasserhahn, Wanne, Spülung bedienbar', async () => {
     await go('B', 20, 5);
     const F = interact.fixtures, us = [...world.uses.values()];
     const wd = us.find((u) => u.kind === 'wardrobe' && !u.o?.open), tap = us.find((u) => u.kind === 'washbasinMarble'), tub = us.find((u) => u.kind === 'bathtub');
@@ -134,7 +134,16 @@ export async function run(d) {
     const fills = F.tubs.get(tub)?.level > 0.22;
     F.toggleTub(tub);
     const c = F.count;
-    return { ok: opened && closed && runs && stops && fills && c.wc > 0, note: `${c.wardrobe} Schränke, ${c.tap} Hähne, ${c.tub} Wannen, ${c.wc} Toiletten (geladene Decks) · Schrank auf/zu: ${opened && closed}, Hahn: ${runs && stops}, Wanne füllt: ${fills}` };
+    // drawers and portholes where the loaded decks have them; light switch and bell push of a cabin
+    const dw = us.find((u) => ['chest', 'dressingTable', 'writingDesk'].includes(u.kind)), ph = us.find((u) => u.kind === 'porthole');
+    let extra = true;
+    if (dw) { F.toggleDrawer(dw); await wait(0.7); extra = extra && F.drawers.some((x) => x.u === dw && x.t === 1); F.toggleDrawer(dw); await wait(0.7); extra = extra && !F.drawers.length; }
+    if (ph) { F.togglePort(ph); await wait(0.7); extra = extra && F.ports.some((x) => x.u === ph && x.t === 1); F.togglePort(ph); await wait(0.7); extra = extra && !F.ports.length; }
+    const sw = F.switches.find((x) => !x.bell && world.lamps.some((L) => L.x > x.room.x0 && L.x < x.room.x1 && L.z > x.room.z0 && L.z < x.room.z1 && Math.abs(L.y - x.y - 1.5) < 1.5));
+    let light = false;
+    if (sw) { F.toggleLight(sw.room); const off = world.lamps.filter((L) => L.off).length; F.toggleLight(sw.room); light = off > 0 && !world.lamps.some((L) => L.off); }
+    if (!(extra && light && c.light > 500 && c.bell > 100)) return { ok: false, note: `Schublade/Bullauge: ${extra}, Licht: ${light}, ${c.light} Schalter, ${c.bell} Klingeln` };
+    return { ok: opened && closed && runs && stops && fills && c.wc > 0, note: `${c.light} Lichtschalter, ${c.bell} Klingeln, ${c.drawer} Schubladen, ${c.porthole} Bullaugen · ` + `${c.wardrobe} Schränke, ${c.tap} Hähne, ${c.tub} Wannen, ${c.wc} Toiletten (geladene Decks) · Schrank auf/zu: ${opened && closed}, Hahn: ${runs && stops}, Wanne füllt: ${fills}` };
   });
 
   // every deck: reachable, built, and how fast it draws here

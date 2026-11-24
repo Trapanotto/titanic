@@ -319,6 +319,25 @@ export class Sound {
     if (!opening) { this._burst(this.fx, t + 0.42, 0.07, 0.35, 'lowpass', 320, 0.8, this.brown); this._burst(this.fx, t + 0.42, 0.02, 0.12, 'bandpass', 2200, 4); }
   }
 
+  /** drawer: wood sliding on wood */
+  drawer(opening) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, 0.32, 0.22, 'bandpass', opening ? 520 : 440, 1.2, this.brown);
+    this._burst(this.fx, t + (opening ? 0.3 : 0.34), 0.05, opening ? 0.12 : 0.3, 'lowpass', 380, 0.8, this.brown);
+  }
+
+  /** electric bell push: the buzz of the indicator bell far away in the pantry */
+  bellPush() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, 0.02, 0.1, 'bandpass', 3000, 4);
+    for (let i = 0; i < 16; i++) this._tone(this.fx, 1960, t + 0.12 + i * 0.055, 0.05, 0.022, { type: 'triangle', attack: 0.004 });
+  }
+
+  /** light switch */
+  click() { if (this.ready) { const t = this.ctx.currentTime; this._burst(this.fx, t, 0.02, 0.22, 'bandpass', 2400, 5); this._burst(this.fx, t + 0.03, 0.015, 0.1, 'bandpass', 1500, 4); } }
+
   /** tap: squeak of the valve */
   tap(on) {
     if (!this.ready) return;
