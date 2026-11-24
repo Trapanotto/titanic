@@ -4,7 +4,7 @@
 // file on top of it, only for the few things in use. The fixtures are registered by the bake (world.addUse).
 import * as THREE from 'three';
 import { mats } from '../core/materials.js';
-import { DECK_Y, DECK_ORDER, deckAboveY } from '../core/constants.js';
+import { DECK_Y, DECK_ORDER, deckAboveY, BOAT_HOUSES } from '../core/constants.js';
 import { matOf } from '../interior/batch.js';
 
 const MAX_OPEN = 8;      // wardrobes standing open at once (the oldest closes itself)
@@ -26,6 +26,19 @@ const DRAWERS = {
   writingDesk: () => [0.5, 0.09, 0.285, 0.66, 0],
 };
 const CABIN = new Set(['cabin', 'suite']);
+const SEATS = new Set(['sofa', 'settee', 'armchair', 'chairDining', 'swivelChair', 'bench', 'stool', 'barberChair', 'coolingCouch', 'abClubChair', 'abChesterfield',
+  'dWickerChair', 'dChesterfield', 'dChairJac', 'dSwivel', 'fhChair3', 'fhLounger', 'bcChairLXVI', 'bcLounger', 'bcSlatBench', 'seat']);
+const CLOCKS = new Set(['clockWall', 'mantelClock', 'abClock', 'honourGlory2']);
+const BOOKS = [
+  'Ein abgegriffener Band aus der Bordbibliothek. Die Bücher konnte man sich beim Bibliothekssteward ausleihen; am Ende der Reise kamen sie zurück in den Schrank.',
+  'Ein Reiseführer durch die Vereinigten Staaten mit ausklappbaren Karten. Zwischen den Seiten steckt als Lesezeichen eine Menükarte.',
+  'Ein Roman in rotem Leinen. Lawrence Beesley, Lehrer und Passagier der zweiten Klasse, schrieb später, er habe den Nachmittag des 14. April lesend in der Bibliothek verbracht.',
+  'Ein Band mit Seekarten des Nordatlantiks. Die übliche Route der Schnelldampfer im April ist eingezeichnet – weit südlich, um dem Eis auszuweichen.',
+  'Gedichte, in Leder gebunden. Im Frachtraum reiste ein weit kostbareres Buch mit: eine mit über tausend Edelsteinen besetzte Prachtausgabe der Rubaiyat des Omar Chayyam.',
+  'Das Handbuch der White Star Line für Passagiere: Essenszeiten, Gebühren für Funktelegramme, die Bitte, an Deck nicht zu rauchen, wenn Damen anwesend sind.',
+  'Ein Kriminalroman, hinten mit Bleistift der Name eines früheren Lesers. Solche Bände wanderten von Reise zu Reise durch viele Hände.',
+];
+const pad = (n) => String(n).padStart(2, '0');
 const floorOf = (y) => { let f = -Infinity; for (const d of DECK_ORDER) if (DECK_Y[d] <= y + 0.05 && DECK_Y[d] > f) f = DECK_Y[d]; return f; };
 const TUB = { lo: 0.2, hi: 0.5, spout: [0, 0.66, -0.68], rate: 0.042 };
 
@@ -42,7 +55,11 @@ export class Fixtures {
     this.ports = [];         // { u, g, leaf, t, target }
     this.switches = [];      // light switches and bell pushes of the cabins: { x, y, z, nx, nz, bell }
     this.dark = new Set();   // rooms with the light switched off
-    this.count = { wardrobe: 0, tap: 0, tub: 0, wc: 0, drawer: 0, porthole: 0, light: 0, bell: 0 };
+    this.seat = null;        // { u, eye, player, back } while the visitor sits
+    this.read = null;        // (title, text) => dialog, set by the app
+    this.flying = [];        // discs and rings on their way
+    this.score = 0;
+    this.count = { wardrobe: 0, tap: 0, tub: 0, wc: 0, drawer: 0, porthole: 0, light: 0, bell: 0, seat: 0, clock: 0, book: 0, fire: 0 };
     const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...o });
     this.M = {
       dark: std(0x17100b), coats: [std(0x1c2433), std(0x4a4640), std(0x4b4030), std(0x2a1f1a)],
@@ -70,6 +87,24 @@ export class Fixtures {
     if (u.kind === 'bathtub') {
       this.count.tub++;
       return { ...at(0, 0), r: 1.25, label: () => (this.tubs.get(u)?.target > TUB.lo ? 'Badewasser ablassen' : 'Badewasser einlassen'), act: () => this.toggleTub(u) };
+    }
+    if (SEATS.has(u.kind)) {
+      this.count.seat++;
+      const lying = /Lounger|coolingCouch/.test(u.kind), eye = o.eye ?? (lying ? 0.9 : 1.12);
+      return { x: u.x, y: floorOf(u.y + 0.1), z: u.z, r: o.reach ?? Math.max(0.95, (fp.w || 0.6) / 2 + 0.55), low: true, label: () => (lying || o.eye < 1 ? 'Hinlegen' : 'Hinsetzen'), act: () => this.sit(u, eye) };
+    }
+    if (CLOCKS.has(u.kind)) {
+      this.count.clock++;
+      const q = at(0.6, 0), g = this.world.groundAt(q.x, q.z, u.y + 0.2); // (the clock of the grand staircase hangs over a half landing)
+      return { ...q, y: g !== null && u.y - g < 3 ? g : floorOf(u.y), r: 1.3, low: true, label: () => 'Uhr ablesen', act: () => { const d = new Date(); this.sound.chime(d.getHours() % 12 || 12); this.toast(`Bordzeit ${pad(d.getHours())}:${pad(d.getMinutes())} Uhr`, 3); } };
+    }
+    if (u.kind === 'bookcase') {
+      this.count.book++;
+      return { ...at(fp.d / 2 + 0.35, 0), r: 0.9, label: () => 'Ein Buch herausnehmen', act: () => { this.read?.('Aus dem Bücherschrank', BOOKS[this._book = ((this._book ?? -1) + 1) % BOOKS.length]); } };
+    }
+    if (u.kind === 'fireplace') {
+      this.count.fire++;
+      return { ...at(fp.d / 2 + 0.6, 0), r: 1.2, low: true, label: () => 'Am Kamin wärmen', act: () => { this.sound.fire(6); this.toast('Das Feuer knistert.', 2.5); } };
     }
     if (DRAWERS[u.kind]) {
       this.count.drawer++;
@@ -129,6 +164,50 @@ export class Fixtures {
     }
     W.target = W.target ? 0 : 1;
     this.sound.cupboard(W.target === 1);
+  }
+
+  // ------------------------------------------------------------------ sitting
+
+  sit(u, eye) {
+    const p = this._player;
+    if (!p || this.seat) return;
+    this.seat = { u, eye, player: p, back: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw } };
+    p.setFlyPose(u.x, u.y + eye, u.z, u.rot || 0, 0);
+    this.toast('E oder F: aufstehen', 2.5);
+  }
+  stand() {
+    const S = this.seat;
+    if (!S) return;
+    this.seat = null;
+    S.player.teleport(S.back);
+  }
+
+  // ------------------------------------------------------------------ deck games on the boat deck (exterior/fit-extras.js)
+
+  _games() {
+    const cx = 0.5, BY = DECK_Y.boat;
+    const disc = new THREE.CylinderGeometry(0.075, 0.075, 0.026, 12), ring = new THREE.TorusGeometry(0.1, 0.016, 5, 14).rotateX(Math.PI / 2);
+    for (const s of [-1, 1]) {
+      const cz = s * (BOAT_HOUSES[1].hw + 2.9), qx = cx + 9.2;
+      this.addItem({ x: cx - 5.3, y: BY, z: cz, r: 1.5, label: () => 'Shuffleboard: Scheibe stoßen', act: () => {
+        const tx = cx + 0.8 + Math.random() * 3.9, tz = cz + (Math.random() - 0.5) * 1.3;
+        const m = new THREE.Mesh(disc, this.flying.length % 2 ? mats.woodDark : mats.hullRed);
+        this.root.add(m);
+        this.sound.slide(1.5);
+        this.flying.push({ m, t: 0, dur: 1.6, a: [cx - 4.2, BY + 0.02, cz + (Math.random() - 0.5) * 0.4], b: [tx, BY + 0.02, tz], arc: 0, done: () => {
+          const dx = tx - cx, dz = Math.abs(tz - cz), inTri = dx >= 1.5 && dx <= 3.7 && dz <= 0.7 * ((dx - 1.5) / 2.2);
+          const pts = inTri ? (dx < 2.7 ? 10 : 8) : dx > 3.7 && dx <= 4.5 && dz < 0.7 ? -10 : 0;
+          this.score += pts;
+          this.toast(`${pts > 0 ? pts + ' Punkte' : pts < 0 ? '10 ab!' : 'Daneben'} · Summe ${this.score}`, 2.5);
+        } });
+      } });
+      this.addItem({ x: qx - 2.4, y: BY, z: cz, r: 1.3, label: () => 'Wurfring werfen', act: () => {
+        const hit = Math.random() < 0.3, tx = qx + (hit ? 0 : (Math.random() - 0.5) * 0.9), tz = cz + (hit ? 0 : (Math.random() - 0.5) * 0.9);
+        const m = new THREE.Mesh(ring, mats.rope);
+        this.root.add(m);
+        this.flying.push({ m, t: 0, dur: 0.9, a: [qx - 2.2, BY + 1.1, cz], b: [tx, BY + (hit ? 0.06 : 0.02), tz], arc: 0.7, done: () => { this.sound.thud(); this.toast(hit ? 'Treffer – der Ring sitzt auf dem Pflock!' : 'Knapp daneben.', 2.5); } });
+      } });
+    }
   }
 
   // ------------------------------------------------------------------ drawers, portholes
@@ -274,7 +353,18 @@ export class Fixtures {
 
   // ------------------------------------------------------------------ per frame
 
-  update(dt, p) {
+  update(dt, p, player) {
+    this._player = player;
+    if (this.seat) { const S = this.seat; if (player.mode !== 'fly') this.stand(); else player.setFlyPose(S.u.x, S.u.y + S.eye, S.u.z); } // stays seated; F = up
+    if (!this._gamesDone && this.plates) { this._gamesDone = true; this._games(); }
+    for (let i = this.flying.length - 1; i >= 0; i--) {
+      const f = this.flying[i];
+      if (f.t >= 1) continue;
+      f.t = Math.min(1, f.t + dt / f.dur);
+      const e = f.arc ? f.t : 1 - (1 - f.t) * (1 - f.t); // a slide slows down, a throw does not
+      f.m.position.set(f.a[0] + (f.b[0] - f.a[0]) * e, f.a[1] + (f.b[1] - f.a[1]) * e + f.arc * 4 * f.t * (1 - f.t), f.a[2] + (f.b[2] - f.a[2]) * e);
+      if (f.t >= 1) { f.done(); if (this.flying.length > 14) { const old = this.flying.shift(); this.root.remove(old.m); i--; } }
+    }
     let noise = 0;
     const near = (u, d = FAR) => Math.abs(u.y - p.y) < 3 && Math.abs(u.x - p.x) < d && Math.abs(u.z - p.z) < d;
     const loud = (u, k = 1) => { if (Math.abs(u.y - p.y) < 2.5) { const d = Math.hypot(u.x - p.x, u.z - p.z); noise = Math.max(noise, k * Math.max(0, 1 - d / 9)); } };

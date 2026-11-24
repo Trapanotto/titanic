@@ -343,13 +343,20 @@ export class Interact {
 
   label(i) {
     if (i === 'boat') return this.boats.riderLabel();
+    if (i === 'seat') return 'Aufstehen';
     if (i !== 'door') return this.items[i]?.label() || '';
     const d = this.door, wt = d?.kind === 'wt';
     return (wt ? 'Schotttür ' : 'Tür ') + (d?.open ? 'schließen' : wt ? 'hochkurbeln' : 'öffnen');
   }
 
+  /** carried along (lifeboat) or seated: E works although the visitor is not on foot */
+  get riding() { return !!(this.boats.rider || this.fixtures.seat); }
+  /** things that step back behind an info point at the same spot (doors, seats, clocks) */
+  isLow(i) { return i === 'door' || !!this.items[i]?.low; }
+
   run(i = this.nearest) {
     if (i === 'boat') { this.boats.riderAct(); return true; }
+    if (i === 'seat') { this.fixtures.stand(); return true; }
     if (i === 'door') { if (this.door) this.toggleDoor(this.door, this._pos); return true; }
     const it = this.items[i];
     if (!it) return false;
@@ -364,7 +371,7 @@ export class Interact {
     if (this._swing.size) this._swingDoors(dt, feet);
     this._stepRide(dt);
     this._stepZoom(dt, player);
-    this.fixtures.update(dt, feet);
+    this.fixtures.update(dt, feet, player);
     this.boats.update(dt, player);
     if (this.world.uses.size !== this._usesN) this._syncUses();
     if (this.world.doors.size !== this._doorsN) { this._doorsN = this.world.doors.size; this._plates(); }
@@ -398,6 +405,6 @@ export class Interact {
       if (d < it.r * it.r && d < bd) { bd = d; best = i; }
     }
     this.door = best < 0 && mode === 'walk' && !this._ride ? this._findDoor(player) : null;
-    this.nearest = this.boats.rider ? 'boat' : best >= 0 ? best : this.door ? 'door' : -1;
+    this.nearest = this.boats.rider ? 'boat' : this.fixtures.seat ? 'seat' : best >= 0 ? best : this.door ? 'door' : -1;
   }
 }

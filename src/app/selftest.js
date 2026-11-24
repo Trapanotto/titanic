@@ -146,6 +146,20 @@ export async function run(d) {
     return { ok: opened && closed && runs && stops && fills && c.wc > 0, note: `${c.light} Lichtschalter, ${c.bell} Klingeln, ${c.drawer} Schubladen, ${c.porthole} Bullaugen · ` + `${c.wardrobe} Schränke, ${c.tap} Hähne, ${c.tub} Wannen, ${c.wc} Toiletten (geladene Decks) · Schrank auf/zu: ${opened && closed}, Hahn: ${runs && stops}, Wanne füllt: ${fills}` };
   });
 
+  await check('Hinsetzen, Uhr, Bücherschrank, Deckspiele', async () => {
+    const F = interact.fixtures, t = world.teleports.find((x) => x.deck === 'A' && /Promenade/.test(x.name)) || world.teleports.find((x) => x.deck === 'A');
+    player.teleport(t); await settle();
+    const seat = [...world.uses.values()].find((u) => u.kind === 'seat' && Math.abs(u.y - DECK_Y.A) < 0.3);
+    if (!seat) return { ok: false, note: 'kein Liegestuhl registriert' };
+    const x0 = player.pos.x, z0 = player.pos.z;
+    F.sit(seat, seat.o.eye); await wait(0.3);
+    const sat = !!F.seat && player.mode === 'fly' && Math.abs(player.pos.x - seat.x) < 0.1 && interact.nearest === 'seat';
+    interact.run('seat'); await wait(0.3);
+    const up = !F.seat && player.mode === 'walk' && Math.abs(player.pos.x - x0) < 0.3 && Math.abs(player.pos.z - z0) < 0.3;
+    const games = interact.items.filter((i) => /Shuffleboard|Wurfring/.test(i.label())).length, c = F.count;
+    return { ok: sat && up && games === 4 && c.seat > 100, note: `${c.seat} Sitzplätze, ${c.clock} Uhren, ${c.book} Bücherschränke, ${c.fire} Kamine (geladene Decks), ${games} Spielpunkte · hingesetzt: ${sat}, aufgestanden: ${up}` };
+  });
+
   await check('Rettungsboot: ausschwenken, einsteigen, fieren', async () => {
     const B = interact.boats, us = [...world.uses.values()].filter((u) => u.kind === 'lifeboat'), u = us.find((x) => !x.spec.out);
     if (us.length !== 16 || !u) return { ok: false, note: us.length + ' Stationen' };

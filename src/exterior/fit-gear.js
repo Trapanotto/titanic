@@ -169,6 +169,7 @@ export function bench(world, parent, x, y, z, s) {
   const G = benchGeos();
   for (const [g, m] of [[G.wood, mats.oak], [G.iron, mats.iron]]) { const b = mk(g, m, x, y, z); b.rotation.y = s > 0 ? 0 : Math.PI; parent.add(b); }
   world.addCollider(x - 0.92, y, z - s * 0.34, x + 0.92, y + 0.9, z + s * 0.3);
+  for (const dx of [-0.5, 0.5]) world.addUse('seat', x + dx, y, z, { rot: -s * Math.PI / 2, o: { eye: 1.12, reach: 1.1 } }); // app/fixtures.js: sit down
 }
 
 // ---------- deck chairs (instanced): the classic folding teak steamer chair with a long leg rest ----------
@@ -445,6 +446,7 @@ export function buildGear(world, parent) {
       o.updateMatrix();
       inst.add(G.wood, mats.oak, o.matrix); inst.add(G.sling, mats.pine, o.matrix);
       if (i % 3 === 1) inst.add(G.rug, i % 2 ? mats.blanket : mats.fabricGreen, o.matrix);
+      else world.addUse('seat', x, y, s * (zHead + 0.2), { rot: -s * Math.PI / 2, o: { eye: 0.98, reach: 1.45 } }); // a free deck chair to lie in
     });
   }
 

@@ -17,7 +17,7 @@ const HELP = [
   ['J', 'Minikarte ein/aus'],
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
-  ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Schotttüren, Aufzüge, Rettungsboote (ausschwenken, einsteigen, fieren, aufholen), Schränke, Schubladen, Bullaugen, Lichtschalter und Klingel in den Kabinen, Wasserhähne, Badewannen, Toilettenspülung, Klaviere, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Fernglas, Morsetaste)'],
+  ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Schotttüren, Aufzüge, Sitzmöbel und Liegestühle (hinsetzen), Uhren, Bücherschränke, Kamine, Shuffleboard und Wurfringe, Rettungsboote (ausschwenken, einsteigen, fieren, aufholen), Schränke, Schubladen, Bullaugen, Lichtschalter und Klingel in den Kabinen, Wasserhähne, Badewannen, Toilettenspülung, Klaviere, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Fernglas, Morsetaste)'],
   ['T', 'Ton an/aus'],
   ['Klick / Antippen', 'Info-Marke direkt öffnen'],
   ['1 – 9', 'Schnellreise zu Höhepunkten'],
@@ -191,7 +191,7 @@ export class UI {
       case 'plan': if (this.modal === 'plan') this.closeModal(); else { this._open('plan'); this.plan.open(); } break;
       case 'info':
         if (this.modal === 'info') this.closeModal();
-        else if (!this.modal && (p.mode === 'walk' || this.interact?.boats?.rider) && this.interact && this.interact.nearest !== -1 && (this.interact.nearest !== 'door' || this.info.nearest < 0)) this.interact.run();
+        else if (!this.modal && (p.mode === 'walk' || this.interact?.riding) && this.interact && this.interact.nearest !== -1 && (!this.interact.isLow(this.interact.nearest) || this.info.nearest < 0)) this.interact.run();
         else if (!this.modal && p.mode === 'walk' && this.info.nearest >= 0) this.openInfo(this.info.nearest);
         break;
       case 'night': if (this.modal !== 'plan') { this.world.setNight(!this.world.state.night); this.toast(this.world.state.night ? 'Nacht' : 'Tag', 1.5); } break;
@@ -214,6 +214,16 @@ export class UI {
       case 'stick': this._stick(arg); break;
       default: break;
     }
+  }
+
+  /** a text of the app's own in the info dialog (books …) */
+  showText(title, text) {
+    if (this.modal) return;
+    this.infoTitle.textContent = title;
+    this.infoText.textContent = '';
+    for (const para of String(text).split(/\n\s*\n/)) this.infoText.append(el('p', '', para.trim()));
+    this._open('info');
+    this.infoEl.hidden = false;
   }
 
   openInfo(i) {
@@ -310,7 +320,7 @@ export class UI {
 
     const use = this.modal ? -1 : (this.interact?.nearest ?? -1), has = use !== -1;
     // a door steps back behind an info point; everything else that can be operated comes first
-    const info = this.modal || (has && use !== 'door') ? -1 : this.info.nearest;
+    const info = this.modal || (has && !this.interact.isLow(use)) ? -1 : this.info.nearest;
     const act = has && info < 0;
     const near = act ? this.interact.label(use) : info; // things to operate come before the info of the same spot
     if (near !== L.prompt) {

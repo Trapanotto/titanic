@@ -146,7 +146,7 @@ try { if (renderer) mirrorView = debug.mirrors = new MirrorView(world, scene, TI
 debug.engine = ENGINE;
 const sound = (ui.sound = debug.sound = new Sound(world, player));
 let interact = null;
-try { interact = ui.interact = debug.interact = new Interact(world, scene, sound, (t, s) => ui.toast(t, s)); } catch (e) { console.warn('[app] Bedienpunkte', e); }
+try { interact = ui.interact = debug.interact = new Interact(world, scene, sound, (t, s) => ui.toast(t, s)); interact.fixtures.read = (t, x) => ui.showText(t, x); } catch (e) { console.warn('[app] Bedienpunkte', e); }
 
 function step(dt) {
   time += dt;

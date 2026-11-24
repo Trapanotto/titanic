@@ -355,6 +355,30 @@ export class Sound {
     this._burst(this.fx, t, 0.5, 0.6, 'lowpass', 180, 0.8, this.brown);
   }
 
+  /** a clock striking n times */
+  chime(n) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < n; i++) for (const [f, v] of [[523, 0.07], [1046, 0.03], [1570, 0.015]]) this._tone(this.fx, f, t + i * 1.1, 1.6, v, { type: 'sine' });
+  }
+
+  /** an open fire: crackle and the low roar */
+  fire(seconds = 6) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, seconds, 0.12, 'lowpass', 300, 0.7, this.brown);
+    for (let i = 0; i < seconds * 5; i++) this._burst(this.fx, t + Math.random() * seconds, 0.02 + Math.random() * 0.03, 0.08 + Math.random() * 0.14, 'bandpass', 1800 + Math.random() * 2600, 3);
+  }
+
+  /** a disc sliding over the deck planks / a rope ring landing */
+  slide(seconds = 1.5) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, 0.04, 0.3, 'lowpass', 500, 1, this.brown);
+    this._burst(this.fx, t + 0.03, seconds, 0.14, 'bandpass', 1300, 0.7);
+  }
+  thud() { if (this.ready) { const t = this.ctx.currentTime; this._burst(this.fx, t, 0.09, 0.4, 'lowpass', 260, 0.8, this.brown); this._burst(this.fx, t, 0.03, 0.1, 'bandpass', 1700, 3); } }
+
   /** tap: squeak of the valve */
   tap(on) {
     if (!this.ready) return;
