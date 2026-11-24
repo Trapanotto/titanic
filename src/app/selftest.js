@@ -10,7 +10,7 @@ let dbg = null, manual = false;
 pump.stuck = 0;
 const turn = () => new Promise((r) => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
 const hidden = () => manual || document.hidden;
-async function pump(s) { for (let i = 0, n = Math.ceil(s * 60); i < n; i++) { if (dbg.streamer?.blocking) { await new Promise((r) => setTimeout(r, 100)); i--; if (++pump.stuck > 1200) return; continue; } dbg.frame(1 / 60, 1); if (i % 4 === 3) await turn(); } await turn(); }
+async function pump(s) { pump.stuck = 0; for (let i = 0, n = Math.ceil(s * 60); i < n; i++) { if (dbg.streamer?.blocking) { await new Promise((r) => setTimeout(r, 100)); i--; if (++pump.stuck > 1200) return; continue; } dbg.frame(1 / 60, 1); if (i % 4 === 3) await turn(); } await turn(); }
 async function wait(s) {
   const t0 = dbg.time || 0;
   if (!hidden()) await new Promise((r) => setTimeout(r, s * 1000));
@@ -18,9 +18,13 @@ async function wait(s) {
   if (missing > 0.05) { if (missing > s * 0.5) manual = true; await pump(missing); }
 }
 async function frame() {
-  if (!hidden()) return new Promise((r) => requestAnimationFrame(r));
+  for (let i = 0; i < 600 && dbg.streamer?.blocking; i++) await new Promise((r) => setTimeout(r, 100)); // a deck is loading: no frames
+  // what the picture cost is read right after it was drawn: later the loader may draw (uploads) and overwrite it
+  const note = () => { const r = dbg.renderer.info.render; frame.calls = r.calls; frame.tris = r.triangles; };
+  if (!hidden()) return new Promise((r) => requestAnimationFrame((t) => { note(); r(t); }));
   const t0 = performance.now();
   dbg.frame(1 / 60, 1);
+  note();
   await turn();
   return (frame.clock = (frame.clock || 0) + Math.max(0.1, performance.now() - t0));
 }
@@ -123,14 +127,15 @@ export async function run(d) {
     await check('Deck ' + (DECK_NAMES[deck] || deck), async () => {
       const t = world.teleports.find((x) => x.deck === deck);
       player.teleport(t); await settle();
-      await waitFor(() => renderer.info.render.triangles > 20000 && !streamer?.busy, 30);
+      // the deck may start loading only after the first frames at the new place: draw some, then wait again
+      for (let k = 0; k < 3; k++) { for (let j = 0; j < 6; j++) await frame(); await settle(); }
+      for (let k = 0; k < 100 && (streamer?.blocking || streamer?.busy || !(frame.tris > 20000)); k++) { await frame(); await wait(0.1); }
       const ground = world.groundAt(player.pos.x, player.pos.z, player.pos.y + 0.3);
-      let n = 0, sum = 0, max = 0, last = 0;
-      for (let k = 0; k < 90; k++) { const now = await frame(); if (last) { const ms = now - last; sum += ms; n++; if (ms > max) max = ms; } last = now; }
+      let n = 0, sum = 0, max = 0, last = 0, calls = 0, tris = 0;
+      for (let k = 0; k < 90; k++) { const now = await frame(); if (last) { const ms = now - last; sum += ms; n++; if (ms > max) max = ms; } last = now; if (frame.tris > tris) { tris = frame.tris; calls = frame.calls; } }
       const avg = n ? sum / n : 0;
       if (avg > worst) worst = avg;
-      const r = renderer.info.render;
-      return { ok: ground !== null && r.triangles > 1000, note: `${avg.toFixed(1)} ms (max ${max.toFixed(0)}) · ${r.calls} Aufrufe · ${(r.triangles / 1e6).toFixed(2)} Mio. Dreiecke` };
+      return { ok: ground !== null && tris > 1000, note: `${avg.toFixed(1)} ms (max ${max.toFixed(0)}) · ${calls} Aufrufe · ${(tris / 1e6).toFixed(2)} Mio. Dreiecke` };
     });
   }
   add('Gerät', null, `Stufe ${d.tier.name} · langsamstes Deck ${worst.toFixed(1)} ms pro Bild` + (hidden() ? ' (Fenster verdeckt: nur Rechenzeit, ohne Grafikkarte)' : ` (${Math.round(1000 / Math.max(worst, 1))} Bilder/s)`));

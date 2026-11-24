@@ -310,6 +310,11 @@ export class DeckStreamer {
     // own deck missing -> load it now, behind the veil
     let ownMissing = false;
     for (const g of this.zonesByDeck[own] || []) if (!this.loaded.has(g)) { ownMissing = true; break; }
+    // on a platform high above the orlop deck (engine-room galleries, boiler casings): the room one stands in
+    // belongs to the tank top below – it is needed like the own deck, not some time later
+    if (!ownMissing && own === 'orlop' && p.y - 1.6 - DECK_Y.orlop > 0.8) {
+      for (const g of this.zonesByDeck.tank || []) if (set.has(g) && !this.loaded.has(g) && g.userData.x1 > p.x - 1 && g.userData.x0 < p.x + 1) { ownMissing = true; break; }
+    }
     if (ownMissing) {
       this.blocking = true;
       this.load(set, { veil: true, label: own }).then(() => { this.blocking = false; this.evict(set); });
