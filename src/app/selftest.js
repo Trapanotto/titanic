@@ -120,6 +120,23 @@ export async function run(d) {
     });
   }
 
+  await check('Schrank, Wasserhahn, Badewanne und Spülung bedienbar', async () => {
+    await go('B', 20, 5);
+    const F = interact.fixtures, us = [...world.uses.values()];
+    const wd = us.find((u) => u.kind === 'wardrobe' && !u.o?.open), tap = us.find((u) => u.kind === 'washbasinMarble'), tub = us.find((u) => u.kind === 'bathtub');
+    if (!wd || !tap || !tub) return { ok: false, note: `Schrank ${!!wd}, Becken ${!!tap}, Wanne ${!!tub}` };
+    F.toggleWardrobe(wd); await wait(0.9);
+    const opened = F.open.some((w) => w.u === wd && w.t === 1);
+    F.toggleWardrobe(wd); await wait(0.9);
+    const closed = !F.open.some((w) => w.u === wd);
+    F.toggleTap(tap); const runs = F.taps.length === 1; F.toggleTap(tap); const stops = F.taps.length === 0;
+    F.toggleTub(tub); await wait(1.5);
+    const fills = F.tubs.get(tub)?.level > 0.22;
+    F.toggleTub(tub);
+    const c = F.count;
+    return { ok: opened && closed && runs && stops && fills && c.wc > 0, note: `${c.wardrobe} Schränke, ${c.tap} Hähne, ${c.tub} Wannen, ${c.wc} Toiletten (geladene Decks) · Schrank auf/zu: ${opened && closed}, Hahn: ${runs && stops}, Wanne füllt: ${fills}` };
+  });
+
   // every deck: reachable, built, and how fast it draws here
   const decks = [...new Set(world.teleports.map((t) => t.deck))];
   let worst = 0;

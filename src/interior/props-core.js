@@ -190,6 +190,7 @@ export function def(name, fp, build) {
     for (const part of t.parts) g.add(new THREE.Mesh(part.geo, part.mat));
     g.userData.fp = { w: t.fp[0], d: t.fp[1], h: t.fp[2] };
     g.userData.prop = name;
+    g.userData.po = o; // the options it was built with (fixtures that can be operated: app/fixtures.js)
     return g;
   };
   fn.fp = (o = {}) => { const a = typeof fp === 'function' ? fp(o) : fp; return { w: a[0], d: a[1], h: a[2] }; };

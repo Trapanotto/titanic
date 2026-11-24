@@ -421,9 +421,9 @@ export class World {
   }
 
   /** Something the visitor can use with E (kind: 'piano'); registered once per place. */
-  addUse(kind, x, y, z) {
+  addUse(kind, x, y, z, more = null) {
     const k = `${kind}|${Math.round(x * 10)}|${Math.round(y * 10)}|${Math.round(z * 10)}`;
-    if (!this.uses.has(k)) this.uses.set(k, { kind, x, y, z });
+    if (!this.uses.has(k)) this.uses.set(k, { kind, x, y, z, ...more });
   }
 
   /**
@@ -766,6 +766,14 @@ function seenThroughOpening(c, open, p, ys) {
   }
   return false;
 }
+// Furniture that can be operated (app/fixtures.js): registered with place, direction and options when its zone is baked.
+const FIXTURES = new Set(['wardrobe', 'washbasinMarble', 'basinSmall', 'washstand', 'sink', 'bcVanity', 'bathtub', 'wc']);
+function noteFixture(world, g) {
+  g.userData.used = true;
+  g.updateWorldMatrix(true, false);
+  const e = g.matrixWorld.elements;
+  world.addUse(g.userData.prop, e[12], e[13], e[14], { rot: Math.atan2(-e[2], e[0]), fp: g.userData.fp, o: g.userData.po });
+}
 function distXYZ(c, p) {
   const dx = Math.max(c.x0 - p.x, 0, p.x - c.x1), dy = Math.max(c.y0 - p.y, 0, p.y - c.y1), dz = Math.max(c.z0 - p.z, 0, p.z - c.z1);
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
@@ -832,6 +840,7 @@ function* bakeGroupSteps(world, root, isZone, users = null) {
     const o = originals[si];
     yield 'mesh';
     if (isZone && o.material.userData.isMirror) noteMirror(root, o); // working mirrors (app/mirrors.js)
+    if (isZone && FIXTURES.has(o.parent.userData.prop) && !o.parent.userData.used) noteFixture(world, o.parent);
     let g = o.geometry;
     if (!g.attributes.normal) { g = g.clone(); g.computeVertexNormals(); }
     const P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, I = g.index;

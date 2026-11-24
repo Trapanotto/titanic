@@ -310,6 +310,56 @@ export class Sound {
     if (!opening) { this._burst(this.fx, t + 0.5, 0.12, 0.6, 'lowpass', 160, 0.7, this.brown); this._burst(this.fx, t + 0.5, 0.03, 0.15, 'bandpass', 1500, 3); }
   }
 
+  /** wardrobe door: catch, and the knock of wood on wood when it shuts */
+  cupboard(opening) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, 0.025, 0.16, 'bandpass', 2600, 5);
+    this._tone(this.fx, opening ? 420 : 350, t + 0.04, 0.28, 0.008, { type: 'sawtooth', cutoff: 1200, attack: 0.08, sustain: true, release: 0.08, vibrato: true });
+    if (!opening) { this._burst(this.fx, t + 0.42, 0.07, 0.35, 'lowpass', 320, 0.8, this.brown); this._burst(this.fx, t + 0.42, 0.02, 0.12, 'bandpass', 2200, 4); }
+  }
+
+  /** tap: squeak of the valve */
+  tap(on) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._tone(this.fx, on ? 1250 : 980, t, 0.16, 0.012, { type: 'triangle', attack: 0.03, vibrato: true });
+    this._burst(this.fx, t, 0.04, 0.08, 'bandpass', 3200, 3);
+  }
+
+  /** running water near the visitor: level 0..1 (app/fixtures.js sets it every frame) */
+  water(level) {
+    if (!this.ready) return;
+    if (!this._water) {
+      if (level <= 0) return;
+      const g = this._gain(0), g2 = this._gain(0);
+      this._chain(this._loop(this.white, 1.1), this._filter('bandpass', 3400, 0.5), g, this.fx);
+      this._chain(this._loop(this.brown, 1.6), this._filter('bandpass', 620, 0.8), g2, this.fx); // the splash in the basin
+      this._water = [g, g2];
+    }
+    const t = this.ctx.currentTime;
+    this._water[0].gain.setTargetAtTime(level * 0.05, t, 0.12);
+    this._water[1].gain.setTargetAtTime(level * 0.22, t, 0.12);
+  }
+
+  /** water closet: the chain, the rush from the cistern, the gurgle, the cistern filling again */
+  flush() {
+    if (!this.ready) return;
+    const c = this.ctx, t = c.currentTime;
+    if (t < (this._flushUntil || 0)) return;
+    this._flushUntil = t + 5;
+    for (let i = 0; i < 3; i++) this._burst(this.fx, t + i * 0.045, 0.03, 0.12, 'bandpass', 2800, 5);
+    const s = c.createBufferSource(), g = c.createGain(), f = this._filter('bandpass', 900, 0.6);
+    s.buffer = this.white;
+    g.gain.setValueAtTime(0.0001, t + 0.15); g.gain.linearRampToValueAtTime(0.3, t + 0.4); g.gain.setValueAtTime(0.3, t + 1.6); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+    f.frequency.setValueAtTime(1400, t + 0.15); f.frequency.exponentialRampToValueAtTime(380, t + 3.0);
+    s.connect(f); f.connect(g); g.connect(this.fx);
+    s.start(t + 0.15, 0, 3.2);
+    this._burst(this.fx, t + 0.3, 2.4, 0.5, 'lowpass', 240, 0.8, this.brown);
+    for (let i = 0; i < 5; i++) this._tone(this.fx, 150 + Math.random() * 90, t + 2.5 + i * 0.13, 0.12, 0.05, { type: 'sine', attack: 0.02 });
+    this._burst(this.fx, t + 3.2, 1.6, 0.05, 'highpass', 4200, 0.5);
+  }
+
   /** electric lift: gate rattle, motor hum, gate again */
   lift(seconds) {
     if (!this.ready) return;
