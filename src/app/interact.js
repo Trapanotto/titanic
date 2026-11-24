@@ -8,6 +8,7 @@ import { ENGINE, ORDERS, stepEngine } from '../core/engine.js';
 import { leafMatrix } from '../core/doors.js';
 import { Fixtures } from './fixtures.js';
 import { Boats } from './boats.js';
+import { Technik } from './technik.js';
 
 const LIFT_NAMES = { A: 'A-Deck', B: 'B-Deck', C: 'C-Deck', D: 'D-Deck', E: 'E-Deck', F: 'F-Deck', boat: 'Bootsdeck' };
 // cx/cz: centre of the cage; stand: where the visitor steps out; rot: turns the cage (its gate is at -x); yaw: view towards the gate
@@ -37,6 +38,7 @@ export class Interact {
     this.items = [];
     this.fixtures = new Fixtures(world, scene, sound, toast, (it) => this.items.push(it));
     this.boats = new Boats(world, scene, sound, toast);
+    this.technik = new Technik(world, scene, sound, toast, (it) => this.items.push(it), (d) => this.toggleDoor(d, this._pos || { x: 0, y: -99, z: 0 }, true));
     this.lifts = LIFTS;
     this.nearest = -1;
     this._timer = 0;
@@ -173,6 +175,7 @@ export class Interact {
       const u = all[i];
       if (u.kind === 'piano') this.items.push({ x: u.x, y: u.y, z: u.z, r: 1.3, label: () => 'Klavier spielen', act: () => this.sound.piano() });
       else if (u.kind === 'lifeboat') this.items.push(...this.boats.items(u));
+      else if (u.kind === 'furnace') { const it = this.technik.item(u); if (it) this.items.push(it); }
       else { const it = this.fixtures.item(u); if (it) this.items.push(it); }
     }
     this._usesN = all.length;
@@ -373,6 +376,7 @@ export class Interact {
     this._stepZoom(dt, player);
     this.fixtures.update(dt, feet, player);
     this.boats.update(dt, player);
+    this.technik.update(dt);
     if (this.world.uses.size !== this._usesN) this._syncUses();
     if (this.world.doors.size !== this._doorsN) { this._doorsN = this.world.doors.size; this._plates(); }
     // moving parts (only near the bridge)

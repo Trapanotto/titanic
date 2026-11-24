@@ -379,6 +379,32 @@ export class Sound {
   }
   thud() { if (this.ready) { const t = this.ctx.currentTime; this._burst(this.fx, t, 0.09, 0.4, 'lowpass', 260, 0.8, this.brown); this._burst(this.fx, t, 0.03, 0.1, 'bandpass', 1700, 3); } }
 
+  /** cast-iron fire door thrown open or shut */
+  clang() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (const [f, v, d] of [[310, 0.16, 0.5], [487, 0.09, 0.4], [1130, 0.05, 0.25], [1790, 0.03, 0.18]]) this._tone(this.fx, f, t, d, v, { type: 'triangle', attack: 0.002 });
+    this._burst(this.fx, t, 0.05, 0.3, 'bandpass', 1400, 2);
+  }
+
+  /** a shovel of coal: the scrape on the plates, the throw, the fire roaring up */
+  shovel() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, 0.28, 0.3, 'bandpass', 2300, 1.5);
+    this._burst(this.fx, t + 0.4, 0.2, 0.25, 'lowpass', 900, 0.8, this.brown);
+    this._burst(this.fx, t + 0.55, 3, 0.35, 'lowpass', 420, 0.7, this.brown);
+    for (let i = 0; i < 12; i++) this._burst(this.fx, t + 0.6 + Math.random() * 2.2, 0.03, 0.1 + Math.random() * 0.1, 'bandpass', 2000 + Math.random() * 2500, 3);
+  }
+
+  /** anchor chain running over the windlass */
+  chain(seconds = 6) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < seconds / 0.11; i++) { const at = t + i * 0.11 + Math.random() * 0.02; this._burst(this.fx, at, 0.05, 0.16, 'bandpass', 900 + (i % 4) * 260, 3); this._tone(this.fx, 180 + (i % 3) * 40, at, 0.09, 0.03, { type: 'square', cutoff: 900, attack: 0.002 }); }
+    this._burst(this.fx, t, seconds, 0.12, 'lowpass', 200, 0.8, this.brown);
+  }
+
   /** tap: squeak of the valve */
   tap(on) {
     if (!this.ready) return;

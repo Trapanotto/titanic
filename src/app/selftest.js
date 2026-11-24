@@ -160,6 +160,24 @@ export async function run(d) {
     return { ok: sat && up && games === 4 && c.seat > 100, note: `${c.seat} Sitzplätze, ${c.clock} Uhren, ${c.book} Bücherschränke, ${c.fire} Kamine (geladene Decks), ${games} Spielpunkte · hingesetzt: ${sat}, aufgestanden: ${up}` };
   });
 
+  await check('Kesselfeuertür, Hauptschalter', async () => {
+    const T = interact.technik, t = world.teleports.find((x) => /Kesselraum 6/.test(x.name));
+    player.teleport(t); await settle();
+    for (let k = 0; k < 3; k++) { for (let j = 0; j < 6; j++) await frame(); await settle(); }
+    const u = [...world.uses.values()].find((x) => x.kind === 'furnace' && !x.open0);
+    if (!u) return { ok: false, note: 'keine Feuerung registriert' };
+    T.workFurnace(u); await wait(0.6);
+    const open = T.furn.get(u).st === 1 && T.furn.get(u).t === 1;
+    T.workFurnace(u); await wait(0.3);
+    const fed = T.furn.get(u).st === 2 && T.coal.length > 0;
+    await wait(0.8); T.workFurnace(u); await wait(0.6);
+    const shut = T.furn.get(u).st === 0 && !T.furn.get(u).g.visible;
+    const n = world.lamps.length, main = interact.items.find((i) => /Hauptschalter/.test(i.label()));
+    main.act(); const dark = world.lamps.filter((L) => L.off).length; main.act();
+    const sw = dark > 1000 && !world.lamps.some((L) => L.off && L.color !== 0xff7a30);
+    return { ok: open && fed && shut && sw, note: `${T.count.furnace} Feuerungen, ${n} Lampen · auf: ${open}, Kohle: ${fed}, zu: ${shut}, Hauptschalter: ${sw}` };
+  });
+
   await check('Rettungsboot: ausschwenken, einsteigen, fieren', async () => {
     const B = interact.boats, us = [...world.uses.values()].filter((u) => u.kind === 'lifeboat'), u = us.find((x) => !x.spec.out);
     if (us.length !== 16 || !u) return { ok: false, note: us.length + ' Stationen' };

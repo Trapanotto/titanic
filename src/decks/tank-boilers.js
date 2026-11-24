@@ -486,6 +486,8 @@ export async function buildBoilerRooms(world, inst) {
         const dir = rot ? -1 : 1;
         world.addCollider(Math.min(x, x + dir * 0.8), Y + 2.2, z - 2.0, Math.max(x, x + dir * 0.8), Y + 6.4, z + 2.0); // smokebox (high)
         if (k) for (const fi of k === 1 ? [1] : k === 2 ? [0] : [0, 2]) glow(x, z + FZ[fi] * (rot ? -1 : 1), dir);
+        // every furnace can be worked (app/technik.js): open0 = modelled with its door open
+        for (let fi = 0; fi < 3; fi++) world.addUse('furnace', x + dir * 0.9, Y, z + FZ[fi] * dir, { rot, fi, bx: x, bz: z, open0: (k === 1 && fi === 1) || (k === 2 && fi === 0) || (k === 3 && fi !== 1) });
         // fire irons leaning against the boiler front in the gaps between the furnaces (no colliders: clutter)
         if (t.slice) {
           const lr = rnd(endNo * 13 + r.n);
