@@ -423,7 +423,8 @@ export class World {
   /** Something the visitor can use with E (kind: 'piano'); registered once per place. */
   addUse(kind, x, y, z, more = null) {
     const k = `${kind}|${Math.round(x * 10)}|${Math.round(y * 10)}|${Math.round(z * 10)}`;
-    if (!this.uses.has(k)) this.uses.set(k, { kind, x, y, z, ...more });
+    if (!this.uses.has(k)) this.uses.set(k, { kind, x, y, z, key: k, ...more });
+    return this.uses.get(k);
   }
 
   /**

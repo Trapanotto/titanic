@@ -18,6 +18,7 @@ const HELP = [
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
   ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Schotttüren, Aufzüge, Turngeräte (aufsteigen), Schwimmbad (hineinsteigen und schwimmen), Squash (Ball schlagen), Kesselfeuertüren (öffnen, Kohle nachlegen), Hauptschalter im Dynamoraum, eigener Funkspruch, Ankerspill, Sitzmöbel und Liegestühle (hinsetzen), Uhren, Bücherschränke, Kamine, Shuffleboard und Wurfringe, Rettungsboote (ausschwenken, einsteigen, fieren, aufholen), Schränke, Schubladen, Bullaugen, Lichtschalter und Klingel in den Kabinen, Wasserhähne, Badewannen, Toilettenspülung, Klaviere, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Fernglas, Morsetaste)'],
+  ['K', 'Goldene Punkte zeigen, wo sich etwas bedienen lässt – ein- und ausblenden'],
   ['T', 'Ton an/aus'],
   ['Klick / Antippen', 'Info-Marke direkt öffnen'],
   ['1 – 9', 'Schnellreise zu Höhepunkten'],
@@ -202,6 +203,7 @@ export class UI {
       case 'flyspeed': this.toast(`Fluggeschwindigkeit × ${p.changeFlySpeed(arg).toFixed(2)}`, 1.2); break;
       case 'fps': this._fps.on = !this._fps.on; this.fpsEl.hidden = !this._fps.on; this._fps.frames = 0; this._fps.t0 = 0; if (this._fps.on) this.fpsEl.textContent = '…'; break;
       case 'sound': if (this.sound) this.toast(this.sound.toggle() ? 'Ton an' : 'Ton aus', 1.5); break;
+      case 'hints': if (this.interact) this.toast(this.interact.toggleHints() ? 'Bedienpunkte werden angezeigt' : 'Bedienpunkte ausgeblendet', 1.8); break;
       case 'bob': p.headBob = !p.headBob; this.toast(p.headBob ? 'Kopfwippen an' : 'Kopfwippen aus', 1.5); break;
       case 'quick': { const t = this.quick[arg - 1]; if (!this.modal && t) this.teleportTo(t); break; }
       case 'touchmode': this.entered = true; this.enableTouch(); break;
@@ -398,6 +400,7 @@ export class UI {
     tbtn('Karte', 'Karte', () => this.action('plan'));
     tbtn('☾', 'Tag / Nacht', () => this.action('night'));
     tbtn('♪', 'Ton an / aus', () => this.action('sound'));
+    tbtn('•', 'Bedienpunkte ein / aus', () => this.action('hints'));
     tbtn('?', 'Hilfe', () => this.action('help'));
     touch.append(this.stickEl, btns);
 

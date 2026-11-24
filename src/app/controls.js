@@ -6,7 +6,7 @@ const MOVE_KEYS = new Set([
   'ShiftLeft', 'ShiftRight', 'Space', 'KeyQ', 'KeyE', 'ControlLeft', 'ControlRight',
 ]);
 const ACTIONS = {
-  KeyF: 'fly', KeyN: 'night', KeyM: 'plan', KeyH: 'help', KeyE: 'info', KeyP: 'fps', KeyB: 'bob', KeyT: 'sound',
+  KeyF: 'fly', KeyN: 'night', KeyM: 'plan', KeyH: 'help', KeyE: 'info', KeyP: 'fps', KeyB: 'bob', KeyT: 'sound', KeyK: 'hints',
   Escape: 'escape', Enter: 'enter',
 };
 

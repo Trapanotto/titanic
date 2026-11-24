@@ -50,6 +50,9 @@ const BOOKS = [
   'Ein Kriminalroman, hinten mit Bleistift der Name eines früheren Lesers. Solche Bände wanderten von Reise zu Reise durch viele Hände.',
 ];
 const pad = (n) => String(n).padStart(2, '0');
+const STORE = 'titanic.zustand';
+const TEST = typeof location !== 'undefined' && /[?&]selftest=/.test(location.search); // the self test neither reads nor writes what the visitor left
+const load = () => { if (TEST) return {}; try { return JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch { return {}; } };
 const floorOf = (y) => { let f = -Infinity; for (const d of DECK_ORDER) if (DECK_Y[d] <= y + 0.05 && DECK_Y[d] > f) f = DECK_Y[d]; return f; };
 const TUB = { lo: 0.2, hi: 0.5, spout: [0, 0.66, -0.68], rate: 0.042 };
 
@@ -66,6 +69,9 @@ export class Fixtures {
     this.ports = [];         // { u, g, leaf, t, target }
     this.switches = [];      // light switches and bell pushes of the cabins: { x, y, z, nx, nz, bell }
     this.dark = new Set();   // rooms with the light switched off
+    // what the visitor left open or switched off on an earlier visit (wardrobes, drawers, portholes, cabin lights)
+    const st = load();
+    this.saved = { w: new Set(st.w || []), d: new Set(st.d || []), p: new Set(st.p || []), dark: new Set(st.dark || []) };
     this.seat = null;        // { u, eye, player, back } while the visitor sits
     this.read = null;        // (title, text) => dialog, set by the app
     this.flying = [];        // discs and rings on their way
@@ -81,8 +87,25 @@ export class Fixtures {
     this.G = { jet: new THREE.CylinderGeometry(0.005, 0.007, 1, 6).translate(0, -0.5, 0), box: new THREE.BoxGeometry(1, 1, 1), knob: new THREE.SphereGeometry(0.014, 8, 6) };
   }
 
+  _save() {
+    if (TEST) return;
+    // (what was left on decks not visited this time stays remembered)
+    const keys = (list, rest) => [...list.filter((x) => x.target).map((x) => x.u.key), ...rest].slice(0, 80);
+    const st = { w: keys(this.open, this.saved.w), d: keys(this.drawers, this.saved.d), p: keys(this.ports, this.saved.p), dark: [...this.dark].map((r) => r.id).slice(0, 200) };
+    try { localStorage.setItem(STORE, JSON.stringify(st)); } catch { /* private mode */ }
+  }
+
   /** the thing to operate for a registered fixture (app/interact.js), or null */
   item(u) {
+    // as it was left on the last visit (no sound, no message)
+    const S = this.saved;
+    if (S.w.has(u.key) || S.d.has(u.key) || S.p.has(u.key)) {
+      this._quiet = true;
+      try { if (S.w.delete(u.key)) this.toggleWardrobe(u); else if (S.d.delete(u.key)) this.toggleDrawer(u); else if (S.p.delete(u.key)) this.togglePort(u); } finally { this._quiet = false; }
+    }
+    return this._item(u);
+  }
+  _item(u) {
     const o = u.o || {}, fp = u.fp || { w: 1, d: 0.5, h: 1 }, c = Math.cos(u.rot || 0), s = Math.sin(u.rot || 0);
     const at = (lx, lz) => ({ x: u.x + c * lx + s * lz, y: u.y, z: u.z - s * lx + c * lz });
     if (u.kind === 'wardrobe') {
@@ -183,7 +206,9 @@ export class Fixtures {
       if (this.open.filter((x) => x.target).length >= MAX_OPEN) this.open.find((x) => x.target).target = 0;
     }
     W.target = W.target ? 0 : 1;
+    if (this._quiet) { W.t = 1; W.L.rotation.y = 1.85; W.R.rotation.y = -1.85; return; }
     this.sound.cupboard(W.target === 1);
+    this._save();
   }
 
   // ------------------------------------------------------------------ sitting
@@ -276,7 +301,9 @@ export class Fixtures {
       if (this.drawers.filter((d) => d.target).length >= MAX_OPEN) this.drawers.find((d) => d.target).target = 0;
     }
     D.target = D.target ? 0 : 1;
+    if (this._quiet) { D.t = 1; D.dr.position.x = D.x0 + 0.26; return; }
     this.sound.drawer(D.target === 1);
+    this._save();
   }
 
   togglePort(u) {
@@ -295,8 +322,10 @@ export class Fixtures {
       if (this.ports.filter((d) => d.target).length >= MAX_OPEN) this.ports.find((d) => d.target).target = 0;
     }
     P.target = P.target ? 0 : 1;
+    if (this._quiet) { P.t = 1; P.leaf.rotation.y = -1.75; return; }
     this.sound.cupboard(P.target === 1);
     if (P.target) this.toast('Frische Seeluft …', 2);
+    this._save();
   }
 
   // ------------------------------------------------------------------ cabins: light switch and bell push by the door
@@ -332,20 +361,23 @@ export class Fixtures {
         if (lit && (room.cls === 'first' || room.cls === 'second')) { if (!put(-lit, true)) put(lit, true, 0.5); }
       }
     }
+    for (const r of W.rooms) if (this.saved.dark.has(r.id)) this.toggleLight(r, true); // lights left switched off
     // the plates: brass with one push (those near the visitor are drawn)
     this.plates = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 0.085, 0.006), mats.brass, 24);
     this.pushes = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.011, 0.011, 0.012, 10).rotateX(Math.PI / 2), mats.porcelain || mats.paintWhite, 24);
     for (const m of [this.plates, this.pushes]) { m.count = 0; m.frustumCulled = false; this.root.add(m); }
   }
 
-  toggleLight(room) {
+  toggleLight(room, quiet = false) {
     const off = !this.dark.has(room);
     if (off) this.dark.add(room); else this.dark.delete(room);
     const y0 = DECK_Y[room.deck] - 0.2, y1 = deckAboveY(room.deck) + 0.1;
     let n = 0;
     for (const L of this.world.lamps) if (L.y > y0 && L.y < y1 && L.x > room.x0 && L.x < room.x1 && L.z > room.z0 && L.z < room.z1) { L.off = off; n++; }
+    if (quiet) return;
     this.sound.click();
     this.toast(n ? (off ? 'Licht aus' : 'Licht an') : 'In dieser Kabine brennt keine Lampe.', 1.5);
+    this._save();
   }
 
   _plates(p) {
@@ -445,7 +477,7 @@ export class Fixtures {
     for (let i = this.open.length - 1; i >= 0; i--) {
       const W = this.open[i];
       if (W.t !== W.target) { W.t = W.target > W.t ? Math.min(1, W.t + dt * 2.2) : Math.max(0, W.t - dt * 2.2); const a = 1.85 * (W.t * W.t * (3 - 2 * W.t)); W.L.rotation.y = a; W.R.rotation.y = -a; }
-      if (W.t === 0 && W.target === 0) { this.root.remove(W.g); this.open.splice(i, 1); continue; } // closed: the baked doors again
+      if (W.t === 0 && W.target === 0) { this.root.remove(W.g); this.open.splice(i, 1); this._save(); continue; } // closed: the baked doors again
       W.g.visible = near(W.u);
     }
     for (const list of [this.drawers, this.ports]) for (let i = list.length - 1; i >= 0; i--) {

@@ -23,10 +23,26 @@ export class Boats {
     this.rope = new THREE.CylinderGeometry(1, 1, 1, 5);
     this.time = 0;
     this.rider = null; // { u, S, player, back: {x, z} } while the visitor is in a boat
+    this.test = typeof location !== 'undefined' && /[?&]selftest=/.test(location.search);
+    try { this.saved = this.test ? {} : JSON.parse(localStorage.getItem('titanic.boote') || '{}') || {}; } catch { this.saved = {}; }
+  }
+
+  _save() {
+    if (this.test) return;
+    const st = { ...this.saved };
+    for (const [u, S] of this.live) if (!S.q.length && (S.phase === 'down' || (S.phase === 'out' && !S.L.out))) st[u.id] = S.phase;
+    try { localStorage.setItem('titanic.boote', JSON.stringify(st)); } catch { /* private mode */ }
   }
 
   /** two places to stand at a station: aft the davits are worked, forward one gets into the boat hanging outboard */
   items(u) {
+    // as it was left on the last visit
+    const was = this.saved[u.id];
+    if (was === 'out' || was === 'down') {
+      delete this.saved[u.id];
+      const S = this._start(u);
+      if (S) { S.phase = was; S.a = 1; S.y = was === 'down' ? Y_WATER : S.L.out ? S.L.by0 : Y_SWING; this._pose(S); }
+    }
     const s = u.spec, inb = 2.6;
     const label = () => {
       const S = this.live.get(u), ph = S ? S.phase : s.out ? 'out' : 'stowed';
@@ -147,12 +163,14 @@ export class Boats {
           if (!S.q.length) {
             S.phase = S.next === 'home' ? (S.L.out ? 'out' : 'stowed') : S.next;
             if (S.phase === 'down') { this.sound.splash(); this.toast('Das Boot schwimmt.', 2.5); }
+            this._saveSoon = true;
             if (S.next === 'home') { for (const c of S.clusters) c.off = false; this.root.remove(S.L.g); this.live.delete(u); continue; } // back in the baked ship
           }
         }
       }
       this._pose(S);
     }
+    if (this._saveSoon) { this._saveSoon = false; this._save(); }
     const R = this.rider;
     if (R) {
       // standing on the bottom boards amidships, free to look around
