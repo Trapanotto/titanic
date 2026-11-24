@@ -667,6 +667,7 @@ export class Batch {
       else { for (let i = 0; i < pa.count; i++) b.idx.push(base + i); n += pa.count / 3; }
     }
     this.tris += n;
+    if (this.world._profile) { const k = 'batch:' + this.deck + ' ' + (group.userData.prop || '?'); this.world._profile.set(k, (this.world._profile.get(k) || 0) + n); }
     return n;
   }
 

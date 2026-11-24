@@ -13,6 +13,7 @@ const OW = GW / OCC, OH = GH / OCC;
 const RAYS = 720;                   // 0.5° – a 0.9 m door at 100 m is still hit by a ray
 const RAY_MAX = 110;
 const BIG_ROOM = 100;               // m² – larger rooms get their own chunks
+const ROOM_TILE = 10;                // big rooms are cut into tiles of about this size (m)
 const REST_X = 12;                  // everything else: 12 m cells (half zones) per ship side
 const LOD_SMALL = { r: 0.2, d: 60 }; // objects with bounding radius < r are not drawn beyond d (m) from their chunk box
 const LOD_TINY = { r: 0.08, d: 30 };
@@ -117,14 +118,17 @@ export class World {
     const inside = st.inside, lodOn = this.culling !== false;
     let open = EMPTY;
     this._frame = (this._frame || 0) + 1;
+    const legacy = this.legacyVis === true; // debug: the visibility rules as they were before (A/B comparisons)
+    _openTest = !legacy;
     if (occl) { this._own = this._castMask(this._own, p.x, p.z, p.y); open = this._activeOpenings(p); } else if (this._own) this._own.valid = false;
     // Below C deck the hull is closed (portholes only): nothing of the exterior can be seen, except when standing in
-    // a stairwell that leads up to C deck or higher (looking up it: well-deck doors, the glass domes).
+    // a stairwell that ends at the doors to a well deck on C deck (the glass domes over the grand staircases are
+    // opaque from inside, and the doors of the other stairwells are too far up and to the side to be seen from below).
     let ext = true;
     if (occl && inside && p.y < DECK_Y.C - 0.3) {
       ext = false;
       for (const o of this._openings) {
-        if (o.hi > DECK_Y.C && p.y >= o.lo && p.x > o.x0 - 3 && p.x < o.x1 + 3 && p.z > o.z0 - 3 && p.z < o.z1 + 3) { ext = true; break; }
+        if ((legacy ? o.hi > DECK_Y.C : o.out) && p.y >= o.lo && p.x > o.x0 - 3 && p.x < o.x1 + 3 && p.z > o.z0 - 3 && p.z < o.z1 + 3) { ext = true; break; }
       }
     }
     this.exterior.visible = ext;
@@ -142,16 +146,18 @@ export class World {
       if (bs) for (let i = 0; i < bs.length; i++) bs[i].visible = false; // switched on by their visible clusters
       const own = p.y >= u.yMin && p.y <= u.yMax;
       // outside near the rail: the adjacent deck as before (looking over the side into the windows below)
-      const keep = !own && !inside && near && Math.abs(p.z) > 9.5;
+      const outView = !own && !inside && near;
+      const keep = outView && Math.abs(p.z) > 9.5;
       // outside, elsewhere: the adjacent deck as seen through its windows (exterior walls never occlude)
-      const win = !own && !inside && near;
+      const win = outView;
       let dm = null, wm = null;
+      const ys = p.y < u.yMin ? u.yMin : u.yMax; // the slab between the eye and this zone's deck, on the zone's side
       for (let i = 0; i < list.length; i++) {
         const c = list[i];
         let v = true;
         if (occl && !keep) {
           if (own) v = this._maskHit(c, 1, this._own);
-          else if (shaft && seenThroughOpening(c, open)) {
+          else if (shaft && seenThroughOpening(c, open, p, ys)) {
             // through a stairwell: the walls of that deck occlude as seen from the camera's plan position
             dm ??= this._deckMask(u.deck, p, open);
             v = this._maskHit(c, 1, dm);
@@ -167,15 +173,25 @@ export class World {
       if (c.lod) showCluster(c, true, p, now, lodOn);
       else if (c.far) c.mesh.visible = !(lodOn && distXYZ(c, p) > c.far);
     }
-    // weak devices: from inside the ship the outside is only seen through windows and doors – skip its far parts
-    const cut = inside && lodOn && ext ? this.insideExtFar : 0;
-    if (cut || this._extCut) {
-      const A = this.extAll;
+    // From inside the ship the outside is only seen through windows, doors and (below C deck) up a stairwell:
+    //  - from B deck upwards the hull below C deck is never in view,
+    //  - up a stairwell only what is above C deck near the well (glass dome, well-deck doors),
+    //  - weak devices: nothing farther away than insideExtFar.
+    const rule = inside && lodOn && ext ? (p.y < DECK_Y.C - 0.3 ? 2 : 1) : 0;
+    if (rule || this._extCut) {
+      const A = this.extAll, cut = rule ? this.insideExtFar : 0;
       for (let i = 0; i < A.length; i++) {
         const c = A[i];
-        if (cut && distXYZ(c, p) > cut) c.on = false; else if (!c.lod) c.on = true;
+        let off = false;
+        if (rule) {
+          if (legacy) off = cut > 0 && distXYZ(c, p) > cut;
+          else if (c.band === 0 && p.y > DECK_Y.B) off = true; // (in the bow of C deck the shell plating is the wall of the rooms)
+          else if (rule === 2 && (c.x0 - p.x > 40 || p.x - c.x1 > 40)) off = true;
+          else if (cut && distXYZ(c, p) > cut) off = true;
+        }
+        if (off) c.on = false; else if (!c.lod) c.on = true;
       }
-      this._extCut = cut > 0;
+      this._extCut = rule > 0;
     }
     const S = this.stats;
     S.zones = nz; S.chunks = nc; S.chunksTotal = this.chunks.length; S.exterior = ext; S.openings = open.length;
@@ -340,6 +356,7 @@ export class World {
         this._openings.push({
           x0: Math.min(s.x0, k.x0 ?? s.x0, s.back ?? s.x0) - 2, x1: Math.max(s.x1, k.x1 ?? s.x1) + 2, z0: (s.zc || 0) - hw, z1: (s.zc || 0) + hw,
           lo: DECK_Y[s.decks[0]] - 0.3, hi: deckAboveY(s.decks[s.decks.length - 1]) + 0.3,
+          out: s.decks[s.decks.length - 1] === 'C', // ends at the doors to a well deck: the outside is seen from below
         });
       }
       for (const m of MACHINERY_ACCESS || []) this._openings.push({ x0: m.x0 - 1, x1: m.x1 + 1, z0: m.z0 - 1, z1: m.z1 + 1, lo: DECK_Y.tank - 0.3, hi: deckAboveY('F') + 0.3 });
@@ -701,10 +718,14 @@ export class World {
       .map((r, i) => ({ r, i, a: (r.x1 - r.x0) * (Math.min(r.z1, 14.1) - Math.max(r.z0, -14.1)) })).sort((a, b) => b.a - a.a);
     for (const { r, i, a } of rooms) {
       if (a < BIG_ROOM) continue;
-      const id = 1 + i;
       const ax = clampI(Math.round(r.x0 - GX0), 0, GW), bx = clampI(Math.round(r.x1 - GX0), 0, GW);
       const az = clampI(Math.round(r.z0 - GZ0), 0, GH), bz = clampI(Math.round(r.z1 - GZ0), 0, GH);
-      for (let x = ax; x < bx; x++) for (let z = az; z < bz; z++) G[z * GW + x] = id;
+      // halls and saloons are cut into tiles of about ROOM_TILE m: the frustum and the sight lines through stairwells
+      // then switch off the part of the room that is not in view (one cluster per room drew all of it or nothing)
+      const tx = Math.max(1, Math.round((bx - ax) / ROOM_TILE)), tz = Math.max(1, Math.round((bz - az) / ROOM_TILE));
+      for (let x = ax; x < bx; x++) for (let z = az; z < bz; z++) {
+        G[z * GW + x] = (1 + i) * 256 + Math.min(tx - 1, Math.floor(((x - ax) * tx) / (bx - ax))) * 16 + Math.min(15, Math.min(tz - 1, Math.floor(((z - az) * tz) / (bz - az))));
+      }
     }
     this._clusterGrids.set(deck, G);
     return G;
@@ -724,12 +745,24 @@ function distXZ(c, p) {
   return Math.sqrt(dx * dx + dz * dz);
 }
 /** Other-level chunk: candidate if it lies within 24 m of an active opening that reaches its height. */
-function seenThroughOpening(c, open) {
+let _openTest = true; // debug: world.openTest = false switches the sight-line test off
+const EXT_BAND0 = DECK_Y.C - 0.6, EXT_BAND2 = DECK_Y.boat + 3.4;
+const OPEN_MARGIN = 2.5; // m around the projected opening (the wells are wider than the stair footprints)
+function seenThroughOpening(c, open, p, ys) {
   for (let i = 0; i < open.length; i++) {
     const o = open[i];
     if (c.y1 < o.lo || c.y0 > o.hi) continue;
     const dx = Math.max(o.x0 - c.x1, 0, c.x0 - o.x1), dz = Math.max(o.z0 - c.z1, 0, c.z0 - o.z1);
-    if (dx * dx + dz * dz <= 576) return true;
+    if (dx * dx + dz * dz > 576) continue;
+    // Sight line through the hole in the deck between: seen from the eye, the opening (at the height `ys` of the slab
+    // next to the cluster's deck) projects onto the cluster's far height as the same rectangle scaled by k about the
+    // eye. What lies outside is hidden by the deck itself.
+    const h = ys - p.y, far = (h > 0 ? c.y1 : c.y0) - p.y, k = far / h;
+    if (!_openTest || !(Math.abs(h) > 0.4) || !(k > 1)) return true; // eye at the level of the slab (on the stairs): no limit
+    const m = OPEN_MARGIN;
+    const rx0 = (o.x0 < p.x ? p.x + (o.x0 - p.x) * k : o.x0) - m, rx1 = (o.x1 > p.x ? p.x + (o.x1 - p.x) * k : o.x1) + m;
+    const rz0 = (o.z0 < p.z ? p.z + (o.z0 - p.z) * k : o.z0) - m, rz1 = (o.z1 > p.z ? p.z + (o.z1 - p.z) * k : o.z1) + m;
+    if (c.x1 >= rx0 && c.x0 <= rx1 && c.z1 >= rz0 && c.z0 <= rz1) return true;
   }
   return false;
 }
@@ -811,6 +844,12 @@ function* bakeGroupSteps(world, root, isZone, users = null) {
     const rad = g.boundingSphere.radius * _m.getMaxScaleOnAxis();
     if (world.dropRadius && rad < world.dropRadius) continue; // weak devices: tiny clutter is left out entirely
     const bin = rad < LOD_TINY.r ? 2 : rad < LOD_SMALL.r ? 1 : 0;
+    if (world._profile) { // ?profile=1: triangles per source (nearest named ancestors + material), see window.__titanic.world._profile
+      let nm = '';
+      for (let q = o, k = 0; q && q !== root && k < 2; q = q.parent) { const n = q.userData.prop || q.name; if (n) { nm = n + (nm ? '/' + nm : ''); k++; } }
+      const key = (root.userData.deck || root.name || '') + ' ' + nm + ' [' + (o.material.name || '?') + ']';
+      world._profile.set(key, (world._profile.get(key) || 0) + (g.index ? g.index.count : nv) / 3);
+    }
     // transform once into root space
     const tp = new Float32Array(nv * 3), tn = new Float32Array(nv * 3), tu = new Float32Array(nv * 2);
     const e = _m.elements, ne = _nm.elements;
@@ -845,7 +884,14 @@ function* bakeGroupSteps(world, root, isZone, users = null) {
       if (!identity) { _v.set(cx, (tp[a * 3 + 1] + tp[b * 3 + 1] + tp[c * 3 + 1]) / 3, cz).applyMatrix4(rootM); cx = _v.x; cz = _v.z; }
       let cid;
       if (grid) cid = grid[clampI(Math.floor(cz - GZ0) | 0, 0, GH - 1) * GW + clampI(Math.floor(cx - GX0) | 0, 0, GW - 1)];
-      else cid = clampI(Math.floor((cx + 140) / 40), 0, 7); // exterior: 40 m slices along the ship (clusters of one multi-draw batch: culled by the frustum and, on weak devices, cut off by distance while the visitor is inside)
+      else {
+        // + three height bands (hull below C deck / decks and houses / funnels, masts and rigging): from inside the
+        // ship the hull below is never in view
+        let cy = (tp[a * 3 + 1] + tp[b * 3 + 1] + tp[c * 3 + 1]) / 3;
+        if (!identity) cy = _v.y;
+        cid = clampI(Math.floor((cx + 140) / 40), 0, 7) + 8 * (cy < EXT_BAND0 ? 0 : cy < EXT_BAND2 ? 1 : 2);
+      }
+      if (0) cid = 0; // exterior: 40 m slices along the ship (clusters of one multi-draw batch: culled by the frustum and, on weak devices, cut off by distance while the visitor is inside)
       let B;
       if (cid === lastC) B = lastB;
       else {
@@ -1171,7 +1217,7 @@ function extPart(B, root) {
   }
   const I0 = B.ix[0].n, I1 = B.ix[1].n, I2 = B.ix[2].n, ix = new Uint32Array(I0 + I1 + I2);
   ix.set(B.ix[0].a.subarray(0, I0), 0); ix.set(B.ix[1].a.subarray(0, I1), I0); ix.set(B.ix[2].a.subarray(0, I2), I0 + I1);
-  const part = { pos, nrm, uv, ix, nv, lod: [I0, I0 + I1, I0 + I1 + I2], box: [x0, y0, z0, x1, y1, z1], material: B.material, cast: B.cast, receive: B.receive, order: B.order };
+  const part = { pos, nrm, uv, ix, nv, lod: [I0, I0 + I1, I0 + I1 + I2], band: B.cid >> 3, box: [x0, y0, z0, x1, y1, z1], material: B.material, cast: B.cast, receive: B.receive, order: B.order };
   B.vtx = B.ix = null;
   return part;
 }
@@ -1190,7 +1236,7 @@ function makeExtBatch(world, parts) {
     const [x0, y0, z0, x1, y1, z1] = p.box;
     X0 = Math.min(X0, x0); Y0 = Math.min(Y0, y0); Z0 = Math.min(Z0, z0); X1 = Math.max(X1, x1); Y1 = Math.max(Y1, y1); Z1 = Math.max(Z1, z1);
     const n = p.ix.length;
-    clusters.push({ mesh: null, batch: null, zone: null, x0, x1, y0, y1, z0, z1, lod: p.lod[0] < n ? p.lod : null, n, start: io, on: true });
+    clusters.push({ mesh: null, batch: null, zone: null, x0, x1, y0, y1, z0, z1, lod: p.lod[0] < n ? p.lod : null, n, start: io, on: true, band: p.band });
     vo += p.nv; io += n;
     p.pos = p.nrm = p.uv = p.ix = null;
   }

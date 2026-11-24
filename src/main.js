@@ -69,6 +69,7 @@ const debug = (window.__titanic = { world, scene, camera, renderer: null, player
 world.tier = TIER;
 try { world.doorSaved = new Set(JSON.parse(localStorage.getItem('titanic.tueren') || '[]')); } catch { world.doorSaved = new Set(); }
 world.dropRadius = TIER.dropRadius;
+if (flag('profile')) world._profile = new Map();
 world.insideExtFar = TIER.insideExtFar || 0;
 world.dropTinyInstances = !TIER.tinyInstances;
 ui.tier = TIER;
