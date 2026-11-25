@@ -38,11 +38,6 @@ export class Interact {
     this.items = [];
     this.fixtures = new Fixtures(world, scene, sound, toast, (it) => this.items.push(it));
     this.boats = new Boats(world, scene, sound, toast);
-    // small golden marks where something can be operated (key K; kept in localStorage)
-    this.hintsOn = (() => { try { return localStorage.getItem('titanic.punkte') !== '0'; } catch { return true; } })();
-    this.hints = new THREE.InstancedMesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshBasicMaterial({ color: 0xf2c75a, transparent: true, opacity: 0.8, depthWrite: false }), 40);
-    this.hints.count = 0; this.hints.frustumCulled = false; this.hints.name = 'hints';
-    scene.add(this.hints);
     this.technik = new Technik(world, scene, sound, toast, (it) => this.items.push(it), (d) => this.toggleDoor(d, this._pos || { x: 0, y: -99, z: 0 }, true));
     this.lifts = LIFTS;
     this.nearest = -1;
@@ -357,26 +352,6 @@ export class Interact {
     return (wt ? 'Schotttür ' : 'Tür ') + (d?.open ? 'schließen' : wt ? 'hochkurbeln' : 'öffnen');
   }
 
-  toggleHints() {
-    this.hintsOn = !this.hintsOn;
-    try { localStorage.setItem('titanic.punkte', this.hintsOn ? '1' : '0'); } catch { /* private mode */ }
-    if (!this.hintsOn) this.hints.count = 0;
-    return this.hintsOn;
-  }
-  /** marks for the things within a few metres (not for seats, clocks and the like: they are plain to see) */
-  _hints(feet) {
-    let k = 0;
-    if (this.hintsOn && !this.riding) for (let i = 0; i < this.items.length && k < 40; i++) {
-      const it = this.items[i];
-      if (it.low || Math.abs(it.y - feet.y) > 1.2) continue;
-      const dx = it.x - feet.x, dz = it.z - feet.z;
-      if (dx * dx + dz * dz > 49) continue;
-      this.hints.setMatrixAt(k++, _m.makeTranslation(it.x, it.y + 1.05, it.z));
-    }
-    this.hints.count = k;
-    this.hints.instanceMatrix.needsUpdate = true;
-  }
-
   /** carried along (lifeboat) or seated: E works although the visitor is not on foot */
   get riding() { return !!(this.boats.rider || this.fixtures.seat); }
   /** things that step back behind an info point at the same spot (doors, seats, clocks) */
@@ -426,7 +401,6 @@ export class Interact {
     this._timer -= dt;
     if (this._timer > 0) return;
     this._timer = 0.15;
-    this._hints(feet);
     let best = -1, bd = Infinity;
     if (mode === 'walk') for (let i = 0; i < this.items.length; i++) {
       const it = this.items[i];
