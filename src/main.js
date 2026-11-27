@@ -1,4 +1,5 @@
 // RMS Titanic – application bootstrap: renderer, module loading, render loop.
+import { params, flag, caps, guard } from './core/boot-tier.js';
 import * as THREE from 'three';
 import { World, yieldTask } from './core/world.js';
 import { MODULES } from './modules.js';
@@ -7,7 +8,7 @@ import { Player } from './app/player.js';
 import { Controls } from './app/controls.js';
 import { UI } from './app/ui.js';
 import { PostPipeline, QUALITY_LEVELS } from './app/post.js';
-import { TIER, TIERS, setTier, detectTier, probeCaps, applyDebugCaps, lowerTier, crashGuard } from './core/tier.js';
+import { TIER, lowerTier } from './core/tier.js';
 import { DeckStreamer } from './app/stream.js';
 import { MirrorView } from './app/mirrors.js';
 import { Sound } from './app/audio.js';
@@ -15,22 +16,7 @@ import { Interact } from './app/interact.js';
 import { ENGINE } from './core/engine.js';
 import { texturesReady } from './core/materials.js';
 
-const params = new URLSearchParams(location.search);
-const flag = (name) => { const v = params.get(name); return v !== null && v !== '0' && v !== 'false'; };
 const DEG = Math.PI / 180;
-
-// ------------------------------------------------------------------ device tier (before anything heavy exists)
-applyDebugCaps(params);
-const caps = probeCaps();
-const tierPick = detectTier(params, caps);
-// the last session died without closing (bluescreen, driver reset): never start above the tier below it again
-const guard = crashGuard(params);
-if (guard.cap && TIERS.indexOf(tierPick.name) > TIERS.indexOf(guard.cap)) {
-  tierPick.name = guard.cap;
-  tierPick.reason += (tierPick.reason ? ', ' : '') + 'nach Absturz zurückgestuft';
-}
-setTier(tierPick.name, tierPick.reason, { ...tierPick.info, ...(caps || {}) });
-TIER.streaming = !flag('nostream');
 
 /** Reload one tier lower (after a lost context or an out-of-memory failure); at most once per tier and session. */
 function fallbackTier(why) {
@@ -318,7 +304,7 @@ async function buildModules() {
   const fixed = TIER.streaming ? list.filter((m) => !STREAMABLE(m)) : list;
   const streamed = TIER.streaming ? list.filter(STREAMABLE) : [];
   const fixedLoads = fixed.map((m) => m.load());
-  for (const m of streamed) m.load();
+  if (TIER.name !== 'mobile') for (const m of streamed) m.load();
   let done = 0;
   const fail = (m, e) => {
     console.error(`[app] Modul "${m.id}" konnte nicht gebaut werden:`, e);

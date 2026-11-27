@@ -13,7 +13,7 @@ const _c = new THREE.Vector3(), _n = new THREE.Vector3(), _r = new THREE.Vector3
 export class MirrorView {
   constructor(world, scene, tier) {
     this.world = world;
-    this.range = tier.fine === 0 ? 35 : 65;
+    this.range = tier.fine === 0 ? 20 : 65;
     const size = tier.fine === 0 ? 384 : tier.fine === 1 ? 512 : tier.fine === 2 ? 768 : 1024;
     this.quad = new Reflector(new THREE.PlaneGeometry(1, 1), { textureWidth: size, textureHeight: size, clipBias: 0.002, color: 0xc4cacc, multisample: 0 });
     this.quad.name = 'mirrorView';
