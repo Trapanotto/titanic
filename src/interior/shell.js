@@ -244,10 +244,10 @@ export function bulkhead(world, deck, x, opts = {}) {
     if (wt) {
       const e = t + 0.04;
       // can be lowered (app/interact.js): by hand at the door, the ones on the tank top also from the bridge
-      b.box(F, x - e, y0, za - 0.09, x + e, yt + 0.09, za);
-      b.box(F, x - e, y0, zb, x + e, yt + 0.09, zb + 0.09);
-      b.box(F, x - e, yt, za, x + e, yt + 0.09, zb, 'xXyY');
-      b.box(F, x - e, y0, za, x + e, y0 + 0.12, zb, 'xXY');
+      b.box(F, x - e, y0, za - 0.09, x + e, yt + 0.09, za + 0.008);
+      b.box(F, x - e, y0, zb - 0.008, x + e, yt + 0.09, zb + 0.09);
+      b.box(F, x - e, yt - 0.008, za + 0.008, x + e, yt + 0.09, zb - 0.008, 'xXyY');
+      b.box(F, x - e, y0, za + 0.008, x + e, y0 + 0.12, zb - 0.008, 'xXY');
       const top = Math.min(y1 - 0.05, yt + 0.15 + d.h);
       // can be lowered (app/interact.js): by hand at the door, the ones on the tank top also from the bridge.
       // The plate is drawn by the app (raised or lowered); here only its guides and the brass plate.

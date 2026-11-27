@@ -11,8 +11,13 @@
 // hatch the player stands next to (tier). Missing zones of the player's own deck are loaded behind a short veil;
 // everything else is pre-built in idle moments (one module per idle slot) so stairs and wells normally never show a
 // missing deck.
-import { DECK_Y, DECK_ORDER, STAIRS, MACHINERY_ACCESS, deckAboveY, deckAtY } from '../core/constants.js';
+import { SHIP, DECK_Y, DECK_ORDER, STAIRS, MACHINERY_ACCESS, hullHalfWidth, deckAboveY, deckAtY } from '../core/constants.js';
 import { yieldTask } from '../core/world.js';
+
+const insideShip = (p) => Math.abs(p.x) <= SHIP.bowX + 1.5
+  && Math.abs(p.z) <= hullHalfWidth(p.x, Math.max(p.y - 1.6, 0)) + 1.0
+  && p.y - 1.6 <= DECK_Y.roof + 2.5
+  && p.y - 1.6 >= DECK_Y.tank - 1.5;
 
 const REG_STUBS = ['addCollider', 'addColliderFor', 'addFloor', 'addRamp', 'addTeleport', 'addInfo', 'addLamp', 'markForBake'];
 const STATE_KEYS = ['rooms', '_kitPorts', '_kitStairs', 'funnelTops', 'kitProblems', '_dStats'];
@@ -290,6 +295,7 @@ export class DeckStreamer {
   update(dt, t, p) {
     for (const m of this.mods) if (m.update) { try { m.update(dt, t); } catch (e) { if (!m.err) { m.err = 1; console.error('[stream] update', m.id, e); } } }
     if (this.world.streamHold) return; // in a lifeboat going down the ship's side: the decks passed are not the visitor's
+    if (!insideShip(p)) return; // outside the hull (overboard, swimming, flying around): never stream interior decks
     if (this.busy) {
       // the player got ahead of a background load (teleport, fast stairs): finish it at full speed behind the veil
       if (!this.rush) {
