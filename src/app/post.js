@@ -9,8 +9,8 @@ const PRESETS = {
   // phones / weak devices: direct rendering, at most 1 pixel per CSS pixel (dynamic resolution may go lower)
   mobil: { post: false, pixelRatio: 1.0, samples: 0, ao: 0, rays: false, bloomLevels: 0, shadow: 0 },
   niedrig: { post: false, pixelRatio: 1.0, samples: 0, ao: 0, rays: false, bloomLevels: 0, shadow: 2048 },
-  mittel: { post: true, pixelRatio: 1.0, samples: 2, ao: 8, rays: false, bloomLevels: 4, shadow: 2048 },
-  hoch: { post: true, pixelRatio: 1.5, samples: 4, ao: 12, rays: true, bloomLevels: 5, shadow: 4096 },
+  mittel: { post: true, pixelRatio: 1.0, samples: 2, ao: 6, rays: false, bloomLevels: 3, shadow: 2048 },
+  hoch: { post: true, pixelRatio: 1.25, samples: 4, ao: 8, rays: false, bloomLevels: 4, shadow: 2048 },
 };
 export function qualityPreset(name) { return PRESETS[name] || PRESETS.hoch; }
 

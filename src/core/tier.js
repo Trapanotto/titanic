@@ -14,28 +14,28 @@ export const TIERS = ['mobile', 'low', 'mid', 'high'];
 
 const SETTINGS = {
   mobile: {
-    quality: 'mobil', qualities: ['mobil', 'niedrig'], antialias: true, maxPixelRatio: 1.5, minPixelRatio: 0.75,
+    quality: 'mobil', qualities: ['mobil', 'niedrig'], antialias: true, maxPixelRatio: 1.25, minPixelRatio: 0.75,
     power: 'default', texMax: 256, detail: 0.25, fine: 0, dropRadius: 0.1, physical: false, lamps: 4, lampShadows: 0, sunShadow: 0,
-    particles: false, lampVolume: false, envMaps: 'min', oceanSeg: 0.3, tinyInstances: false, insideExtFar: 70,
-    stream: { neighbours: 0, nearDecks: 14, wells: 'near', budgetMB: 60 },
+    particles: false, lampVolume: false, envMaps: 'min', oceanSeg: 0.25, tinyInstances: false, insideExtFar: 70,
+    stream: { neighbours: 0, nearDecks: 14, wells: 'near', budgetMB: 55, sliceMs: 3 },
   },
   low: {
     quality: 'niedrig', qualities: ['niedrig', 'mittel'], antialias: true, maxPixelRatio: 1, minPixelRatio: 0.7,
     power: 'default', texMax: 512, detail: 0.35, fine: 1, dropRadius: 0.05, physical: false, lamps: 6, lampShadows: 0, sunShadow: 1024,
-    particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 0.6, tinyInstances: true, insideExtFar: 120,
-    stream: { neighbours: 1, wells: 'near', budgetMB: 110 },
+    particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 0.5, tinyInstances: true, insideExtFar: 120,
+    stream: { neighbours: 1, wells: 'near', budgetMB: 110, sliceMs: 4 },
   },
   mid: {
     quality: 'mittel', qualities: ['niedrig', 'mittel', 'hoch'], antialias: true, maxPixelRatio: 2, minPixelRatio: 0.7,
-    power: 'high-performance', texMax: 512, detail: 0.6, fine: 2, dropRadius: 0, physical: true, lamps: 18, lampShadows: 2, sunShadow: 2048,
-    particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 1, tinyInstances: true,
-    stream: { neighbours: 1, wells: true, budgetMB: 160 },
+    power: 'high-performance', texMax: 512, detail: 0.6, fine: 2, dropRadius: 0, physical: true, lamps: 12, lampShadows: 2, sunShadow: 2048,
+    particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 0.6, tinyInstances: true,
+    stream: { neighbours: 1, wells: true, budgetMB: 160, sliceMs: 6 },
   },
   high: {
-    quality: 'hoch', qualities: ['niedrig', 'mittel', 'hoch'], antialias: true, maxPixelRatio: 2, minPixelRatio: 0.75,
-    power: 'high-performance', texMax: 1024, detail: 1, fine: 3, dropRadius: 0, physical: true, lamps: 18, lampShadows: 2, sunShadow: 4096,
-    particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 1, tinyInstances: true,
-    stream: { neighbours: 1, wells: true, budgetMB: 200 },
+    quality: 'hoch', qualities: ['niedrig', 'mittel', 'hoch'], antialias: true, maxPixelRatio: 1.5, minPixelRatio: 0.75,
+    power: 'high-performance', texMax: 1024, detail: 1, fine: 3, dropRadius: 0, physical: true, lamps: 14, lampShadows: 2, sunShadow: 2048,
+    particles: true, lampVolume: true, envMaps: 'all', oceanSeg: 0.75, tinyInstances: true,
+    stream: { neighbours: 1, wells: true, budgetMB: 200, sliceMs: 6 },
   },
 };
 

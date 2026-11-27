@@ -275,9 +275,12 @@ debug.frame = (dt = 1 / 60, count = 1) => { if (renderer) for (let i = 0; i < co
  * Let the browser repaint the loading screen. In a hidden tab rAF is paused and timers are clamped to >= 1 s, so
  * there it only yields to the event loop (MessageChannel, not throttled) – loading continues at full speed.
  */
-function nextPaint() {
+let lastPaintAt = 0;
+function nextPaint(force = false) {
   guard.beat(TIER.name); // loading counts as running: a crash while the ship is built lowers the tier as well
-  if (document.hidden) return yieldTask();
+  const t = performance.now();
+  if (document.hidden || (!force && t - lastPaintAt < 80)) return yieldTask();
+  lastPaintAt = t;
   return new Promise((resolve) => {
     let done = false;
     const go = () => { if (!done) { done = true; resolve(); } };
@@ -338,6 +341,9 @@ async function buildModules() {
       try { await renderer.compileAsync(tmp, camera, scene); } catch { /* compiled on first use */ }
       tmp.children.length = 0;
     };
+    const fine0 = TIER.fine, detail0 = kit.DETAIL.q;
+    TIER.fine = 0;
+    kit.DETAIL.q = 0.25;
     try {
       await streamer.dryPass(streamed, async (m, phase) => {
         if (phase === 'start') { ui.setProgress(done / total, m.label + ' …'); await nextPaint(); return; }
@@ -345,11 +351,16 @@ async function buildModules() {
         done++;
         // on low-memory tiers give GC a brief breather between dry-pass decks; on desktop yield immediately
         if (!document.hidden) {
-          if (TIER.name === 'mobile' || TIER.name === 'low') await new Promise((r) => setTimeout(r, 40));
+          if (TIER.name === 'mobile' || TIER.name === 'low') await new Promise((r) => setTimeout(r, 10));
           else await yieldTask();
         }
       });
     } catch (e) { fail({ id: 'stream', label: 'Decks' }, e); }
+    finally {
+      TIER.fine = fine0;
+      kit.DETAIL.q = detail0;
+      flush();
+    }
   }
   ui.setProgress(done / total, 'Das Schiff wird zusammengesetzt …');
   await nextPaint();
@@ -426,7 +437,7 @@ async function main() {
   if (streamer) {
     // only the player's own deck before going interactive; neighbours follow in idle time
     ui.setProgress(0.97, 'Das Deck wird eingerichtet …');
-    await nextPaint();
+    await nextPaint(true);
     const t0 = performance.now();
     // only the own deck before going interactive (time to interactive); stairwell views and neighbours follow right
     // after the start in idle slices
@@ -435,7 +446,7 @@ async function main() {
     debug.timings.push({ id: 'deck ' + own, build: Math.round(performance.now() - t0), heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : -1 });
   }
   ui.setProgress(1, 'Leinen los!');
-  await nextPaint();
+  await nextPaint(true);
   try { // the procedural textures are generated in a worker while the ship is built
     const t0 = performance.now();
     await texturesReady();
