@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { applyNightToMaterials, mats, lightingUniforms } from '../core/materials.js';
-import { MACHINERY_X, DECK_Y, deckAboveY, deckAtY } from '../core/constants.js';
+import { SHIP, MACHINERY_X, DECK_Y, deckAboveY, deckAtY } from '../core/constants.js';
 import { bakeLampVolume, createHalos, isExteriorLamp } from './shiplights.js';
 import { createSky, createInteriorEnvMaterial } from './sky.js';
 import { createOcean } from './ocean.js';
@@ -92,6 +92,7 @@ export async function build(world) {
 
   // ---------- fog / background ----------
   const fogDay = new THREE.Color(0.60, 0.69, 0.79), fogNight = new THREE.Color(0.0035, 0.0055, 0.010);
+  const fogUnderDay = new THREE.Color(0x062436), fogUnderNight = new THREE.Color(0x020b14);
   const fogDayCur = fogDay.clone();
   const fog = new THREE.FogExp2(fogDayCur.clone(), FOG_DAY);
   scene.fog = fog;
@@ -595,7 +596,8 @@ export async function build(world) {
     // world.updateVisibility hides the exterior where nothing of the outside can be seen (closed hull below C deck):
     // then sky, sea, smoke, iceberg and the lamp sprites cannot be seen either
     const out = world.exterior.visible !== false;
-    halos.points.visible = out && n > 0.01;
+    const under = !world.state.inside && camPos.y < SHIP.waterline + 0.05;
+    halos.points.visible = out && !under && n > 0.01;
     halos.material.uniforms.uK.value = n * 6;
     halos.material.uniforms.uScale.value = pxScale;
     hemi.color.lerpColors(hemiDaySky, hemiNightSky, n);
@@ -611,8 +613,8 @@ export async function build(world) {
 
     // sky / ocean / smoke / iceberg / dust
     sky.follow(camPos);
-    sky.dome.visible = out;
-    sky.stars.visible = out && n > 0.002;
+    sky.dome.visible = out && !under;
+    sky.stars.visible = out && !under && n > 0.002;
     ocean.mesh.visible = out;
     ocean.spray.visible = smoke.points.visible = out && TIER.particles !== false;
     if (renderer) sky.starUniforms.uPx.value = renderer.getPixelRatio();
@@ -642,6 +644,11 @@ export async function build(world) {
     fog.color.lerpColors(fogDayCur, fogNight, n);
     fog.density = lerp(FOG_DAY, FOG_NIGHT, n) * fogScale;
     background.copy(fog.color);
+    if (under) {
+      fog.color.lerpColors(fogUnderDay, fogUnderNight, n);
+      fog.density = 0.045;
+      background.copy(fog.color);
+    }
     if (envDay) {
       const inEnv = insideLin > 0.5;
       const envIn = machineLin > 0.5 ? envMachine : envInside;

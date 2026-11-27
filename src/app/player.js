@@ -314,7 +314,7 @@ export class Player {
       this._bobAmp *= Math.max(0, 1 - dt * 8);
       const outside = Math.abs(p.x) > SHIP.bowX || Math.abs(p.z) > hullHalfWidth(p.x, Math.max(p.y, 0)) + 0.4;
       if (outside) this._outsideTime += dt; else this._outsideTime = 0;
-      const waterY = SHIP.waterline - 1.30;
+      const waterY = SHIP.waterline - 0.95;
       if (outside && p.y <= waterY) {
         this.inWater = true;
         p.y = waterY;
@@ -347,7 +347,7 @@ export class Player {
       const hw = hullHalfWidth(p.x, SHIP.waterline);
       if (hw > 0.1 && Math.abs(p.z) < hw + PLAYER.radius + 0.15) p.z = (p.z >= 0 ? 1 : -1) * (hw + PLAYER.radius + 0.15);
     }
-    const waterY = SHIP.waterline - 1.30;
+    const waterY = SHIP.waterline - 0.95;
     if (inp.jump && p.y <= waterY + 0.12) v.y = 1.4;
     v.y += (waterY - p.y) * 14 * dt;
     v.y *= Math.exp(-5 * dt);

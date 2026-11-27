@@ -342,6 +342,14 @@ void main() {
   vec3 dh = normalize(vec3(-V.x, 0.0, -V.z) + vec3(0.00001, 0.0, 0.0));
   col = mix(col, seaFar(dh), smoothstep(600.0, 4800.0, dist) * 0.95);
 
+  if (!gl_FrontFacing) {
+    vec3 underCol = mix(vec3(0.002, 0.018, 0.037), vec3(0.0004, 0.002, 0.005), uNight);
+    float snell = smoothstep(0.45, 0.92, max(dot(-Nn, V), 0.0));
+    vec3 skyUp = mix(vec3(0.09, 0.22, 0.30), vec3(0.008, 0.018, 0.035), uNight);
+    col = mix(underCol, skyUp, snell * 0.72);
+    col = mix(col, underCol, 1.0 - exp(-dist * 0.045));
+  }
+
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -539,7 +547,7 @@ export function createOcean(shared) {
   };
   const material = new THREE.ShaderMaterial({
     name: 'ocean', uniforms, vertexShader: VERT.replace('OCEAN_CELL', CELL.toFixed(3)), fragmentShader: FRAG,
-    side: THREE.FrontSide, depthTest: true, depthWrite: true, fog: false,
+    side: THREE.DoubleSide, depthTest: true, depthWrite: true, fog: false,
   });
   const mesh = new THREE.Mesh(grid.geometry, material);
   mesh.name = 'ocean';
