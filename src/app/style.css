@@ -89,16 +89,24 @@ kbd {
 .needle-tip { color: var(--brass-hi); font-size: 12px; line-height: 1; margin-top: 3px; }
 .needle-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cream); }
 
+.prompt-wrap {
+  position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 92vw; pointer-events: none;
+}
 .prompt, .toast {
-  position: absolute; left: 50%; transform: translate(-50%, 8px); opacity: 0; transition: opacity 0.25s, transform 0.25s;
   padding: 8px 16px; border: 1px solid var(--line); border-radius: 3px; background: rgba(10, 20, 34, 0.78);
   text-shadow: none; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis;
 }
-.prompt { bottom: 96px; font-size: 16px; }
+.prompt {
+  display: none; align-items: center; opacity: 0; transform: translateY(8px); transition: opacity 0.25s, transform 0.25s;
+  font-size: 16px;
+}
 .prompt kbd { margin-right: 8px; }
-.toast { bottom: 150px; font-size: 14.5px; font-style: italic; color: var(--brass-hi); }
-.prompt.show, .toast.show { opacity: 1; transform: translate(-50%, 0); }
-.touch .prompt.show { pointer-events: auto; }
+.prompt-info { border-color: rgba(241, 213, 138, 0.65); }
+.toast { position: absolute; left: 50%; bottom: 150px; transform: translate(-50%, 8px); opacity: 0; transition: opacity 0.25s, transform 0.25s; font-size: 14.5px; font-style: italic; color: var(--brass-hi); }
+.prompt.show { display: inline-flex; opacity: 1; transform: translateY(0); pointer-events: auto; cursor: pointer; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.touch .prompt kbd { display: none; }
 
 .keybar {
   position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom));
@@ -263,7 +271,8 @@ kbd {
   .keybar .key-label { display: none; }                 /* icons only: the help (H) explains them */
   .hud-tl { max-width: calc(100% - 200px); }
   .hud-deck { font-size: 18px; }
-  .prompt { bottom: 52px; font-size: 14.5px; max-width: calc(100% - 32px); }
+  .prompt-wrap { bottom: 52px; }
+  .prompt { font-size: 14.5px; }
   .toast { bottom: 96px; max-width: calc(100% - 32px); }
 }
 @media (max-height: 600px) {
@@ -288,9 +297,12 @@ kbd {
   .help-keys dt { text-align: left; margin-top: 6px; white-space: normal; }
   .info-text { font-size: 15.5px; }
 }
-.touch .prompt { bottom: 128px; }
+.touch .prompt-wrap { bottom: 128px; }
 .touch .toast { bottom: 176px; top: auto; transform: translate(-50%, 8px); }
 .touch .toast.show { transform: translate(-50%, 0); }
+@media (pointer: coarse) {
+  .start-keys, .keybar { display: none; }
+}
 @media (max-width: 480px) {
   .stick { left: 12px; bottom: 12px; width: 96px; height: 96px; }
   .stick.floating { margin: -48px 0 0 -48px; }

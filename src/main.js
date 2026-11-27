@@ -199,7 +199,7 @@ function autoQuality(raw) {
   if (!q || !TIER.qualities.includes(q)) return;
   post.setQuality(q);
   a.cool = 6; a.slow = a.fast = 0; a.ema = 1 / 60;
-  ui.toast(`Grafikqualität automatisch auf „${q}“ ${QUALITY_LEVELS.indexOf(q) > i ? 'erhöht' : 'gesenkt'} (G zum Ändern)`, 3.5);
+  ui.toast(`Grafikqualität automatisch auf „${q}“ ${QUALITY_LEVELS.indexOf(q) > i ? 'erhöht' : 'gesenkt'}${controls?.touch ? '' : ' (G zum Ändern)'}`, 3.5);
 }
 debug.autoQuality = autoQ;
 

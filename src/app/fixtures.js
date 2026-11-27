@@ -218,7 +218,8 @@ export class Fixtures {
     if (!p || this.seat) return;
     this.seat = { u, eye, player: p, back: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw }, t: 0, ...more };
     p.setFlyPose(u.x, u.y + eye, u.z, u.rot || 0, 0);
-    this.toast(`E oder F: ${more?.up ? more.up.toLowerCase() : 'aufstehen'}`, 2.5);
+    const touch = typeof document !== 'undefined' && document.getElementById('ui')?.classList?.contains('touch');
+    this.toast(touch ? `Hinweis antippen: ${more?.up ? more.up.toLowerCase() : 'aufstehen'}` : `E oder F: ${more?.up ? more.up.toLowerCase() : 'aufstehen'}`, 2.5);
   }
 
   /** into the swimming bath: the visitor floats at the water line and swims with the usual keys, inside the pool */
@@ -228,7 +229,8 @@ export class Fixtures {
     this.seat = { u: null, swim: true, up: 'Aus dem Becken steigen', player: p, back: { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw }, t: 0 };
     p.setFlyPose(POOL.x0 + 1.4, POOL.wl + 0.2, (POOL.z0 + POOL.z1) / 2, 0, 0);
     this.sound.splash?.();
-    this.toast('Im Wasser. Schwimmen wie gehen · E oder F: aussteigen', 3.5);
+    const touch = typeof document !== 'undefined' && document.getElementById('ui')?.classList?.contains('touch');
+    this.toast(touch ? 'Im Wasser – schwimmen wie gehen · „Aus dem Becken steigen“ zum Verlassen' : 'Im Wasser. Schwimmen wie gehen · E oder F: aussteigen', 3.5);
   }
 
   /** squash: the ball to the front wall, back off the floor */

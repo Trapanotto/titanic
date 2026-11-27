@@ -20,6 +20,7 @@ const HELP = [
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
   ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Schotttüren, Aufzüge, Turngeräte (aufsteigen), Schwimmbad (hineinsteigen und schwimmen), Squash (Ball schlagen), Kesselfeuertüren (öffnen, Kohle nachlegen), Hauptschalter im Dynamoraum, eigener Funkspruch, Ankerspill, Sitzmöbel und Liegestühle (hinsetzen), Uhren, Bücherschränke, Kamine, Shuffleboard, Rettungsboote (ausschwenken, einsteigen, fieren, aufholen), Schränke, Schubladen, Bullaugen, Lichtschalter und Klingel in den Kabinen, Wasserhähne, Badewannen, Toilettenspülung, Klaviere, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Morsetaste)'],
+  ['I', 'Info lesen (wenn daneben eine Aktion mit E angezeigt wird)'],
   ['T', 'Ton an/aus'],
   ['Klick / Antippen', 'Info-Marke direkt öffnen'],
   ['1 – 9', 'Schnellreise zu Höhepunkten'],
@@ -28,6 +29,17 @@ const HELP = [
   ['B', 'Kopfwippen & Seegang an/aus'],
   ['H', 'Hilfe'],
   ['Esc', 'Maus freigeben'],
+];
+
+const HELP_TOUCH = [
+  ['Linker Stick', 'Gehen / Schwimmen (ganz außen: rennen)'],
+  ['Rechte Hälfte ziehen', 'Umsehen'],
+  ['Antippen (3D / Hinweis)', 'Info-Marke oder Aktion direkt öffnen / auslösen'],
+  ['▲ / ▼', 'Springen (im Flug: steigen / sinken)'],
+  ['Fliegen / Landen', 'Flugmodus an- und ausschalten'],
+  ['Karte', 'Deckplan mit Schnellreise zu allen Räumen & Decks'],
+  ['Minikarte antippen', 'Deckplan öffnen'],
+  ['☾ / ♪ / ?', 'Tag/Nacht, Ton an/aus, diese Hilfe'],
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -53,7 +65,7 @@ export class UI {
     this.quick = [];
     this._hudTimer = 1;
     this._fps = { on: false, frames: 0, time: 0 };
-    this._last = { deck: '', sub: '', deg: 999, head: '', prompt: -2, found: -1, total: -1 };
+    this._last = { deck: '', sub: '', deg: 999, head: '', actPrompt: -2, infoPrompt: '', found: -1, total: -1 };
     this._toastTimer = 0;
     this._overlayTimer = 0;
 
@@ -111,10 +123,13 @@ export class UI {
     // desktop: a start button with the three things one needs to know; phones and tablets go straight in
     const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     if (this.noLock || coarse || this.controls?.touch) this.entered = true;
+    if (coarse || this.controls?.touch) this.enableTouch();
     this._refreshOverlay();
   }
 
   // ------------------------------------------------------------------ state
+
+  _isTouch() { return !!(this.controls?.touch || this.root?.classList?.contains?.('touch')); }
 
   /** True while the player must not move / look (modal open or still loading). */
   isBlocked() { return this.modal !== null || !this.started || !this.entered; }
@@ -122,6 +137,7 @@ export class UI {
   enableTouch() {
     if (this.controls) this.controls.touch = true;
     this.root.classList.add('touch');
+    this._syncHelpMode();
     this.minimap?.relayout();
     this._refreshOverlay();
   }
@@ -191,6 +207,13 @@ export class UI {
       case 'escape': this.closeModal(false); break;
       case 'help': if (this.modal === 'help') this.closeModal(); else { this._open('help'); this.helpEl.hidden = false; } break;
       case 'plan': if (this.modal === 'plan') this.closeModal(); else { this._open('plan'); this.plan.open(); } break;
+      case 'interact':
+        if (!this.modal && (p.mode === 'walk' || this.interact?.riding) && this.interact && this.interact.nearest !== -1) this.interact.run();
+        break;
+      case 'infoOnly':
+        if (this.modal === 'info') this.closeModal();
+        else if (!this.modal && p.mode === 'walk' && this.info.nearest >= 0) this.openInfo(this.info.nearest);
+        break;
       case 'info':
         if (this.modal === 'info') this.closeModal();
         else if (!this.modal && (p.mode === 'walk' || this.interact?.riding) && this.interact && this.interact.nearest !== -1 && (!this.interact.isLow(this.interact.nearest) || this.info.nearest < 0)) this.interact.run();
@@ -205,7 +228,8 @@ export class UI {
       } break;
       case 'fly':
         if (this.modal) break;
-        if (p.toggleFly() === 'fly') this.toast('Flugmodus – F zum Landen', 2.5); else this.toast('Zu Fuß', 1.5);
+        if (p.toggleFly() === 'fly') this.toast(this._isTouch() ? 'Flugmodus – „Landen“ zum Beenden' : 'Flugmodus – F zum Landen', 2.5);
+        else this.toast('Zu Fuß', 1.5);
         break;
       case 'crouch': if (!this.modal && p.mode === 'walk') p.toggleCrouch(); break;
       case 'flyspeed': this.toast(`Fluggeschwindigkeit × ${p.changeFlySpeed(arg).toFixed(2)}`, 1.2); break;
@@ -332,16 +356,25 @@ export class UI {
     const head = a <= 45 ? 'Blick zum Bug' : a >= 135 ? 'Blick zum Heck' : deg > 0 ? 'Blick nach Backbord' : 'Blick nach Steuerbord';
     if (head !== L.head) { L.head = head; this.headEl.textContent = head; }
 
-    const use = this.modal ? -1 : (this.interact?.nearest ?? -1), has = use !== -1;
-    // a door steps back behind an info point; everything else that can be operated comes first
-    const info = this.modal || (has && !this.interact.isLow(use)) ? -1 : this.info.nearest;
-    const act = has && info < 0;
-    const near = act ? this.interact.label(use) : info; // things to operate come before the info of the same spot
-    if (near !== L.prompt) {
-      L.prompt = near;
-      if (act) { this.promptText.textContent = near; this.promptEl.classList.add('show'); }
-      else if (info >= 0) { this.promptText.textContent = 'Info: ' + this.info.items[info].info.title; this.promptEl.classList.add('show'); }
+    const use = this.modal ? -1 : (this.interact?.nearest ?? -1), hasAct = use !== -1;
+    const info = this.modal || p.mode !== 'walk' || this.interact?.riding ? -1 : this.info.nearest, hasInfo = info >= 0;
+    const touch = this._isTouch();
+    const actPrimary = hasAct && (!hasInfo || !this.interact.isLow(use));
+    const actLabel = hasAct && (actPrimary || touch) ? this.interact.label(use) : '';
+    if (actLabel !== L.actPrompt) {
+      L.actPrompt = actLabel;
+      if (actLabel) { this.promptText.textContent = actLabel; this.promptEl.classList.add('show'); }
       else this.promptEl.classList.remove('show');
+    }
+    const infoKey = actPrimary ? 'I' : 'E';
+    const infoLabel = hasInfo ? `${infoKey}|Info: ${this.info.items[info].info.title}` : '';
+    if (infoLabel !== L.infoPrompt) {
+      L.infoPrompt = infoLabel;
+      if (hasInfo) {
+        this.infoPromptKey.textContent = infoKey;
+        this.infoPromptText.textContent = 'Info: ' + this.info.items[info].info.title;
+        this.infoPromptEl.classList.add('show');
+      } else this.infoPromptEl.classList.remove('show');
     }
     const total = this.info.items.length, found = this.info.foundCount;
     if (found !== L.found || total !== L.total) {
@@ -378,9 +411,14 @@ export class UI {
     this.rightEl = el('div', 'hud-right');
     this.rightEl.append(tr);
 
+    const prompts = (this.promptWrap = el('div', 'prompt-wrap'));
     this.promptEl = el('div', 'prompt');
     this.promptEl.append(el('kbd', '', 'E'), (this.promptText = el('span', '', '')));
-    this.promptEl.addEventListener('click', () => this.action('info'));
+    this.promptEl.addEventListener('click', () => this.action('interact'));
+    this.infoPromptEl = el('div', 'prompt prompt-info');
+    this.infoPromptEl.append((this.infoPromptKey = el('kbd', '', 'E')), (this.infoPromptText = el('span', '', '')));
+    this.infoPromptEl.addEventListener('click', () => this.action('infoOnly'));
+    prompts.append(this.infoPromptEl, this.promptEl);
     this.toastEl = el('div', 'toast');
 
     const bar = el('div', 'keybar');
@@ -418,7 +456,7 @@ export class UI {
     tbtn('?', 'Hilfe', () => this.action('help'));
     touch.append(this.stickEl, btns);
 
-    hud.append(tl, this.rightEl, this.promptEl, this.toastEl, bar, touch);
+    hud.append(tl, this.rightEl, prompts, this.toastEl, bar, touch);
     this.root.append(hud);
   }
 
@@ -451,10 +489,10 @@ export class UI {
     help.hidden = true;
     const hb = el('div', 'panel help-box');
     hb.append(el('h2', '', 'Steuerung'));
-    const dl = el('dl', 'help-keys');
-    for (const [k, v] of HELP) dl.append(el('dt', '', k), el('dd', '', v));
+    const dl = (this.helpDl = el('dl', 'help-keys'));
     this.quickEl = el('div', 'help-quick');
-    hb.append(dl, this.quickEl, el('div', 'panel-foot', 'H oder Esc zum Schließen'));
+    this.helpFoot = el('div', 'panel-foot', '');
+    hb.append(dl, this.quickEl, this.helpFoot);
     help.append(hb);
     help.addEventListener('click', () => this.closeModal());
 
@@ -464,11 +502,24 @@ export class UI {
     const ib = el('div', 'panel info-box');
     this.infoTitle = el('h2', '', '');
     this.infoText = el('div', 'info-text');
-    ib.append(el('div', 'info-orn', '✦  White Star Line  ✦'), this.infoTitle, this.infoText, el('div', 'panel-foot', 'E, Esc, Klick oder Antippen zum Schließen'));
+    this.infoFoot = el('div', 'panel-foot', '');
+    ib.append(el('div', 'info-orn', '✦  White Star Line  ✦'), this.infoTitle, this.infoText, this.infoFoot);
     info.append(ib);
     info.addEventListener('click', () => this.closeModal());
 
+    this._syncHelpMode();
     this.root.append(help, info);
+  }
+
+  _syncHelpMode() {
+    const touch = this._isTouch();
+    if (this.helpDl) {
+      this.helpDl.textContent = '';
+      for (const [k, v] of (touch ? HELP_TOUCH : HELP)) this.helpDl.append(el('dt', '', k), el('dd', '', v));
+    }
+    if (this.quickEl) this.quickEl.hidden = touch;
+    if (this.helpFoot) this.helpFoot.textContent = touch ? 'Antippen zum Schließen' : 'H oder Esc zum Schließen';
+    if (this.infoFoot) this.infoFoot.textContent = touch ? 'Antippen zum Schließen' : 'E, Esc, Klick oder Antippen zum Schließen';
   }
 
   _fillHelp() {
@@ -483,5 +534,6 @@ export class UI {
       list.append(item);
     }
     this.quickEl.append(list);
+    this._syncHelpMode();
   }
 }
