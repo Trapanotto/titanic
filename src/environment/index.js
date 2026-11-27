@@ -553,6 +553,7 @@ export async function build(world) {
   function update(dt) {
     dt = Math.min(Math.max(dt || 0, 0), 0.1);
     time += dt;
+    if (nightTarget > 0 && !lampVolBaked && castersReady) ensureLampVolume();
     const cam = world.camera;
     if (cam) camPos.copy(cam.position);
     if (world.quality !== lastQuality) {
@@ -664,16 +665,26 @@ export async function build(world) {
     blendGrade(dt, n, ins * (1 - 0.75 * daylight * (1 - n)));
   }
 
+  let lampVolBaked = false;
+  function ensureLampVolume() {
+    if (lampVolBaked || TIER.lampVolume === false) return 0;
+    lampVolBaked = true;
+    const t0 = performance.now();
+    const nLamps = bakeLampVolume(world.lamps);
+    console.info(`[environment] ${nLamps} exterior lamps baked in ${(performance.now() - t0).toFixed(0)} ms`);
+    return nLamps;
+  }
+
   // once every module is built and baked (called by the app before the first frame)
   world.onAfterBake = () => {
     try {
       const t0 = performance.now();
       world.exterior.updateMatrixWorld(true);
-      const nLamps = TIER.lampVolume === false ? 0 : bakeLampVolume(world.lamps);
+      const nLamps = nightTarget > 0 ? ensureLampVolume() : 0;
       halos.rebuild(world);
       prepareCasters();
       lampCount = -1; // re-index lamps (rooms are known now)
-      console.info(`[environment] ${nLamps} exterior lamps baked, casters prepared in ${(performance.now() - t0).toFixed(0)} ms`);
+      console.info(`[environment] casters prepared (${nLamps} lamps baked) in ${(performance.now() - t0).toFixed(0)} ms`);
     } catch (e) {
       console.warn('[environment] after-bake setup failed', e);
     }

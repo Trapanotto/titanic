@@ -10,7 +10,7 @@ export class MirrorView {
     this.world = world;
     this.scene = scene;
     this.tier = tier;
-    const size = tier.fine === 0 ? 128 : tier.fine <= 2 ? 256 : 512;
+    const size = tier.fine === 0 ? 128 : 256;
     this.rt = new THREE.WebGLCubeRenderTarget(size, {
       generateMipmaps: true,
       minFilter: THREE.LinearMipmapLinearFilter,
@@ -38,7 +38,7 @@ export class MirrorView {
   /** Capture a local 360 cubemap around the camera whenever a mirror zone is nearby and state changed. */
   update(camera) {
     const renderer = this.world.renderer;
-    if (!renderer) return;
+    if (!renderer || !this.world.state?.inside) return;
     const p = camera.position;
     let hasMirror = false;
     let visHash = 0;
@@ -62,7 +62,7 @@ export class MirrorView {
     if (!changed) return;
 
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    if (this._lastAt >= 0 && now - this._lastAt < 350) return;
+    if (this._lastAt >= 0 && now - this._lastAt < 1200) return;
 
     this.cubeCam.position.copy(p);
     const prevEnv = mats.mirror.envMap;

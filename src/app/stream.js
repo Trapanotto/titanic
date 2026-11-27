@@ -37,7 +37,7 @@ export class DeckStreamer {
     this.blocking = false;     // the player's own deck is loading (veil, no simulation)
     this.stats = { builds: 0, evictions: 0, lastMs: 0, mb: 0, zones: 0, maxOver: 0 };
     this.rush = false;         // the running load must finish as fast as possible (veil is up)
-    this.sliceMs = tier.stream.sliceMs ?? 4; // background work per frame
+    this.sliceMs = Math.min(tier.stream.sliceMs ?? 3, 3.5); // background work per frame
     this._swap = null;
     this._idle = 0;
     this._still = 0;
@@ -337,7 +337,8 @@ export class DeckStreamer {
     if (!nMiss) { if (tNow - (this._evT || 0) > 1) { this._evT = tNow; this.evict(set); } return; }
     if (!this._evT) { this._evT = tNow; this.evict(set); return; } // finish evicting before the next build
     const missing = [...set].filter((g) => !this.loaded.has(g));
-    if (this._idle < 0.15) return;
+    if (t < 2.0) return; // let initial frames stay smooth before background deck preloads
+    if (this._still < 0.35 && this._idle < 2.5) return;
     this._idle = 0;
     // one module per slot: the module feeding the missing zone closest to the player's deck (neighbours first)
     const oi = DECK_ORDER.indexOf(own);

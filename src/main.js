@@ -445,7 +445,7 @@ async function main() {
     await streamer.load(streamer.zonesByDeck[own] || [], { rush: true });
     debug.timings.push({ id: 'deck ' + own, build: Math.round(performance.now() - t0), heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) : -1 });
   }
-  ui.setProgress(1, 'Leinen los!');
+  ui.setProgress(0.98, 'Grafik wird vorbereitet …');
   await nextPaint(true);
   try { // the procedural textures are generated in a worker while the ship is built
     const t0 = performance.now();
@@ -458,10 +458,11 @@ async function main() {
     console.error('[app] onAfterBake fehlgeschlagen:', e);
   }
   try {
-    // first frame under the loading screen: compiles shaders, uploads textures; then compile the programs of every
-    // object (also the culled interior zones), so that walking around never stalls on a shader compile
+    // first frame under the loading screen: sync sky/ocean/lights to real start pose, compile shaders, upload textures
     const t0 = performance.now();
     world.updateVisibility(camera.position, undefined, player.mode === 'walk' ? player.pos.y : undefined);
+    world.update(0, 0);
+    for (let i = 0; i < updates.length; i++) updates[i](0, 0);
     // compile in parallel (KHR_parallel_shader_compile) while the loading screen keeps animating
     try {
       if (renderer.compileAsync) await renderer.compileAsync(scene, camera);
@@ -473,6 +474,7 @@ async function main() {
   } catch (e) {
     console.error('[app] erster Frame fehlgeschlagen:', e);
   }
+  ui.setProgress(1, 'Leinen los!');
   debug.ready = true;
   ui.ready();
   if (params.has('selftest')) import('./app/selftest.js').then((m) => m.run(debug)).catch((e) => console.error('[selftest]', e));
