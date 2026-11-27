@@ -31,9 +31,9 @@ const LAMP_EVERY = 0.12;
 // plain lamp lights + shadow-casting lamp lights (fixed counts, by device tier: 12 + 2 on desktop, 4 + 0 on phones; TIER.lamps is the total)
 const SH_POOL = Math.max(0, TIER.lampShadows ?? 2), POOL = Math.max(1, (TIER.lamps ?? 12) - SH_POOL);
 const LAMP_DAY_OUT = 0.6, LAMP_NIGHT_OUT = 14, LAMP_INSIDE = 9, LAMP_MACHINE = 1.35, VOL_NIGHT = 13;
-const RANGE_INSIDE = 9, RANGE_OUT = 15, RANGE_MACHINE = 13;
+const RANGE_INSIDE = 11, RANGE_OUT = 15, RANGE_MACHINE = 13;
 const SH_RANGE = 9, SH_NEAR = 0.3, SH_EVERY = 0.1, SH_MAP = { niedrig: 256, mittel: 512, hoch: 512 };
-const OTHER_ROOM = 1.6;   // squared-distance penalty of lamps outside the camera's room
+const OTHER_ROOM = 5;   // squared-distance penalty of lamps outside the camera's room
 const BUCKET = 8, BUCKET_X0 = -168, BUCKETS = 42, LAMP_SEARCH = 30;
 // share of the sky light that reaches into the interior, per deck (windows / skylights / open doors)
 const DAYLIGHT = { boat: 0.55, A: 0.45, B: 0.35, C: 0.16, D: 0.07, E: 0.03, F: 0.02, G: 0.015, orlop: 0.01, tank: 0.01 };
@@ -368,7 +368,7 @@ export async function build(world) {
     nPending = 0;
     for (let q = 0; q < nBest && nPending < POOL; q++) if (!taken[q] && !isSh(bestI[q]) && !shOwned(bestI[q])) pending[nPending++] = bestI[q];
     // the visitor's room with its lamps switched off: what comes in from the lamps of the other rooms is little
-    otherK = roomOff && !roomOn ? 0.07 : 0.85;
+    otherK = roomOff && !roomOn ? 0.07 : 0.65;
     for (const s of slots) if (s.lamp >= 0) s.roomT = camRoom < 0 || lampRoom[s.lamp] === camRoom ? 1 : otherK;
   }
 
@@ -408,7 +408,7 @@ export async function build(world) {
           else s.lamp = -1;
         }
       }
-      s.room = approach(s.room, s.roomT, dt * 0.9);
+      s.room = approach(s.room, s.roomT, dt * 1.5);
       let f = 1;
       if (s.flick > 0) {
         const t = time * (s.flick === 1 ? 9 : 23) + s.seed * 10;
