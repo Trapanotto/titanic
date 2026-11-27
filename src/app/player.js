@@ -22,7 +22,7 @@ export const PLAYER = {
   maxStep: 0.75,      // follow the ground up/down to this difference
   subStep: 0.2,       // max horizontal distance per collision step
   maxPitch: 1.5,
-  landRange: 3,       // fly -> walk: ground must be within this distance below the camera
+  landRange: 6,       // fly -> walk: ground must be within this distance below the camera
 };
 
 const HALF_PI = Math.PI / 2;
@@ -133,7 +133,19 @@ export class Player {
       this._setMode('fly');
       this.vel.y = 0;
     } else if (!this.tryLand()) {
-      this.onHint?.('Kein Deck unter dir – fliege zu einem Deck');
+      const s = this._safeOld;
+      if (s.ok) {
+        this.pos.x = s.x; this.pos.y = s.y; this.pos.z = s.z;
+        this.vel.x = this.vel.y = this.vel.z = 0;
+        this.grounded = true;
+        this.inWater = false;
+        this._airTime = this._outsideTime = 0;
+        this._setMode('walk');
+        this._eyeY = this.pos.y + PLAYER.eye;
+        this.onHint?.('Zurück an Deck gelandet');
+      } else {
+        this.onHint?.('Kein Deck unter dir – fliege zu einem Deck');
+      }
     }
     return this.mode;
   }
@@ -145,23 +157,26 @@ export class Player {
     return this.crouch;
   }
 
-  /** fly -> walk if there is ground within PLAYER.landRange below the camera. */
+  /** fly -> walk if there is ground below the camera. */
   tryLand() {
     const p = this.pos, camY = p.y + PLAYER.eye;
+    let g = null;
     for (let h = camY - 0.6; h >= camY - PLAYER.landRange - 0.01; h -= 0.6) {
-      const g = this.world.groundAt(p.x, p.z, h);
-      if (g === null || g < camY - PLAYER.landRange - 0.2) continue;
-      p.y = g;
-      const c = this.world.collide(p.x, p.z, p.y, PLAYER.radius, PLAYER.height);
-      p.x = c.x; p.z = c.z;
-      this.vel.x = this.vel.y = this.vel.z = 0;
-      this.grounded = true;
-      this._airTime = this._outsideTime = 0;
-      this._setMode('walk');
-      this._markSafe(true);
-      return true;
+      const hit = this.world.groundAt(p.x, p.z, h);
+      if (hit !== null && hit >= camY - PLAYER.landRange - 0.2) { g = hit; break; }
     }
-    return false;
+    if (g === null) g = this.world.groundAt(p.x, p.z, camY - 0.6);
+    if (g === null) return false;
+    p.y = g;
+    const c = this.world.collide(p.x, p.z, p.y, PLAYER.radius, PLAYER.height);
+    p.x = c.x; p.z = c.z;
+    this.vel.x = this.vel.y = this.vel.z = 0;
+    this.grounded = true;
+    this.inWater = false;
+    this._airTime = this._outsideTime = 0;
+    this._setMode('walk');
+    this._markSafe(true);
+    return true;
   }
 
   changeFlySpeed(factor) {

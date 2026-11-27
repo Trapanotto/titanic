@@ -331,7 +331,7 @@ export class Interact {
     if (r.t > r.move + 1.0) {
       this.cage.visible = false;
       this._ride = null;
-      r.player.teleport({ deck: r.to, x: L.stand[0], y: DECK_Y[r.to], z: L.stand[1], yaw: L.yaw + Math.PI });
+      r.player.teleport({ deck: r.to, x: L.stand[0], y: DECK_Y[r.to], z: L.stand[1], yaw: L.yaw });
       this.toast(LIFT_NAMES[r.to], 2);
     }
   }

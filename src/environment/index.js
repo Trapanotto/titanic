@@ -33,7 +33,7 @@ const SH_POOL = Math.max(0, TIER.lampShadows ?? 2), POOL = Math.max(1, (TIER.lam
 const LAMP_DAY_OUT = 0.6, LAMP_NIGHT_OUT = 14, LAMP_INSIDE = 9, LAMP_MACHINE = 1.35, VOL_NIGHT = 13;
 const RANGE_INSIDE = 9, RANGE_OUT = 15, RANGE_MACHINE = 13;
 const SH_RANGE = 9, SH_NEAR = 0.3, SH_EVERY = 0.1, SH_MAP = { niedrig: 256, mittel: 512, hoch: 512 };
-const OTHER_ROOM = 5;   // squared-distance penalty of lamps outside the camera's room
+const OTHER_ROOM = 1.6;   // squared-distance penalty of lamps outside the camera's room
 const BUCKET = 8, BUCKET_X0 = -168, BUCKETS = 42, LAMP_SEARCH = 30;
 // share of the sky light that reaches into the interior, per deck (windows / skylights / open doors)
 const DAYLIGHT = { boat: 0.55, A: 0.45, B: 0.35, C: 0.16, D: 0.07, E: 0.03, F: 0.02, G: 0.015, orlop: 0.01, tank: 0.01 };
@@ -59,7 +59,7 @@ function grade(o) {
 }
 // auto exposure per situation (log2 scene luminance that needs no correction, correction limits, strength):
 // small white cabins / corridors are exposed down so the paint keeps its relief, dark machinery spaces up
-const AE_ROOM = { aeKey: -2.6, aeMin: 0.55, aeMax: 1.6, aeStrength: 0.55 };
+const AE_ROOM = { aeKey: -2.6, aeMin: 0.72, aeMax: 1.35, aeStrength: 0.35 };
 const AE_MACHINE = { aeKey: -3.8, aeMin: 0.7, aeMax: 2.6, aeStrength: 0.65 };
 const GRADES = {
   day: grade({ exposure: 1.0, contrast: 1.07, saturation: 1.03, vignette: 0.2, grain: 0.002, lift: C(0.0, 0.004, 0.012), gain: C(0.985, 1.0, 1.025), bloom: 0.08, bloomThreshold: 2.4, aoStrength: 0.65, aoRadius: 1.1, aoIntensity: 1.0, rays: 0.32 }),
@@ -367,7 +367,7 @@ export async function build(world) {
     nPending = 0;
     for (let q = 0; q < nBest && nPending < POOL; q++) if (!taken[q] && !isSh(bestI[q]) && !shOwned(bestI[q])) pending[nPending++] = bestI[q];
     // the visitor's room with its lamps switched off: what comes in from the lamps of the other rooms is little
-    otherK = roomOff && !roomOn ? 0.07 : 0.5;
+    otherK = roomOff && !roomOn ? 0.07 : 0.85;
     for (const s of slots) if (s.lamp >= 0) s.roomT = camRoom < 0 || lampRoom[s.lamp] === camRoom ? 1 : otherK;
   }
 
@@ -407,7 +407,7 @@ export async function build(world) {
           else s.lamp = -1;
         }
       }
-      s.room = approach(s.room, s.roomT, dt * 1.5);
+      s.room = approach(s.room, s.roomT, dt * 0.9);
       let f = 1;
       if (s.flick > 0) {
         const t = time * (s.flick === 1 ? 9 : 23) + s.seed * 10;
@@ -567,11 +567,11 @@ export async function build(world) {
     }
 
     nightLin = approach(nightLin, nightTarget, dt / 2.0);
-    insideLin = approach(insideLin, world.state.inside ? 1 : 0, dt / 0.6);
+    insideLin = approach(insideLin, world.state.inside ? 1 : 0, dt / 1.0);
     const n = smooth(nightLin), ins = smooth(insideLin);
     situation(camPos);
-    machineLin = approach(machineLin, sit.machine, dt / 1.2);
-    firstLin = approach(firstLin, sit.firstCls, dt / 1.2);
+    machineLin = approach(machineLin, sit.machine, dt / 1.8);
+    firstLin = approach(firstLin, sit.firstCls, dt / 1.8);
     daylight = approach(daylight, DAYLIGHT[world.state.deck] ?? 0.05, dt / 1.0);
 
     shared.uTime.value = time;

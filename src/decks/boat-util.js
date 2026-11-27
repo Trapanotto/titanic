@@ -373,11 +373,13 @@ export function detailer(ctx) {
       const sill = o.sill ?? 0.9, head = o.head ?? 2.25, t = o.t ?? 0.03;
       const holes = [...wins.map(([p, q]) => [p - 0.06, q + 0.06]), ...doors.map(([p, q]) => [p - 0.07, q + 0.07])];
       const dh = doors.map(([p, q]) => [p - 0.07, q + 0.07]);
-      d.strip(o.wainscot ?? o.wall, w, a, e, 0, sill - 0.02, t, dh);
+      d.strip(o.wainscot ?? o.wall, w, a, e, 0, sill - 0.05, t, dh);
+      d.strip(o.wainscot ?? o.wall, w, a, e, sill - 0.05, sill - 0.02, t, holes);
       d.strip(o.wall, w, a, e, sill - 0.02, head + 0.02, t, holes);
-      d.strip(o.wall, w, a, e, head + 0.02, H, t, doors.map(([p, q]) => [p - 0.07, q + 0.07]).filter(() => (o.doorH ?? 2.1) > H - 0.05));
+      d.strip(o.wall, w, a, e, head + 0.02, head + 0.05, t, holes);
+      d.strip(o.wall, w, a, e, head + 0.05, H, t, dh.filter(() => (o.doorH ?? 2.1) > H - 0.05));
       d.mouldRun(o.skirt ?? o.dado ?? o.wall, w, a, e, 0, PR.skirt, dh, t);
-      if (o.dado) d.mouldRun(o.dado, w, a, e, sill - 0.04, PR.dado, dh, t);
+      if (o.dado) d.mouldRun(o.dado, w, a, e, sill - 0.04, PR.dado, holes, t);
       if (o.cornice) d.mould(o.cornice, w, a, e, H - 0.16, PR.cornice, t);
       if (o.panels) d.dress(w, a, e, { mat: o.panels.mat === 'oakPanel' ? 'oak' : o.panels.mat, frame: o.panels.frame, pitch: o.panels.pitch ?? 0.9, skip: holes, upper: [0.12, sill - 0.14], lower: false, frieze: false });
       if (o.reveal) for (const [p, q] of wins) {

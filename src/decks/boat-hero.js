@@ -534,8 +534,8 @@ export function furnishGym(ctx) {
   d.wquad(M.shipSection, aw, 4.6, 6.4, 1.0, 2.1, 0.035);
   d.path('oak', aw, d.rectLoop(4.6, 6.4, 1.0, 2.1), PR.arch, 0.02, true);
   d.wmount(clockWall(), aw, 3.8, 2.25);
-  d.wmount(mirrorWall({ w: 0.6, h: 1.4, frame: 'oak' }), fw, 5.85, 1.95);
-  for (const x of [30.4, 33.8, 36.6]) d.wmount(sconce({ plain: true }), sw, x, 2.3, 0.03);
+  d.wmount(mirrorWall({ w: 0.55, h: 1.3, frame: 'oak' }), fw, 6.95, 1.65);
+  for (const x of [30.4, 33.8, 37.15]) d.wmount(sconce({ plain: true }), sw, x, 2.3, 0.03);
   if (fine(1)) { // leather exercise mat on the floor between the bench and the rowing machine (flat: walked over)
     d.box('leather', 30.3, 5.05, 32.0, 5.95, 0, 0.03);
     if (fine(2)) d.mount(gymSmall(), 31.55, 5.32, 0.2, 0.03);

@@ -102,7 +102,7 @@ export class DeckPlan {
     root.append(box);
     parent.append(root);
 
-    root.addEventListener('mousedown', (e) => { if (e.target === root) this.close(); });
+    root.addEventListener('click', (e) => { if (e.target === root) this.close(); });
     this.search.addEventListener('input', () => this._filter());
     this.search.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { const first = this.items.querySelector('.plan-item:not([hidden])'); first?.click(); }
@@ -136,6 +136,7 @@ export class DeckPlan {
   select(deck) {
     this.deck = deck;
     for (const d in this._tabBtns) this._tabBtns[d].classList.toggle('active', d === deck);
+    this._tabBtns[deck]?.scrollIntoView?.({ inline: 'center', block: 'nearest', behavior: 'smooth' });
     const n = this.world.teleports.filter((t) => t.deck === deck).length;
     this.deckTitle.textContent = `${DECK_NAMES[deck]} · ${n} ${n === 1 ? 'Ort' : 'Orte'}`;
     this._hoverTp = null;
@@ -479,11 +480,16 @@ export class DeckPlan {
   _topPick(e) {
     const r = this.topCanvas.getBoundingClientRect();
     const x = e.clientX - r.left, y = e.clientY - r.top;
-    let best = null;
+    const pad = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 14 : 4;
+    let best = null, bestD = Infinity;
     for (const hit of this._hits) {
-      if (x < hit.x || x > hit.x + hit.w || y < hit.y || y > hit.y + hit.h) continue;
-      if (hit.pin) return hit.t;
-      best = hit.t;
+      if (x >= hit.x && x <= hit.x + hit.w && y >= hit.y && y <= hit.y + hit.h) {
+        if (hit.pin) return hit.t;
+        best = hit.t;
+      } else if (hit.pin) {
+        const d = Math.hypot(x - hit.px, y - hit.pz);
+        if (d <= pad + 6 && d < bestD) { bestD = d; best = hit.t; }
+      }
     }
     return best;
   }

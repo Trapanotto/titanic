@@ -323,6 +323,11 @@ export class UI {
     if (deck !== L.deck) { L.deck = deck; this.deckEl.textContent = deck; }
     const sub = p.inWater ? 'Im Wasser · Schwimmen' : (high ? 'Freier Flug' : st.inside ? 'Innen' : 'Außendeck') + ' · ' + (p.mode === 'fly' ? 'Flugmodus' : p.crouch ? 'Kriechend' : 'Zu Fuß');
     if (sub !== L.sub) { L.sub = sub; this.subEl.textContent = sub; }
+    if (this.flyBtn) {
+      const flying = p.mode === 'fly';
+      this.flyBtn.classList.toggle('on', flying);
+      this.flyBtn.textContent = flying ? 'Landen' : 'Fliegen';
+    }
     const a = Math.abs(deg);
     const head = a <= 45 ? 'Blick zum Bug' : a >= 135 ? 'Blick zum Heck' : deg > 0 ? 'Blick nach Backbord' : 'Blick nach Steuerbord';
     if (head !== L.head) { L.head = head; this.headEl.textContent = head; }
@@ -397,13 +402,16 @@ export class UI {
     const tbtn = (label, title, down, up) => {
       const b = el('button', 'tbtn', label);
       b.title = title;
-      b.addEventListener('touchstart', (e) => { e.preventDefault(); down(); }, { passive: false });
+      let touched = 0;
+      b.addEventListener('touchstart', (e) => { e.preventDefault(); touched = performance.now(); down(); }, { passive: false });
       if (up) { b.addEventListener('touchend', (e) => { e.preventDefault(); up(); }, { passive: false }); b.addEventListener('touchcancel', up); }
+      else { b.addEventListener('click', (e) => { if (performance.now() - touched < 500) return; e.preventDefault(); down(); }); }
       btns.append(b);
+      return b;
     };
     tbtn('▲', 'Springen / Steigen', () => { if (this.player.mode === 'fly') this.controls.touchVertical(1); else this.controls.touchJump(); }, () => this.controls.touchVertical(0));
     tbtn('▼', 'Sinken', () => { if (this.player.mode === 'fly') this.controls.touchVertical(-1); }, () => this.controls.touchVertical(0));
-    tbtn('Fliegen', 'Flugmodus', () => this.action('fly'));
+    this.flyBtn = tbtn('Fliegen', 'Flugmodus an/aus', () => this.action('fly'));
     tbtn('Karte', 'Karte', () => this.action('plan'));
     tbtn('☾', 'Tag / Nacht', () => this.action('night'));
     tbtn('♪', 'Ton an / aus', () => this.action('sound'));

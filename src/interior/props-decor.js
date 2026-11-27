@@ -448,19 +448,19 @@ export const liftCage = def('liftCage', [1.6, 1.6, 2.4], (p) => {
 
 function trunkAt(p, w, d, h, x, y, z, m, r) {
   p.bb(m, d, h, w, x, y, z, 0.02);
-  for (const s of [-1, 1]) p.b(M.woodDark, d + 0.012, 0.03, 0.035, x, y + h * 0.45, z + s * w * 0.3);
-  for (const s of [-1, 1]) { p.bb(M.woodDark, d + 0.014, h + 0.012, 0.04, x, y - 0.006, z + s * w * 0.18, 0.008); }
-  p.bb(M.woodDark, d + 0.012, 0.035, w + 0.012, x, y + h * 0.7, z, 0.008);
-  for (const s of [-1, 1]) { p.bb(M.leather, d + 0.02, h + 0.02, 0.05, x, y - 0.01, z + s * w * 0.38, 0.006); p.b(M.brass, 0.01, 0.05, 0.06, x + d / 2 + 0.01, y + h * 0.75, z + s * w * 0.38); }
-  for (const sx of [-1, 1]) for (const sy of [0, 1]) for (const sz of [-1, 1]) p.b(M.brass, 0.05, 0.05, 0.05, x + sx * (d / 2 - 0.02), y + sy * (h - 0.05), z + sz * (w / 2 - 0.02));
-  p.b(M.brass, 0.012, 0.08, 0.1, x + d / 2 + 0.006, y + h * 0.6, z);
+  for (const s of [-1, 1]) p.b(M.woodDark, d + 0.014, 0.03, 0.035, x, y + h * 0.45, z + s * w * 0.3);
+  p.bb(M.woodDark, d + 0.014, 0.035, w + 0.014, x, y + h * 0.7, z, 0.008);
+  for (const s of [-1, 1]) { p.bb(M.woodDark, d + 0.022, h + 0.018, 0.04, x, y - 0.004, z + s * w * 0.18, 0.008); }
+  for (const s of [-1, 1]) { p.bb(M.leather, d + 0.030, h + 0.026, 0.05, x, y - 0.008, z + s * w * 0.38, 0.006); p.b(M.brass, 0.012, 0.05, 0.06, x + d / 2 + 0.018, y + h * 0.75, z + s * w * 0.38); }
+  for (const sx of [-1, 1]) for (const sy of [0, 1]) for (const sz of [-1, 1]) p.b(M.brass, 0.056, 0.056, 0.056, x + sx * (d / 2 - 0.022), y + (sy ? h - 0.048 : -0.004), z + sz * (w / 2 - 0.022));
+  p.b(M.brass, 0.014, 0.08, 0.1, x + d / 2 + 0.012, y + h * 0.6, z);
   if (FINE() >= 2) { // lid seam, side clasps, studs along the lid band
-    p.b(M.woodDark, d + 0.004, 0.006, w + 0.004, x, y + h * 0.83, z);
-    for (const s of [-1, 1]) p.bb(M.brass, 0.014, 0.06, 0.04, x + d / 2 + 0.007, y + h * 0.76, z + s * w * 0.3, 0.004);
-    if (FINE() >= 3) for (let i = -3; i <= 3; i++) if (i) p.s(M.brass, 0.007, x + d / 2 + 0.008, y + h * 0.7 + 0.0175, z + i * w * 0.12);
+    p.b(M.woodDark, d + 0.008, 0.006, w + 0.008, x, y + h * 0.83, z);
+    for (const s of [-1, 1]) p.bb(M.brass, 0.014, 0.06, 0.04, x + d / 2 + 0.013, y + h * 0.76, z + s * w * 0.3, 0.004);
+    if (FINE() >= 3) for (let i = -3; i <= 3; i++) if (i) p.s(M.brass, 0.007, x + d / 2 + 0.012, y + h * 0.7 + 0.0175, z + i * w * 0.12);
   }
   for (const s of [-1, 1]) p.loft(M.leather, [[x, y + h * 0.55, z + s * (w / 2 + 0.002)], [x, y + h * 0.6, z + s * (w / 2 + 0.03)], [x + 0.06, y + h * 0.6, z + s * (w / 2 + 0.03)], [x + 0.06, y + h * 0.55, z + s * (w / 2 + 0.002)]], 0.012, 4);
-  if (r) for (let i = 0; i < 2; i++) { const l = p.ab([AT.label, AT.labelRed, AT.labelBlue, AT.yellow][Math.floor(r() * 4)], 0.003, 0.08 + r() * 0.05, 0.1 + r() * 0.05, x + d / 2 + 0.012, y + 0.1 + r() * (h - 0.3), z - w * 0.1 + r() * w * 0.25); l.rotation.x = (r() - 0.5) * 0.6; }
+  if (r) for (let i = 0; i < 2; i++) { const l = p.ab([AT.label, AT.labelRed, AT.labelBlue, AT.yellow][Math.floor(r() * 4)], 0.003, 0.08 + r() * 0.04, 0.09 + r() * 0.04, x + d / 2 + 0.004 + i * 0.004, y + 0.10 + r() * Math.max(0.08, h * 0.34), z + (i === 0 ? -0.09 : 0.09) * w + (r() - 0.5) * 0.05 * w); l.rotation.x = (r() - 0.5) * 0.5; }
 }
 function suitcaseAt(p, x, y, z, m, cell = null, rot = 0) {
   const g = p.add(G.roundBox(0.2, 0.42, 0.62, 0.025, 1), m, x, y + 0.21, z); g.rotation.y = rot;
