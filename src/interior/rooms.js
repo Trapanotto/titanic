@@ -256,11 +256,14 @@ class DeckPlan {
       const mirror = spec.alternateMirror !== false ? i % 2 === 1 : !!spec.mirror;
       const at = mirror ? hi - 0.2 - dw / 2 : lo + 0.2 + dw / 2;
       const label = num ? `${num.deckLetter ?? this.deck}${n}` : null;
+      const walls = spec.omitFwd && i === count - 1 ? ['aft', 'port', 'stbd']
+        : spec.omitAft && i === 0 ? ['fwd', 'port', 'stbd']
+          : spec.walls;
       const r = this.room({
         id: spec.idPrefix ? `${spec.idPrefix}${i + 1}` : (label ?? undefined), name: label ? `${spec.name ?? cls.label} ${num.deckLetter ?? this.deck} ${n}` : (spec.name ?? cls.label),
         type: 'cabin', cls: spec.type ?? 'second', quiet: true,
         x0: alongX ? lo : spec.x0, x1: alongX ? hi : spec.x1, z0: alongX ? spec.z0 : lo, z1: alongX ? spec.z1 : hi,
-        wall: spec.wall ?? cls.wall, floor: spec.floor ?? cls.floor, furnish: spec.furnish ?? cls.furnish, lamp: spec.lamp,
+        walls, wall: spec.wall ?? cls.wall, floor: spec.floor ?? cls.floor, furnish: spec.furnish ?? cls.furnish, lamp: spec.lamp,
         doors: [{ side, at: Math.min(hi - dw / 2 - 0.06, Math.max(lo + dw / 2 + 0.06, at)), w: dw, label, style: spec.door, hinge: mirror ? 'hi' : 'lo', open: spec.open }],
         berths: spec.berths, group: spec.group,
       });

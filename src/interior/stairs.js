@@ -263,8 +263,8 @@ function buildFlight(world, f, bl, bu) {
     bl.wallZ(S.riser, xa, z0, z1, yt - r, yt, -dir);
     if (S.nosing) {
       bl.sweep(S.tread, NOSE, [xa, yt, z0], [0, 0, 1], [-dir, 0, 0], [0, 1, 0], z1 - z0, [true, true]);
-      bl.box(S.nosing, Math.min(xa, xa + dir * 0.045), yt + 0.002, z0 + 0.03, Math.max(xa, xa + dir * 0.045), yt + 0.012, z1 - 0.03, 'xXYzZ');
-      if (f.st.style === 'grand') bl.flat(mats.carpetRed, xa + dir * 0.06, xe - dir * 0.02, z0 + 0.25, z1 - 0.25, yt + 0.009);
+      bl.box(S.nosing, Math.min(xa, xa + dir * 0.045), yt + 0.003, z0 + 0.03, Math.max(xa, xa + dir * 0.045), yt + 0.012, z1 - 0.03, 'xXYzZ');
+      if (f.st.style === 'grand') bl.flat(mats.carpetRed, xa + dir * 0.06, xe - dir * 0.02, z0 + 0.25, z1 - 0.25, yt + 0.012);
     } else {
       bl.box(mats.steelDark, Math.min(xa, xa + dir * 0.05), yt - 0.05, z0, Math.max(xa, xa + dir * 0.05), yt + 0.004, z1, 'xXYzZ');
     }
@@ -552,13 +552,13 @@ function stepRun(b, S, xb, xt, z0, z1, y0, y1) {
   for (let i = 0; i < N; i++) {
     const xa = xb + dir * i * g, xe = xa + dir * g, yt = y0 + (i + 1) * r;
     b.wallZ(S.riser, xa, z0, z1, yt - r, yt, -dir);
-    b.wallZ(mats.carpetRed, xa - dir * 0.004, c0, c1, yt - r, yt - 0.03, -dir);
+    b.wallZ(mats.carpetRed, xa - dir * 0.008, c0, c1, yt - r, yt - 0.03, -dir);
     b.prism(mats.brass, [xa - dir * 0.014, yt - r + 0.016, c0 - 0.03], [xa - dir * 0.014, yt - r + 0.016, c1 + 0.03], 0.008, 5);
     if (i === N - 1) break; // the last riser rises onto the landing / deck
     b.flat(S.tread, xa, xe, z0, z1, yt);
     b.sweep(S.tread, NOSE, [xa, yt, z0], [0, 0, 1], [-dir, 0, 0], [0, 1, 0], z1 - z0, [true, true]);
-    b.box(S.nosing, Math.min(xa, xa + dir * 0.045), yt + 0.002, z0 + 0.03, Math.max(xa, xa + dir * 0.045), yt + 0.012, z1 - 0.03, 'xXYzZ');
-    b.flat(mats.carpetRed, xa + dir * 0.05, xe - dir * 0.01, c0, c1, yt + 0.009);
+    b.box(S.nosing, Math.min(xa, xa + dir * 0.045), yt + 0.003, z0 + 0.03, Math.max(xa, xa + dir * 0.045), yt + 0.012, z1 - 0.03, 'xXYzZ');
+    b.flat(mats.carpetRed, xa + dir * 0.05, xe - dir * 0.01, c0, c1, yt + 0.012);
   }
 }
 
@@ -646,10 +646,13 @@ function buildImperial(world, st, B) {
 
     // ---- half-landing: oak floor with carpet field, plaster soffit with gilt frame, moulded front edge
     bl.flat(S.tread, x0, xl, zc - hwi, zc + hwi, ym);
-    bl.flat(mats.carpetRed, x0 + 0.3, xl - 0.15, zc - hwi + 0.3, zc + hwi - 0.3, ym + 0.009);
-    bl.box(mats.brass, xl - 0.15, ym, zc - hwi + 0.3, xl - 0.12, ym + 0.008, zc + hwi - 0.3, 'XYx');
+    bl.flat(mats.carpetRed, x0 + 0.3, xl - 0.15, zc - hwi + 0.3, zc + hwi - 0.3, ym + 0.012);
+    bl.box(mats.brass, xl - 0.15, ym + 0.001, zc - hwi + 0.3, xl - 0.12, ym + 0.012, zc + hwi - 0.3, 'XYx');
     bl.flat(mats.plaster, x0, xl, zc - hwi, zc + hwi, ym - LAND_T, true);
-    bl.wallZ(S.rail, xl, zc - hwi, zc + hwi, ym - LAND_T, ym, 1);
+    const topRiser = (ym - y0) / Math.max(2, Math.round((ym - y0) / 0.175));
+    bl.wallZ(S.rail, xl, zc - hwi, zc - cw, ym - LAND_T, ym, 1);
+    bl.wallZ(S.rail, xl, zc + cw, zc + hwi, ym - LAND_T, ym, 1);
+    if (ym - topRiser > ym - LAND_T) bl.wallZ(S.rail, xl, zc - cw, zc + cw, ym - LAND_T, ym - topRiser, 1);
     bl.sweep(mats.oak, ENTAB, [xl, ym - LAND_T, zc - hwi], [0, 0, 1], [1, 0, 0], [0, 1, 0], 2 * hwi, [true, true]);
     bl.wallZ(S.rail, xl, zc - hwi, zc + hwi, ym - LAND_T - 0.12, ym - LAND_T, -1); // back of the moulding
     for (const [a, c, d, e] of [[x0 + 0.25, xl - 0.25, zc - hwi + 0.25, zc - hwi + 0.29], [x0 + 0.25, xl - 0.25, zc + hwi - 0.29, zc + hwi - 0.25], [x0 + 0.25, x0 + 0.29, zc - hwi + 0.25, zc + hwi - 0.25], [xl - 0.29, xl - 0.25, zc - hwi + 0.25, zc + hwi - 0.25]]) {

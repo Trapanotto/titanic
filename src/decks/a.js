@@ -27,7 +27,7 @@ export async function build(world) {
   const SVC = { type: 'service', wall: 'paintWhite', lamp: 'bulkhead' };
   const WET = { type: 'bath', wall: 'tile', floor: 'tile' };
 
-  const AA = -65.95, AF = 69.95;      // room limits at the house end walls (kit walls hidden behind the exterior walls)
+  const AA = -65.85, AF = 69.85;      // inner faces of the house end walls (exterior module owns them)
   const C = 3;                        // casing half width
   const SC0 = 5.4, SC1 = 7.0;         // forward side corridors (1st class), |z|
   const MC = 0.8;                     // forward centre corridor half width
@@ -39,16 +39,16 @@ export async function build(world) {
   await world.tick();
   for (const s of [-1, 1]) {
     const stb = s > 0, sd = stb ? 'stbd' : 'bb', odd = stb ? 1 : 0;
-    gang('gang-vorn-' + sd, stb ? 'Gang Steuerbord (vorn)' : 'Gang Backbord (vorn)', XH1, AF, stb ? SC0 : -SC1, stb ? SC1 : -SC0, { teleport: { group: G1 } });
+    gang('gang-vorn-' + sd, stb ? 'Gang Steuerbord (vorn)' : 'Gang Backbord (vorn)', XH1, AF, stb ? SC0 : -SC1, stb ? SC1 : -SC0, { walls: sidesBut('fwd'), teleport: { group: G1 } });
     // window cabins A1–A14 (odd starboard, even port), numbered from the bow
     plan.cabinRow({
       x0: XH1, x1: AF, z0: stb ? SC1 : -99, z1: stb ? 99 : -SC1, count: 7, corridorSide: stb ? 'port' : 'stbd', type: 'first',
-      numbering: { deckLetter: 'A', start: 13 + 1 - odd, step: -2 }, wall: stb ? 'whiteGold' : 'damaskBlue', group: G1,
+      numbering: { deckLetter: 'A', start: 13 + 1 - odd, step: -2 }, wall: stb ? 'whiteGold' : 'damaskBlue', omitFwd: true, group: G1,
     });
     // inside cabins forward of the cross corridor
     plan.cabinRow({
       x0: XQ1, x1: AF, z0: stb ? MC : -SC0, z1: stb ? SC0 : -MC, count: 3, corridorSide: stb ? 'port' : 'stbd', type: 'first',
-      numbering: { deckLetter: 'A', start: 19 + 1 - odd, step: -2 }, wall: stb ? 'damaskGreen' : 'damaskRed', floor: 'carpetBlue', group: G1,
+      numbering: { deckLetter: 'A', start: 19 + 1 - odd, step: -2 }, wall: stb ? 'damaskGreen' : 'damaskRed', floor: 'carpetBlue', omitFwd: true, group: G1,
     });
     // inside suite aft of the funnel-1 casing, behind the lifts
     const n = stb ? 21 : 22;
@@ -73,7 +73,7 @@ export async function build(world) {
   await world.tick();
   gang('quergang-vorn', 'Quergang (vorn)', XQ0, XQ1, -SC0, SC0, { teleport: { group: G1 } });
   await world.tick();
-  gang('mittelgang-vorn', 'Mittelgang (vorn)', XQ1, AF, -MC, MC, { teleport: { group: G1, yaw: 0 } });
+  gang('mittelgang-vorn', 'Mittelgang (vorn)', XQ1, AF, -MC, MC, { walls: sidesBut('fwd'), teleport: { group: G1, yaw: 0 } });
 
   await world.tick();
   // ============================================================ forward Grand Staircase x 37.5..47.5
