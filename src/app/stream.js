@@ -37,7 +37,7 @@ export class DeckStreamer {
     this.blocking = false;     // the player's own deck is loading (veil, no simulation)
     this.stats = { builds: 0, evictions: 0, lastMs: 0, mb: 0, zones: 0, maxOver: 0 };
     this.rush = false;         // the running load must finish as fast as possible (veil is up)
-    this.sliceMs = Math.min(tier.stream.sliceMs ?? 3, 3.5); // background work per frame
+    this.sliceMs = Math.min(tier.stream.sliceMs ?? 2.5, 2.5); // background work per frame
     this._swap = null;
     this._idle = 0;
     this._still = 0;
@@ -197,8 +197,8 @@ export class DeckStreamer {
         for (const g of (d && this.zonesByDeck[d]) || []) if (g.userData.x1 > p.x - nd && g.userData.x0 < p.x + nd) out.add(g);
       }
     }
-    // stairwells / hatches next to the camera: the zones of every deck they connect, near the well
-    if (this.cfg.wells) {
+    // stairwells / hatches next to the camera: only when indoors (walking on open decks never looks down wells)
+    if (this.cfg.wells && this.world.state?.inside) {
       // weak tiers ('near'): of every deck the well passes through only the zones the well itself is in – enough to
       // close the view down a stairwell or machinery hatch (otherwise one looks through the empty ship)
       const near = this.cfg.wells === 'near', m = near ? 9 : 8, zm = near ? 1 : 12;
@@ -207,6 +207,7 @@ export class DeckStreamer {
         const lo = DECK_Y[o.decks[0]] - 0.5, hi = deckAboveY(o.decks[o.decks.length - 1]) + 2;
         if (p.y < lo || p.y > hi) continue;
         for (const d of o.decks) {
+          if (Math.abs(DECK_ORDER.indexOf(d) - i) > 2) continue;
           for (const g of this.zonesByDeck[d] || []) if (g.userData.x1 > o.x0 - zm && g.userData.x0 < o.x1 + zm) out.add(g);
         }
       }
@@ -337,8 +338,8 @@ export class DeckStreamer {
     if (!nMiss) { if (tNow - (this._evT || 0) > 1) { this._evT = tNow; this.evict(set); } return; }
     if (!this._evT) { this._evT = tNow; this.evict(set); return; } // finish evicting before the next build
     const missing = [...set].filter((g) => !this.loaded.has(g));
-    if (t < 2.0) return; // let initial frames stay smooth before background deck preloads
-    if (this._still < 0.35 && this._idle < 2.5) return;
+    if (t < 2.5) return; // let initial frames stay smooth before background deck preloads
+    if (this._still < 0.6 && this._idle < 5.0) return;
     this._idle = 0;
     // one module per slot: the module feeding the missing zone closest to the player's deck (neighbours first)
     const oi = DECK_ORDER.indexOf(own);

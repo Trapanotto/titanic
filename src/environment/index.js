@@ -26,7 +26,7 @@ const HEMI_DAY = 0.5, HEMI_NIGHT = 0.5;
 const ENV_DAY = 0.95, ENV_NIGHT = 0.8, ENV_INSIDE = 0.26, ENV_MACHINE = 0.2;
 const FOG_DAY = 0.00016, FOG_NIGHT = 0.0004;
 const AMB_FIRST = 0.05, AMB_OTHER = 0.045, AMB_MACHINE = 0.035;
-const SHADOW_HALF = 55, SHADOW_DIST = 260, SHADOW_STEP = 9; // the map follows the camera in 9 m steps (3 m meant a full shadow pass every second or two of walking)
+const SHADOW_HALF = 65, SHADOW_DIST = 260, SHADOW_STEP = 24; // the map follows the camera in 24 m steps (wide margin avoids periodic shadow-pass hitches while walking)
 const LAMP_EVERY = 0.12;
 // plain lamp lights + shadow-casting lamp lights (fixed counts, by device tier: 12 + 2 on desktop, 4 + 0 on phones; TIER.lamps is the total)
 const SH_POOL = Math.max(0, TIER.lampShadows ?? 2), POOL = Math.max(1, (TIER.lamps ?? 12) - SH_POOL);

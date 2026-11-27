@@ -73,6 +73,7 @@ export class DeckPlan {
 
     const main = el('div', 'plan-main');
     const left = el('div', 'plan-left');
+    const tabsWrap = el('div', 'plan-tabs-wrap');
     this.tabs = el('div', 'plan-tabs');
     this._tabBtns = {};
     for (const d of [...DECK_ORDER].reverse()) {
@@ -82,11 +83,20 @@ export class DeckPlan {
       this._tabBtns[d] = b;
       this.tabs.append(b);
     }
+    this._tabLeft = el('button', 'plan-scroll left', '‹');
+    this._tabLeft.type = 'button';
+    this._tabLeft.setAttribute('aria-label', 'Decks links');
+    this._tabLeft.addEventListener('click', () => this.tabs.scrollBy({ left: -140, behavior: 'smooth' }));
+    this._tabRight = el('button', 'plan-scroll right', '›');
+    this._tabRight.type = 'button';
+    this._tabRight.setAttribute('aria-label', 'Decks rechts');
+    this._tabRight.addEventListener('click', () => this.tabs.scrollBy({ left: 140, behavior: 'smooth' }));
+    tabsWrap.append(this._tabLeft, this.tabs, this._tabRight);
     this.sideCanvas = el('canvas', 'plan-side');
     this.deckTitle = el('h3', 'plan-deckname');
     this.topCanvas = el('canvas', 'plan-top');
     this.legend = el('div', 'plan-legend', 'Backbord oben · Steuerbord unten · Bug rechts · Querrichtung gestreckt dargestellt');
-    left.append(this.tabs, this.sideCanvas, this.deckTitle, this.topCanvas, this.legend);
+    left.append(tabsWrap, this.sideCanvas, this.deckTitle, this.topCanvas, this.legend);
 
     const side = el('aside', 'plan-list');
     this.search = el('input', 'plan-search');
@@ -113,7 +123,16 @@ export class DeckPlan {
     this.topCanvas.addEventListener('mousemove', (e) => this._topHover(e));
     this.topCanvas.addEventListener('mouseleave', () => this._setHoverTp(null));
     this.topCanvas.addEventListener('click', (e) => { const t = this._topPick(e); if (t) this._go(t); });
-    window.addEventListener('resize', () => { if (this.isOpen) this.draw(); });
+    this.tabs.addEventListener('scroll', () => this._updateTabArrows(), { passive: true });
+    window.addEventListener('resize', () => { if (this.isOpen) { this.draw(); this._updateTabArrows(); } });
+  }
+
+  _updateTabArrows() {
+    const t = this.tabs;
+    if (!t || !this._tabLeft || !this._tabRight) return;
+    const canScroll = t.scrollWidth > t.clientWidth + 2;
+    this._tabLeft.hidden = !canScroll || t.scrollLeft <= 2;
+    this._tabRight.hidden = !canScroll || t.scrollLeft >= t.scrollWidth - t.clientWidth - 2;
   }
 
   open() {
@@ -123,6 +142,7 @@ export class DeckPlan {
     this.search.value = '';
     this._filter();
     this.select(this._playerDeck());
+    requestAnimationFrame(() => this._updateTabArrows());
   }
 
   close() {
@@ -137,6 +157,8 @@ export class DeckPlan {
     this.deck = deck;
     for (const d in this._tabBtns) this._tabBtns[d].classList.toggle('active', d === deck);
     this._tabBtns[deck]?.scrollIntoView?.({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    requestAnimationFrame(() => this._updateTabArrows());
+    setTimeout(() => this._updateTabArrows(), 220);
     const n = this.world.teleports.filter((t) => t.deck === deck).length;
     this.deckTitle.textContent = `${DECK_NAMES[deck]} · ${n} ${n === 1 ? 'Ort' : 'Orte'}`;
     this._hoverTp = null;

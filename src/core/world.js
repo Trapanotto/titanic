@@ -238,7 +238,7 @@ export class World {
     try {
       while (U.i < U.list.length && now() - t0 < budgetMs) {
         const batch = [];
-        for (let k = 0, kn = this.slicer ? 4 : 24; k < kn && U.i < U.list.length; k++) {
+        for (let k = 0, kn = this.slicer ? 2 : 4; k < kn && U.i < U.list.length; k++) {
           const m = U.list[U.i++];
           if (!m.geometry.index.array) continue; // already uploaded by a normal frame
           batch.push([m, m.parent, m.visible, m.frustumCulled]);
@@ -643,7 +643,7 @@ export class World {
         let k = 0;
         while (k < mine.length) {
           const up = this._uploadState(), s = this.slicer;
-          const n = s ? 4 : mine.length;
+          const n = s ? 2 : mine.length;
           for (let e = Math.min(mine.length, k + n); k < e; k++) up.list.push(mine[k]);
           this._uploadRun(renderer, Infinity);
           if (up.i >= up.list.length) { up.list.length = 0; up.i = 0; }
