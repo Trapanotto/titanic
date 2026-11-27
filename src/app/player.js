@@ -13,9 +13,11 @@ export const PLAYER = {
   walkSpeed: 2.4,
   crouchSpeed: 1.1,
   runSpeed: 6,
+  swimSpeed: 2.6,
+  swimFast: 4.5,
   flySpeed: 12,
   flyFast: 40,
-  jumpSpeed: 3.6,     // ~0.66 m jump
+  jumpSpeed: 5.1,     // ~1.32 m jump: clears the 1.1 m deck railings and bulwarks
   gravity: 9.81,
   maxStep: 0.75,      // follow the ground up/down to this difference
   subStep: 0.2,       // max horizontal distance per collision step
@@ -44,6 +46,7 @@ export class Player {
     this.pitch = 0;
     this.mode = 'walk';
     this.crouch = false;
+    this.inWater = false;
     this.grounded = false;
     this.headBob = true;
     this.flySpeedScale = 1;
@@ -80,6 +83,7 @@ export class Player {
     this.pitch = t.pitch ?? 0;
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.crouch = false;
+    this.inWater = false;
     this._setMode('walk');
     // settle on the real ground if the given height is slightly off
     const g = this.world.groundAt(p.x, p.z, p.y + 0.3);
@@ -100,6 +104,7 @@ export class Player {
     if (pitch !== undefined) this.pitch = clamp(pitch, -PLAYER.maxPitch, PLAYER.maxPitch);
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.crouch = false;
+    this.inWater = false;
     this._setMode('fly');
     this._eyeY = y;
     this.applyCamera();
@@ -124,6 +129,7 @@ export class Player {
   toggleFly() {
     if (this.mode === 'walk') {
       this.crouch = false;
+      this.inWater = false;
       this._setMode('fly');
       this.vel.y = 0;
     } else if (!this.tryLand()) {
@@ -134,7 +140,7 @@ export class Player {
 
   /** Toggle crouch / crawl in walk mode. Returns the resulting crouch state. */
   toggleCrouch() {
-    if (this.mode !== 'walk') return false;
+    if (this.mode !== 'walk' || this.inWater) return false;
     this.crouch = !this.crouch;
     return this.crouch;
   }
@@ -191,9 +197,9 @@ export class Player {
     const shipRoll = (Math.sin(st * 0.57) * 0.0065 + Math.sin(st * 0.37 + 1.4) * 0.0025) * a;
     const shipPitch = (Math.sin(st * 0.74 + 0.8) * 0.0032 + Math.sin(st * 0.43 + 2.6) * 0.0012) * a;
     const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
-    const camPitchOff = shipPitch * cy - shipRoll * sy;
-    const camRollOff = shipRoll * cy + shipPitch * sy;
-    const heave = Math.sin(st * 0.74 + 0.8) * 0.018 * a;
+    const camPitchOff = this.inWater ? Math.sin(st * 1.1 + 0.5) * 0.012 : shipPitch * cy - shipRoll * sy;
+    const camRollOff = this.inWater ? Math.sin(st * 0.9) * 0.016 : shipRoll * cy + shipPitch * sy;
+    const heave = this.inWater ? (Math.sin(st * 1.45) * 0.08 + Math.sin(st * 0.85 + 1.1) * 0.05) : Math.sin(st * 0.74 + 0.8) * 0.018 * a;
     cam.position.set(p.x, this._eyeY + bob + heave, p.z);
     cam.rotation.set(this.pitch + camPitchOff, this.yaw - HALF_PI, camRollOff);
   }
@@ -226,6 +232,7 @@ export class Player {
   }
 
   _updateWalk(dt) {
+    if (this.inWater) { this._updateSwim(dt); return; }
     const inp = this.input, p = this.pos, v = this.vel, w = this.world;
     const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
 
@@ -290,10 +297,50 @@ export class Player {
     } else {
       this._airTime += dt;
       this._bobAmp *= Math.max(0, 1 - dt * 8);
-      const outside = Math.abs(p.x) > SHIP.bowX || Math.abs(p.z) > hullHalfWidth(p.x, Math.max(p.y, 0)) + 0.5;
+      const outside = Math.abs(p.x) > SHIP.bowX || Math.abs(p.z) > hullHalfWidth(p.x, Math.max(p.y, 0)) + 0.4;
       if (outside) this._outsideTime += dt; else this._outsideTime = 0;
-      if ((outside && (p.y < SHIP.waterline - 3 || this._outsideTime > 2)) || p.y < -4 || this._airTime > 5) this.respawn();
+      const waterY = SHIP.waterline - 1.30;
+      if (outside && p.y <= waterY) {
+        this.inWater = true;
+        p.y = waterY;
+        v.y = 0;
+        this.crouch = false;
+        this._airTime = this._outsideTime = 0;
+        this.onHint?.('Über Bord! Du schwimmst im Atlantik – F zum Fliegen oder M für Deckplan');
+      } else if (!outside && (p.y < -4 || this._airTime > 5)) {
+        this.respawn();
+      }
     }
+  }
+
+  /** Buoyant swimming on the Atlantic surface outside the hull. */
+  _updateSwim(dt) {
+    const inp = this.input, p = this.pos, v = this.vel;
+    const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
+    let tx = inp.f * cy + inp.s * sy;
+    let tz = -inp.f * sy + inp.s * cy;
+    const len = Math.hypot(tx, tz);
+    if (len > 1) { tx /= len; tz /= len; }
+    const speed = inp.run ? PLAYER.swimFast : PLAYER.swimSpeed;
+    const k = 1 - Math.exp(-5 * dt);
+    v.x += (tx * speed - v.x) * k;
+    v.z += (tz * speed - v.z) * k;
+    const ox = p.x, oz = p.z;
+    p.x = clamp(p.x + v.x * dt, -2500, 2500);
+    p.z = clamp(p.z + v.z * dt, -2500, 2500);
+    if (Math.abs(p.x) <= SHIP.bowX + 0.4) {
+      const hw = hullHalfWidth(p.x, SHIP.waterline);
+      if (hw > 0.1 && Math.abs(p.z) < hw + PLAYER.radius + 0.15) p.z = (p.z >= 0 ? 1 : -1) * (hw + PLAYER.radius + 0.15);
+    }
+    const waterY = SHIP.waterline - 1.30;
+    if (inp.jump && p.y <= waterY + 0.12) v.y = 1.4;
+    v.y += (waterY - p.y) * 14 * dt;
+    v.y *= Math.exp(-5 * dt);
+    p.y += v.y * dt;
+    this.speed = dt > 0 ? Math.hypot(p.x - ox, p.z - oz) / dt : 0;
+    this.grounded = false;
+    this._airTime = this._outsideTime = 0;
+    this._bobAmp = 0;
   }
 
   /** While grounded: snap to the floor/ramp if it is within reach, otherwise start falling. */
@@ -317,6 +364,7 @@ export class Player {
     const s = this._safeOld, p = this.pos;
     this.vel.x = this.vel.y = this.vel.z = 0;
     this._airTime = this._outsideTime = 0;
+    this.inWater = false;
     if (!s.ok) {
       p.y = Math.max(p.y, SHIP.waterline + 30);
       this._setMode('fly');

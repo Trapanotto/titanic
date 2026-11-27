@@ -1,62 +1,91 @@
-// Working mirrors: the wall mirror nearest to the camera shows a real (planar) reflection.
-// The mirror glass of every prop is baked into the big zone meshes, so the bake records the world box of each pane
-// (world.js: zone.userData.mirrors); one Reflector quad is moved in front of the nearest pane. Only one mirror at a
-// time reflects (the scene is drawn a second time for it), all others keep their plain glossy glass.
+// Local room cubemap probes for mirrors: one CubeCamera capture shared across all mirrors in view,
+// updated only when moving across rooms/decks, shifting position, or changing lighting/weather.
 import * as THREE from 'three';
-import { Reflector } from 'three/addons/objects/Reflector.js';
 import { mats } from '../core/materials.js';
 
-mats.mirror.userData.isMirror = true; // read by the bake
-
-const _c = new THREE.Vector3(), _n = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3(0, 1, 0), _m = new THREE.Matrix4();
+mats.mirror.userData.isMirror = true; // read by the bake (marks zones that contain mirrors)
 
 export class MirrorView {
   constructor(world, scene, tier) {
     this.world = world;
-    this.range = tier.fine === 0 ? 20 : 65;
-    const size = tier.fine === 0 ? 384 : tier.fine === 1 ? 512 : tier.fine === 2 ? 768 : 1024;
-    this.quad = new Reflector(new THREE.PlaneGeometry(1, 1), { textureWidth: size, textureHeight: size, clipBias: 0.002, color: 0xc4cacc, multisample: 0 });
-    this.quad.name = 'mirrorView';
-    this.quad.visible = false;
-    this.quad.matrixAutoUpdate = false;
-    this.quad.userData.noMerge = true;
-    scene.add(this.quad);
-    this._tick = 0;
-    this._cur = null;
-    if (tier.fine <= 1) { // the scene is drawn a second time for the mirror: only every second frame on weak devices
-      const q = this.quad, draw = q.onBeforeRender;
-      let n = 0;
-      q.userData.fresh = false;
-      q.onBeforeRender = function (...a) { if ((n++ & 1) && q.userData.fresh) return; q.userData.fresh = true; draw.apply(this, a); };
-    }
+    this.scene = scene;
+    this.tier = tier;
+    const size = tier.fine === 0 ? 128 : tier.fine <= 2 ? 256 : 512;
+    this.rt = new THREE.WebGLCubeRenderTarget(size, {
+      generateMipmaps: true,
+      minFilter: THREE.LinearMipmapLinearFilter,
+      magFilter: THREE.LinearFilter,
+      type: tier.caps?.floatRT ? THREE.HalfFloatType : THREE.UnsignedByteType,
+    });
+    this.cubeCam = new THREE.CubeCamera(0.15, 180, this.rt);
+    this._pos = new THREE.Vector3(1e9, 1e9, 1e9);
+    this._deck = null;
+    this._visHash = 0;
+    this._dirty = true;
+    this._lastAt = -1e9;
+    world.onTimeChange?.(() => { this._dirty = true; });
+    world.onWeatherChange?.(() => { this._dirty = true; });
   }
 
-  /** Pick the nearest mirror in front of the camera (every few frames) and place the reflecting quad on it. */
+  invalidate() { this._dirty = true; }
+
+  dispose() {
+    mats.mirror.envMap = null;
+    mats.mirror.needsUpdate = true;
+    this.rt.dispose();
+  }
+
+  /** Capture a local 360 cubemap around the camera whenever a mirror zone is nearby and state changed. */
   update(camera) {
-    if ((this._tick++ & 7) !== 0 && this._cur) return;
-    const p = camera.position, R2 = this.range * this.range;
-    let best = null, bd = R2;
+    const renderer = this.world.renderer;
+    if (!renderer) return;
+    const p = camera.position;
+    let hasMirror = false;
+    let visHash = 0;
+    const R2 = 35 * 35;
     for (const g of this.world.zones.values()) {
+      if (!g.visible || g.userData.loading || !g.children.length) continue;
+      visHash = (visHash * 31 + g.children.length) | 0;
       const list = g.userData.mirrors;
-      if (!list || !g.visible || g.userData.loading || !g.children.length) continue;
+      if (hasMirror || !list) continue;
       for (const b of list) {
-        const dx = b.cx - p.x, dy = b.cy - p.y, dz = b.cz - p.z, d = dx * dx + dy * dy + dz * dz;
-        if (d < bd) { bd = d; best = b; }
+        const dx = b.cx - p.x, dy = b.cy - p.y, dz = b.cz - p.z;
+        if (dx * dx + dy * dy + dz * dz < R2) { hasMirror = true; break; }
       }
     }
-    if (!best) { this.quad.visible = false; this._cur = null; return; }
-    // the pane is a thin box: its normal is the thin horizontal axis, pointing to the camera's side
-    const nx = best.ax === 0 ? Math.sign(p.x - best.cx) || 1 : 0, nz = best.ax === 2 ? Math.sign(p.z - best.cz) || 1 : 0;
-    const key = best.cx + '|' + best.cy + '|' + best.cz + '|' + nx + nz;
-    this.quad.visible = true;
-    if (key === this._cur) return;
-    this._cur = key;
-    this.quad.userData.fresh = false; // another mirror: draw it at once
-    _n.set(nx, 0, nz); _r.crossVectors(_u, _n);
-    _c.set(best.cx + nx * (best.t / 2 + 0.004), best.cy, best.cz + nz * (best.t / 2 + 0.004));
-    _m.makeBasis(_r, _u, _n).setPosition(_c);
-    this.quad.matrix.copy(_m).scale(_r.set(best.w, best.h, 1));
-    this.quad.matrixWorldNeedsUpdate = true;
-    this.quad.updateMatrixWorld(true);
+    if (!hasMirror) return;
+
+    const deck = this.world.state?.deck ?? null;
+    const dHoriz = Math.hypot(p.x - this._pos.x, p.z - this._pos.z);
+    const dVert = Math.abs(p.y - this._pos.y);
+    const changed = this._dirty || deck !== this._deck || visHash !== this._visHash || dHoriz > 2.5 || dVert > 1.0;
+    if (!changed) return;
+
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (this._lastAt >= 0 && now - this._lastAt < 350) return;
+
+    this.cubeCam.position.copy(p);
+    const prevEnv = mats.mirror.envMap;
+    const prevShadow = renderer.shadowMap.enabled;
+    const prevTone = renderer.toneMapping;
+    const prevTarget = renderer.getRenderTarget();
+    try {
+      mats.mirror.envMap = null; // avoid WebGL feedback loop while capturing
+      renderer.shadowMap.enabled = false;
+      renderer.toneMapping = THREE.NoToneMapping;
+      this.cubeCam.update(renderer, this.scene);
+    } finally {
+      renderer.setRenderTarget(prevTarget);
+      renderer.shadowMap.enabled = prevShadow;
+      renderer.toneMapping = prevTone;
+      mats.mirror.envMap = this.rt.texture;
+      if (prevEnv !== this.rt.texture) mats.mirror.needsUpdate = true;
+    }
+
+    this._pos.copy(p);
+    this._deck = deck;
+    this._visHash = visHash;
+    this._dirty = false;
+    this._lastAt = now;
   }
 }

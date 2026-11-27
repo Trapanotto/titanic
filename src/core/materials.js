@@ -266,7 +266,7 @@ export const mats = {
   rubber: std(surf({ color: 0x1c1c1c, roughness: 0.9 }, S.paint, 'n')),
   plant: std({ color: 0x2f5f2c, roughness: 0.7, side: THREE.DoubleSide }),
   paper: std(surf({ color: 0xe7e0c6, roughness: 1 }, S.fabric, 'n', 0.25)),
-  mirror: std({ color: 0xd6dbde, roughness: 0.025, metalness: 1, envMapIntensity: 1.2 }),
+  mirror: std({ color: 0xe6e4de, roughness: 0.04, metalness: 1, envMapIntensity: 1.15 }),
   glass: glassMaterial(),
   // --- emissive (driven by day/night) ---
   windowLit: std({ color: 0x1d2a33, roughness: 0.12, metalness: 0.6, emissive: 0xffbf6a, emissiveIntensity: 0 }), // opaque porthole / window as seen from outside

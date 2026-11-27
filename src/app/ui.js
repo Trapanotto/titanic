@@ -319,9 +319,9 @@ export class UI {
     this._hudTimer = 0;
 
     const high = p.mode === 'fly' && p.pos.y > DECK_Y.roof + 6;
-    const deck = high ? 'Über dem Schiff' : DECK_NAMES[st.deck] || '';
+    const deck = p.inWater ? 'Nordatlantik' : high ? 'Über dem Schiff' : DECK_NAMES[st.deck] || '';
     if (deck !== L.deck) { L.deck = deck; this.deckEl.textContent = deck; }
-    const sub = (high ? 'Freier Flug' : st.inside ? 'Innen' : 'Außendeck') + ' · ' + (p.mode === 'fly' ? 'Flugmodus' : p.crouch ? 'Kriechend' : 'Zu Fuß');
+    const sub = p.inWater ? 'Im Wasser · Schwimmen' : (high ? 'Freier Flug' : st.inside ? 'Innen' : 'Außendeck') + ' · ' + (p.mode === 'fly' ? 'Flugmodus' : p.crouch ? 'Kriechend' : 'Zu Fuß');
     if (sub !== L.sub) { L.sub = sub; this.subEl.textContent = sub; }
     const a = Math.abs(deg);
     const head = a <= 45 ? 'Blick zum Bug' : a >= 135 ? 'Blick zum Heck' : deg > 0 ? 'Blick nach Backbord' : 'Blick nach Steuerbord';
