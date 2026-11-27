@@ -23,12 +23,13 @@ export class Boats {
     this.rope = new THREE.CylinderGeometry(1, 1, 1, 5);
     this.time = 0;
     this.rider = null; // { u, S, player, back: {x, z} } while the visitor is in a boat
+    this.sink = null;  // the night of 14 April (app/sinking.js): { timeScale, waterY(S), onAfloat(S) }
     this.test = typeof location !== 'undefined' && /[?&]selftest=/.test(location.search);
     try { this.saved = this.test ? {} : JSON.parse(localStorage.getItem('titanic.boote') || '{}') || {}; } catch { this.saved = {}; }
   }
 
   _save() {
-    if (this.test) return;
+    if (this.test || this.sink) return;
     const st = { ...this.saved };
     for (const [u, S] of this.live) if (!S.q.length && (S.phase === 'down' || (S.phase === 'out' && !S.L.out))) st[u.id] = S.phase;
     try { localStorage.setItem('titanic.boote', JSON.stringify(st)); } catch { /* private mode */ }
@@ -37,7 +38,7 @@ export class Boats {
   /** two places to stand at a station: aft the davits are worked, forward one gets into the boat hanging outboard */
   items(u) {
     // as it was left on the last visit
-    const was = this.saved[u.id];
+    const was = this.sink ? null : this.saved[u.id];
     if (was === 'out' || was === 'down') {
       delete this.saved[u.id];
       const S = this._start(u);
@@ -47,6 +48,7 @@ export class Boats {
     const label = () => {
       const S = this.live.get(u), ph = S ? S.phase : s.out ? 'out' : 'stowed';
       if (S?.q.length) return 'Rettungsboot … (in Bewegung)';
+      if (this.sink && (S?.away || ph === 'down')) return 'Das Boot hat abgelegt';
       return ph === 'stowed' ? 'Rettungsboot ausschwenken' : ph === 'out' ? 'Rettungsboot fieren' : 'Rettungsboot aufholen';
     };
     const canBoard = () => { const S = this.live.get(u); return (S ? S.phase : s.out ? 'out' : 'stowed') === 'out' && !S?.q.length; };
@@ -69,9 +71,10 @@ export class Boats {
     const S = this.rider?.S;
     if (!S) return '';
     if (S.q.length) return 'Im Rettungsboot … (in Bewegung)';
+    if (this.sink && (S.away || S.phase === 'down')) return 'Im Rettungsboot';
     return S.phase === 'down' ? 'Boot aufholen lassen' : 'Fieren lassen (F: aussteigen)';
   }
-  riderAct() { if (this.rider) this.work(this.rider.u); }
+  riderAct() { if (this.rider && !(this.sink && (this.rider.S.away || this.rider.S.phase === 'down'))) this.work(this.rider.u); }
   _stepOff() {
     const R = this.rider;
     if (!R) return;
@@ -82,7 +85,7 @@ export class Boats {
   }
 
   _start(u) {
-    if (this.live.size >= MAX_LIVE) { this.toast('Erst ein anderes Boot wieder einholen.', 2.5); return null; }
+    if (this.live.size >= (this.sink ? 20 : MAX_LIVE)) { this.toast('Erst ein anderes Boot wieder einholen.', 2.5); return null; }
     const L = liveStation({ ...u.spec, covered: false }), S = { u, L, phase: u.spec.out ? 'out' : 'stowed', y: L.by0, a: 0, q: [], t: 0, falls: [], screws: [] };
     const line = (r) => { const m = new THREE.Mesh(this.rope, mats.rope); m.scale.set(r, 1, r); L.g.add(m); return m; };
     for (let i = 0; i < 2; i++) { S.falls.push(line(0.02)); if (!L.out) { const m = new THREE.Mesh(this.rope, mats.iron); m.scale.set(0.03, 1, 0.03); L.g.add(m); S.screws.push(m); } }
@@ -95,13 +98,15 @@ export class Boats {
   }
 
   /** E at a station: the next step of the drill */
-  work(u) {
+  work(u, quiet = false) {
     let S = this.live.get(u);
-    if (S?.q.length) return;
+    if (S?.q.length || S?.away) return;
+    if (this.sink && S?.phase === 'down') return; // no hauling up in the night of 14 April
+    const say = (t, s) => { if (!quiet) this.toast(t, s); }, snd = (s) => { if (!quiet || this.rider?.u === u) this.sound.davit(s); };
     if (!S && !(S = this._start(u))) return;
     const step = (v, to, dur) => S.q.push({ v, from: null, to, dur, t: 0 });
-    if (S.phase === 'stowed') { step('y', Y_SWING, 2.5); step('a', 1, 6); S.next = 'out'; this.sound.davit(8.5); this.toast('Die Davits schwenken das Boot über die Reling.', 3); }
-    else if (S.phase === 'out') { step('y', Y_WATER, 18); S.next = 'down'; this.sound.davit(18); this.toast('Fieren! Das Boot geht zu Wasser.', 3); }
+    if (S.phase === 'stowed') { step('y', Y_SWING, 2.5); step('a', 1, 6); S.next = 'out'; snd(8.5); say('Die Davits schwenken das Boot über die Reling.', 3); }
+    else if (S.phase === 'out') { step('y', this.sink ? this.sink.waterY(S) : Y_WATER, 18); S.next = 'down'; snd(18); say('Fieren! Das Boot geht zu Wasser.', 3); }
     else {
       step('y', S.L.out ? S.L.by0 : Y_SWING, 18);
       S.q.push({ fn: () => { if (this.rider?.S === S) { this._stepOff(); this.toast('Wieder an Deck.', 2); } } }); // level with the deck: out of the boat
@@ -131,25 +136,31 @@ export class Boats {
   _pose(S) {
     const L = S.L, th = L.out ? 0 : S.a * SWING, c = Math.cos(th), s = Math.sin(th), [py, pz] = DAVIT_PIVOT;
     const rot = (y, z) => [py + (y - py) * c - (z - pz) * s, pz + (y - py) * s + (z - pz) * c]; // a point of the arm, turned
+    if (S.away) { for (const f of S.falls) f.visible = false; } // rowing away (app/sinking.js moves it)
     const afloat = S.phase === 'down' && !S.q.length;
     const bob = afloat ? Math.sin(this.time * 1.3 + S.u.id) * 0.07 : 0;
     const head = rot(L.head[1], L.head[2]), zb = L.out ? L.bz0 : head[1] + 0.14;
-    L.boat.position.set(0, S.y + bob, zb);
-    L.boat.rotation.x = afloat ? Math.sin(this.time * 0.9 + S.u.id * 2) * 0.03 : 0;
+    if (!S.away) {
+      L.boat.position.set(0, S.y + bob, zb);
+      L.boat.rotation.x = afloat ? Math.sin(this.time * 0.9 + S.u.id * 2) * 0.03 : 0;
+    }
     const blk = rot(L.uby, L.head[2]), nut = rot(L.sp1[1], L.sp1[2]);
     L.arms.forEach((arm, i) => {
       const sg = i ? 1 : -1;
       arm.rotation.x = th;
-      this._stick(S.falls[i], sg * L.xd, blk[0], blk[1], sg * L.xh, S.y + bob + L.hookY, zb);
+      if (!S.away) this._stick(S.falls[i], sg * L.xd, blk[0], blk[1], sg * L.xh, S.y + bob + L.hookY, zb);
       if (S.screws[i]) this._stick(S.screws[i], sg * L.xd, L.sp0[1], L.sp0[2], sg * L.xd, nut[0], nut[1]);
     });
   }
 
   update(dt, player) {
+    const rdt = dt;
+    dt *= this.sink?.timeScale ?? 1;
     this.time += dt;
     this._player = player;
-    if (this.rider && player.mode !== 'fly') this._stepOff(); // F: out of the boat
-    this.world.streamHold = !!this.rider;
+    if (this.rider && player.mode !== 'fly') { if (this.sink && (this.rider.S.away || this.rider.S.phase === 'down')) this.toast('Im Boot bleiben – das Wasser ist eiskalt.', 2); else this._stepOff(); } // F: out of the boat
+    this.world.streamHold = !!this.rider || !!this.world.sinkHold;
+    void rdt;
     for (const [u, S] of this.live) {
       const st = S.q[0];
       if (st) this.world.shadowBusy = 1; // its shadow on the ship's side follows (environment: sun shadow refresh)
@@ -163,7 +174,7 @@ export class Boats {
           S.q.shift();
           if (!S.q.length) {
             S.phase = S.next === 'home' ? (S.L.out ? 'out' : 'stowed') : S.next;
-            if (S.phase === 'down') { this.sound.splash(); this.toast('Das Boot schwimmt.', 2.5); }
+            if (S.phase === 'down') { if (!this.sink || this.rider?.S === S) { this.sound.splash(); this.toast('Das Boot schwimmt.', 2.5); } this.sink?.onAfloat(S); }
             this._saveSoon = true;
             if (S.next === 'home') { for (const c of S.clusters) c.off = false; this.root.remove(S.L.g); this.live.delete(u); continue; } // back in the baked ship
           }
@@ -176,6 +187,7 @@ export class Boats {
     if (R) {
       // standing on the bottom boards amidships, free to look around
       R.S.L.g.updateMatrixWorld(true);
+      R.S.L.boat.updateWorldMatrix(true, false); // (rowing away it hangs in the outside world: app/sinking.js)
       _a.set(0.5, 1.82, 0).applyMatrix4(R.S.L.boat.matrixWorld);
       R.player.setFlyPose(_a.x, _a.y, _a.z);
     }

@@ -176,6 +176,12 @@ float shipLights(float hx, float hy, float sig) {
   return L;
 }
 
+// height of the topmost open deck at station x (forecastle, well decks, boat deck, poop): where the sea stands
+// above it, the hull has gone under and the sea closes over it (the night of 14 April)
+float topDeck(float x) {
+  if (x > 94.0) return 22.5; if (x > 78.0) return 19.7; if (x > 74.0) return 22.5; if (x > -72.0) return 28.2;
+  if (x > -90.0) return 22.5; if (x > -106.0) return 19.7; return 22.5;
+}
 // height of the ship's side above the water at station x (for shadow / reflection)
 float sideTop(float x) {
   float t = 11.8;                                         // C/B-deck sheer line
@@ -227,8 +233,9 @@ void main() {
   float az = abs(g.y);
   float side = g.y >= 0.0 ? 1.0 : -1.0;
   float ax = max(abs(x) - BOW_X, 0.0);
-  float dHull = length(vec2(ax, max(az - hw, 0.0)));
-  if (ax <= 0.0 && az < hw - 0.35) discard; // no sea inside the hull (it showed on G deck where the shell is hidden or not loaded)
+  bool overHull = vWorld.y > topDeck(x) - 0.2;           // the hull has sunk below the sea here
+  float dHull = overHull ? 1e4 : length(vec2(ax, max(az - hw, 0.0)));
+  if (ax <= 0.0 && az < hw - 0.35 && !overHull) discard; // no sea inside the hull (it showed on G deck where the shell is hidden or not loaded) (it showed on G deck where the shell is hidden or not loaded)
   float sBow = BOW_X - x;
   float bowK = smoothstep(-70.0, 125.0, x);
   float sW = -128.0 - x;

@@ -268,7 +268,7 @@ export async function build(world) {
     if (skip || hold) { if (need) shadowStale = true; }
     else if (need || shadowStale) { sun.shadow.needsUpdate = true; shadowTimer = busy ? 0.5 : dirKey ? 15 : 12; shadowStale = false; } // slow refresh (was twice a second: a periodic hitch on desktops)
     const dayK = Math.max(0, 1 - 2 * n), nightK = Math.max(0, 2 * n - 1);
-    sun.intensity = (SUN_INTENSITY * dayK * sunWeather + STAR_INTENSITY * nightK) * lerp(1, daylight * 0.5, ins);
+    sun.intensity = (SUN_INTENSITY * dayK * sunWeather + STAR_INTENSITY * nightK * (world.starBoost ?? 1)) * lerp(1, daylight * 0.5, ins);
     return SUN_INTENSITY * dayK * sunWeather;
   }
 
@@ -428,7 +428,7 @@ export async function build(world) {
         const w = Math.sin(t) * 0.5 + Math.sin(t * 2.31 + 1.7) * 0.3 + Math.sin(t * 5.13 + 0.4) * 0.2;
         f = 1 - s.flick * 0.28 * (0.5 + 0.5 * w);
       }
-      s.light.intensity = s.lamp < 0 ? 0 : smooth(s.k) * s.base * scale * f * s.room;
+      s.light.intensity = s.lamp < 0 ? 0 : smooth(s.k) * s.base * scale * f * s.room * (s.flick === 1 ? 1 : (world.power ?? 1));
       s.light.distance = s.shadow ? Math.min(range, SH_RANGE) : range;
     }
     if (next > 0) { for (let q = next; q < nPending; q++) pending[q - next] = pending[q]; nPending -= next; }
@@ -560,7 +560,7 @@ export async function build(world) {
   }
 
   // ---------- per frame ----------
-  const camPos = new THREE.Vector3(0, 40, 0);
+  const camPos = new THREE.Vector3(0, 40, 0), _camW = new THREE.Vector3();
   const size = new THREE.Vector2();
   let lastQuality = world.quality;
   function update(dt) {
@@ -604,35 +604,39 @@ export async function build(world) {
     const sunI = updateSun(camPos, n, ins, dt, lampShadowFrame);
     const dayIn = lerp(1, daylight, ins);
     // the ship's own exterior lighting at night (baked lamp volume, window glow, lamp sprites)
-    lightingUniforms.uShipVolK.value = VOL_NIGHT * n;
-    lightingUniforms.uWinGlow.value = n * (1 - ins);
-    lightingUniforms.uShipAmb.value.setRGB(0.046, 0.036, 0.026).multiplyScalar(n * (1 - ins));
+    const pw = world.power ?? 1; // electric power of the ship (blackout in the night of 14 April: app/sinking.js)
+    lightingUniforms.uShipVolK.value = VOL_NIGHT * n * pw;
+    lightingUniforms.uWinGlow.value = n * (1 - ins) * pw;
+    lightingUniforms.uShipAmb.value.setRGB(0.046, 0.036, 0.026).multiplyScalar(n * (1 - ins) * pw);
     // world.updateVisibility hides the exterior where nothing of the outside can be seen (closed hull below C deck):
     // then sky, sea, smoke, iceberg and the lamp sprites cannot be seen either
     const out = world.exterior.visible !== false;
-    const under = !world.state.inside && camPos.y < SHIP.waterline + 0.05;
+    const under = world.underwater ?? (!world.state.inside && camPos.y < SHIP.waterline + 0.05);
     halos.points.visible = out && !under && n > 0.01;
-    halos.material.uniforms.uK.value = n * 6;
+    halos.material.uniforms.uK.value = n * 6 * pw;
     halos.material.uniforms.uScale.value = pxScale;
     hemi.color.lerpColors(hemiDaySky, hemiNightSky, n);
     hemi.groundColor.lerpColors(hemiDayGround, hemiNightGround, n);
-    hemi.intensity = lerp(HEMI_DAY, HEMI_NIGHT, n) * dayIn;
+    hemi.intensity = lerp(HEMI_DAY, HEMI_NIGHT * (world.starBoost ?? 1), n) * dayIn;
     const amb = lerp(lerp(AMB_OTHER, AMB_FIRST, firstLin), AMB_MACHINE, machineLin);
     interiorAmbient.color.copy(ambOther).lerp(ambWarm, firstLin).lerp(ambMachine, machineLin);
-    interiorAmbient.intensity = amb * ins;
+    interiorAmbient.intensity = amb * ins * Math.max(0.18, pw);
     let fireI = 0, allI = 1e-3;
     for (const s of slots) { allI += s.light.intensity; if (s.flick === 1) fireI += s.light.intensity; }
     fireLin = approach(fireLin, Math.min(1, (fireI / allI) * 2.5), dt / 1.5);
     mats.fire.emissiveIntensity = 2.6 + 0.6 * Math.sin(time * 7.3) * Math.sin(time * 3.1 + 1.2) + 0.3 * Math.sin(time * 17.0);
 
     // sky / ocean / smoke / iceberg / dust
-    sky.follow(camPos);
+    // (in the night of 14 April the outside world moves, not the ship: sky and sea follow the camera in world terms)
+    const camW = world.shipToWorld ? _camW.copy(camPos).applyMatrix4(world.shipToWorld) : camPos;
+    sky.follow(camW);
     sky.dome.visible = out && !under;
     sky.stars.visible = out && !under && n > 0.002;
     ocean.mesh.visible = out;
     ocean.spray.visible = smoke.points.visible = out && TIER.particles !== false;
     if (renderer) sky.starUniforms.uPx.value = renderer.getPixelRatio();
-    if (out) ocean.update(camPos, time, n, sunI, pxScale);
+    if (out) ocean.update(camW, time, n, sunI, pxScale);
+    if (out) ocean.uniforms.uShipLights.value *= pw; // (no reflections of the ship's lights after the blackout)
     if (smoke.points.visible) smoke.update(dt, n, cam, pxScale);
     if (out) berg.update(n); else berg.mesh.visible = false;
     dust.points.visible = TIER.particles !== false && ins > 0.01;
@@ -659,7 +663,7 @@ export async function build(world) {
     background.copy(fog.color);
     if (under) {
       fog.color.lerpColors(fogUnderDay, fogUnderNight, n);
-      fog.density = 0.045;
+      fog.density = world.sinkMode ? 0.12 : 0.045; // (the night of 14 April: dark, murky water)
       background.copy(fog.color);
     }
     if (envDay) {
@@ -703,5 +707,6 @@ export async function build(world) {
   };
 
   update(0);
+  world.env = { sky, ocean, berg, smoke, sun, root }; // (app/sinking.js moves the outside world, not the ship)
   return { update };
 }

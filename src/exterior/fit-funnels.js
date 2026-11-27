@@ -77,6 +77,7 @@ export function buildFunnels(world, parent) {
     const cut = RY - BY - 0.06;                     // foot plane (just inside the roof plating)
     const dummy = fi === 3;
     const g = new THREE.Group(); g.name = 'funnel' + (fi + 1);
+    if (fi === 0) g.userData.extCluster = 101; // its clusters can be switched off (it falls in the night of 14 April: app/sinking.js)
     g.position.set(F.x, BY, 0); g.rotation.z = rake;
     root.add(g);
     g.updateMatrix();

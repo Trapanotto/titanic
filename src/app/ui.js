@@ -20,6 +20,7 @@ const HELP = [
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
   ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Schotttüren, Aufzüge, Turngeräte (aufsteigen), Schwimmbad (hineinsteigen und schwimmen), Squash (Ball schlagen), Kesselfeuertüren (öffnen, Kohle nachlegen), Hauptschalter im Dynamoraum, eigener Funkspruch, Ankerspill, Sitzmöbel und Liegestühle (hinsetzen), Uhren, Bücherschränke, Kamine, Shuffleboard, Rettungsboote (ausschwenken, einsteigen, fieren, aufholen), Schränke, Schubladen, Bullaugen, Lichtschalter und Klingel in den Kabinen, Wasserhähne, Badewannen, Toilettenspülung, Klaviere, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Morsetaste)'],
+  ['U', 'Nacht des 14. April: Zeit schnell (5 Min.), langsam (20 Min.) oder angehalten'],
   ['I', 'Info lesen (wenn daneben eine Aktion mit E angezeigt wird)'],
   ['T', 'Ton an/aus'],
   ['Klick / Antippen', 'Info-Marke direkt öffnen'],
@@ -72,6 +73,9 @@ export class UI {
     this.root = $('ui') || document.body.appendChild(el('div'));
     this.loadingEl = $('loading');
     this.startEl = $('start');
+    // second button: the night of 14 April (app/sinking.js; the start overlay's own handler then enters as usual)
+    const sinkBtn = $('sink-btn');
+    if (sinkBtn) { sinkBtn.addEventListener('click', () => this.onSinking?.()); sinkBtn.addEventListener('touchend', () => this.onSinking?.()); }
     this._buildHud();
     this._buildPanels();
     this.plan = new DeckPlan(this.root, world, player, (t) => this.teleportTo(t), () => this._closed('plan'));
@@ -343,9 +347,10 @@ export class UI {
     this._hudTimer = 0;
 
     const high = p.mode === 'fly' && p.pos.y > DECK_Y.roof + 6;
-    const deck = p.inWater ? 'Nordatlantik' : high ? 'Über dem Schiff' : DECK_NAMES[st.deck] || '';
+    const view = this.world.viewLabel; // (the night of 14 April: in a lifeboat, in the water)
+    const deck = view ? view[0] : p.inWater ? 'Nordatlantik' : high ? 'Über dem Schiff' : DECK_NAMES[st.deck] || '';
     if (deck !== L.deck) { L.deck = deck; this.deckEl.textContent = deck; }
-    const sub = p.inWater ? 'Im Wasser · Schwimmen' : (high ? 'Freier Flug' : st.inside ? 'Innen' : 'Außendeck') + ' · ' + (p.mode === 'fly' ? 'Flugmodus' : p.crouch ? 'Kriechend' : 'Zu Fuß');
+    const sub = view ? view[1] : p.inWater ? 'Im Wasser · Schwimmen' : (high ? 'Freier Flug' : st.inside ? 'Innen' : 'Außendeck') + ' · ' + (p.mode === 'fly' ? 'Flugmodus' : p.crouch ? 'Kriechend' : 'Zu Fuß');
     if (sub !== L.sub) { L.sub = sub; this.subEl.textContent = sub; }
     if (this.flyBtn) {
       const flying = p.mode === 'fly';

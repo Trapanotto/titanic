@@ -319,3 +319,17 @@ kbd {
 
 /* lift ride */
 
+
+/* second start button: the night of 14 April (app/sinking.js) */
+#sink-btn { margin-top: 12px; padding: 9px 22px; font: 500 15px Georgia, 'Times New Roman', serif; letter-spacing: 0.06em; color: var(--cream, #efe3c4); background: rgba(8, 14, 26, 0.55); border: 1px solid rgba(239, 227, 196, 0.45); border-radius: 3px; cursor: pointer; }
+#sink-btn:hover { background: rgba(20, 30, 52, 0.75); }
+#sink-btn:focus-visible { outline: 2px solid var(--cream, #efe3c4); outline-offset: 3px; }
+.sink-clock { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20; text-align: center; color: #efe3c4; font: 400 26px Georgia, 'Times New Roman', serif; letter-spacing: 0.08em; text-shadow: 0 1px 6px rgba(0,0,0,0.85); pointer-events: none; }
+.sink-clock small { display: block; margin-top: 2px; font-size: 12px; letter-spacing: 0.1em; opacity: 0.8; pointer-events: auto; cursor: pointer; }
+.sink-under { position: fixed; inset: 0; z-index: 5; pointer-events: none; background: radial-gradient(ellipse at 50% 40%, rgba(6, 34, 44, 0.35), rgba(0, 8, 14, 0.8)); opacity: 0; transition: opacity 0.6s; }
+.sink-under.show { opacity: 1; }
+.sink-end { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: rgba(0, 3, 8, 0.0); color: #efe3c4; font-family: Georgia, 'Times New Roman', serif; opacity: 0; transition: opacity 2.5s, background 4s; pointer-events: none; }
+.sink-end.show { opacity: 1; background: rgba(0, 3, 8, 0.72); pointer-events: auto; }
+.sink-end .t { font-size: clamp(40px, 8vw, 72px); letter-spacing: 0.1em; }
+.sink-end .row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.sink-end button { padding: 10px 22px; font: 500 15px Georgia, serif; color: #efe3c4; background: rgba(20, 30, 52, 0.8); border: 1px solid rgba(239, 227, 196, 0.5); border-radius: 3px; cursor: pointer; }

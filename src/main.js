@@ -13,6 +13,7 @@ import { DeckStreamer } from './app/stream.js';
 import { MirrorView } from './app/mirrors.js';
 import { Sound } from './app/audio.js';
 import { Interact } from './app/interact.js';
+import { Sinking } from './app/sinking.js';
 import { ENGINE } from './core/engine.js';
 import { texturesReady } from './core/materials.js';
 
@@ -134,12 +135,19 @@ debug.engine = ENGINE;
 const sound = (ui.sound = debug.sound = new Sound(world, player));
 let interact = null;
 try { interact = ui.interact = debug.interact = new Interact(world, scene, sound, (t, s) => ui.toast(t, s)); interact.fixtures.read = (t, x) => ui.showText(t, x); } catch (e) { console.warn('[app] Bedienpunkte', e); }
+// the night of 14 April 1912: start screen button or ?untergang=1 (app/sinking.js)
+let sinking = null;
+try {
+  sinking = debug.sinking = new Sinking({ world, scene, camera, player, renderer, sound, ui, interact, post });
+  ui.onSinking = () => { sinking.start(); if (post) post.sceneRender = (r, s, c) => sinking.renderScene(r, s, c); };
+} catch (e) { console.warn('[app] Untergang', e); }
 
 function step(dt) {
   time += dt;
   debug.time = time;
   controls.apply();
   player.update(dt);
+  sinking?.update(dt);
   // Near plane by situation: the depth buffer resolves 1/near times finer. Indoors things come close (0.15 m); on
   // the open decks a little more room is safe; flying away from the ship the near plane follows the distance, so
   // window frames, doors and rivets seen from afar no longer flicker (z-fighting).
@@ -148,7 +156,7 @@ function step(dt) {
     let near = 0.18;
     if (!st.inside) {
       near = 0.22;
-      if (player.mode === 'fly') {
+      if (player.mode === 'fly' && !world.sinkMode) { // (in the night of 14 April the ship moves under the camera: no shortcuts)
         const dx = Math.max(0, Math.abs(p.x) - 137), dz = Math.max(0, Math.abs(p.z) - 15.5), dy = Math.max(0, p.y - 64, 9.5 - p.y);
         near = Math.min(25, Math.max(0.22, 0.3 * Math.hypot(dx, dy, dz)), Math.max(0.22, 0.5 * Math.abs(p.y - 10.5))); // (never cuts into the sea below)
       }
@@ -166,7 +174,8 @@ function step(dt) {
   interact?.update(dt, player);
   sound.update(dt);
   ui.update(dt, time);
-  if (!contextLost) { mirrorView?.update(camera); if (post) post.render(dt); else renderer.render(scene, camera); }
+  sinking?.lateUpdate(dt);
+  if (!contextLost) { mirrorView?.update(camera); if (post) post.render(dt); else if (sinking?.active) sinking.renderScene(renderer, scene, camera); else renderer.render(scene, camera); }
 }
 
 // Automatic quality fallback: if the frame time stays above ~25 ms for a few seconds, step the preset down (toast);
@@ -434,6 +443,7 @@ async function main() {
   addFallbackEnvironment();
   if (flag('night')) world.setNight(true);
   placePlayer();
+  if (flag('untergang')) ui.onSinking?.();
   if (streamer) {
     // only the player's own deck before going interactive; neighbours follow in idle time
     ui.setProgress(0.97, 'Das Deck wird eingerichtet …');

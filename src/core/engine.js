@@ -8,6 +8,7 @@ export const ORDERS = [
 ];
 
 export const ENGINE = {
+  steam: 0, // 0..1: steam blowing off at the funnels (after the collision)
   order: 3,   // index into ORDERS
   speed: 1,   // 0..1, follows the order slowly (the engines take a while)
   phase: 0,   // integral of speed over time (s): animators use it instead of the clock

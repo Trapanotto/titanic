@@ -104,7 +104,8 @@ export class Sound {
     const c = this.ctx;
     this.master = this._gain(this.muted ? 0 : 0.9);
     const comp = c.createDynamicsCompressor();
-    this._chain(this.master, comp, c.destination);
+    this.muffleF = this._filter('lowpass', 20000, 0.5);
+    this._chain(this.master, this.muffleF, comp, c.destination);
     this.white = this._noise(2, false);
     this.brown = this._noise(4, true);
     const L = (this.layer = {});
@@ -185,8 +186,10 @@ export class Sound {
     set(L.dynamo, 0.07 * near(-62, 0, 20));
 
     // the trio in the Reception Room (D deck)
-    const md = Math.hypot(pos.x - MUSIC.x, pos.z - MUSIC.z);
-    const mk = Math.abs(h - DECK_Y[MUSIC.deck]) < 2.2 && st.inside ? clamp01(1 - md / MUSIC.range) : 0;
+    // (in the night of 14 April the band plays on the boat deck: this.band, set by app/sinking.js)
+    const M = this.band || MUSIC, my = M.y ?? DECK_Y[M.deck];
+    const md = Math.hypot(pos.x - M.x, pos.z - M.z);
+    const mk = this.band === null ? 0 : Math.abs(h - my) < (M.y !== undefined ? 6 : 2.2) && (M.y !== undefined || st.inside) ? clamp01(1 - md / M.range) : 0;
     set(this.music, 0.5 * mk * mk);
     if (mk > 0) {
       if (this._barAt < t) this._barAt = t + 0.1;
@@ -416,6 +419,51 @@ export class Sound {
 
   /** squash ball: racquet, wall, floor */
   pock(at = 0, f = 900) { if (this.ready) { const t = this.ctx.currentTime + at; this._burst(this.fx, t, 0.035, 0.35, 'bandpass', f, 2.5); this._tone(this.fx, f * 0.5, t, 0.06, 0.05, { type: 'sine', attack: 0.002 }); } }
+
+  /** under water: everything dull and far away */
+  muffle(on) {
+    if (!this.ready || this._muffled === on) return;
+    this._muffled = on;
+    this.muffleF.frequency.setTargetAtTime(on ? 420 : 20000, this.ctx.currentTime, 0.25);
+  }
+
+  /** the iceberg along the side: a long low grinding with cracks of ice */
+  scrape(seconds = 10) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, seconds, 0.7, 'lowpass', 140, 0.9, this.brown);
+    this._burst(this.fx, t, seconds * 0.9, 0.18, 'bandpass', 700, 0.8);
+    for (let i = 0; i < seconds * 4; i++) this._burst(this.fx, t + Math.random() * seconds, 0.05 + Math.random() * 0.1, 0.2 + Math.random() * 0.25, 'bandpass', 900 + Math.random() * 2400, 2);
+    for (let i = 0; i < 6; i++) this._tone(this.fx, 70 + Math.random() * 40, t + i * seconds / 6, seconds / 5, 0.06, { type: 'sawtooth', cutoff: 260, attack: 0.3, sustain: true, release: 0.6, vibrato: true });
+  }
+
+  /** steam blowing off at the funnels: a deafening roar */
+  steamRoar(seconds = 30) {
+    if (!this.ready) return;
+    const c = this.ctx, t = c.currentTime, s = c.createBufferSource(), g = c.createGain(), f = this._filter('bandpass', 1600, 0.35);
+    s.buffer = this.white; s.loop = true;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.22, t + 1.2); g.gain.setValueAtTime(0.22, t + seconds * 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+    s.connect(f); f.connect(g); g.connect(this.fx);
+    s.start(t); s.stop(t + seconds + 0.1);
+  }
+
+  /** a distress rocket: the hiss going up, the report high above */
+  rocket(up = 1.8) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, up, 0.18, 'highpass', 2500, 0.7);
+    this._burst(this.fx, t + up, 0.5, 0.5, 'lowpass', 300, 0.7, this.brown);
+    this._burst(this.fx, t + up, 0.06, 0.35, 'bandpass', 1200, 1.5);
+  }
+
+  /** steel giving way: groaning, the crack of plates, the thunder of things falling inside */
+  groan(seconds = 6) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this._burst(this.fx, t, seconds, 0.6, 'lowpass', 110, 0.9, this.brown);
+    for (let i = 0; i < 5; i++) this._tone(this.fx, 45 + Math.random() * 35, t + i * 0.9, 1.6, 0.08, { type: 'sawtooth', cutoff: 200, attack: 0.2, sustain: true, release: 0.8, vibrato: true });
+    for (let i = 0; i < 14; i++) this._burst(this.fx, t + Math.random() * seconds, 0.08, 0.3, 'bandpass', 400 + Math.random() * 1500, 2);
+  }
 
   /** tap: squeak of the valve */
   tap(on) {

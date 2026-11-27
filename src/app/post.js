@@ -431,15 +431,16 @@ export class PostPipeline {
     r.info.autoReset = false;
     r.info.reset();
     r.toneMappingExposure = P.exposure;
+    const drawScene = this.sceneRender || ((rr, s, c) => rr.render(s, c)); // (app/sinking.js: the two halves of the broken ship)
     if (!this.preset.post || this.failed || !this.rtScene) {
       r.setRenderTarget(null);
-      r.render(scene, cam);
+      drawScene(r, scene, cam);
       return;
     }
     try {
       // 1. scene (HDR, MSAA, depth texture)
       r.setRenderTarget(this.rtScene);
-      r.render(scene, cam);
+      drawScene(r, scene, cam);
       const pm = cam.projectionMatrix.elements;
       this.uProj.value.set(pm[0], pm[5], cam.near, cam.far);
       const F = this.mFinal.uniforms;

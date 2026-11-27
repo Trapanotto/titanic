@@ -55,6 +55,7 @@ void main() {
 
 function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
 
+const STEAM = new THREE.Color(0.62, 0.64, 0.66);
 export function createSmoke(shared, world) {
   const r = rng(77);
   const pos = new Float32Array(COUNT * 3);
@@ -112,9 +113,10 @@ export function createSmoke(shared, world) {
         uniforms.uScale.value = h / (2 * Math.tan((fov * Math.PI) / 360));
       }
       uniforms.uShip.value = 0.12 + 0.88 * ENGINE.speed; // a light breeze remains
-      uniforms.uOpacity.value = (0.34 - 0.24 * n) * (0.35 + 0.65 * ENGINE.speed);        // dense coal smoke by day, subtle at night
+      uniforms.uOpacity.value = (0.34 - 0.24 * n) * (0.35 + 0.65 * ENGINE.speed) * (1 - ENGINE.steam) + 0.42 * ENGINE.steam; // dense coal smoke by day, subtle at night; white steam after the collision
       const c = 0.045 - 0.04 * n;                        // coal smoke: dark charcoal-black, slightly warmer in sunlight
       uniforms.uColor.value.setRGB(c * 1.05, c, c * 0.92);
+      if (ENGINE.steam > 0) uniforms.uColor.value.lerp(STEAM, ENGINE.steam);
     },
   };
 }
