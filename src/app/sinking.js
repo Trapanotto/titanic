@@ -15,10 +15,14 @@ import { SHIP_SPEED } from '../environment/ocean.js';
 const WL = SHIP.waterline, ROOF = DECK_Y.roof + 0.5, D2R = Math.PI / 180;
 const XB = 1.0;                 // the hull breaks here: between the third (x 12) and the fourth funnel (x -10)
 const P_BREAK = new THREE.Vector3(XB, 4, 0);
-const HIT = 28;                 // s of real time from the first sight of the iceberg to the collision (23:40)
+const HIT = 15;                 // s of real time from the first sight of the iceberg to the collision (23:40)
+const SCRAPE = 8;               // s of real time while the berg grinds along (then the clock runs compressed)
 const END = 160;                // 02:20, minutes after 23:40
-const RATE = { fast: 160 / 300, slow: 160 / 1200, pause: 0 };   // minutes of the night per second
-const FINALE = 154, FINALE_RATE = 0.1;                           // from 02:14 at most six times real time
+// minutes of the night per second: 'fast' = the whole night in about two minutes (15 s approach, 8 s scraping,
+// 77 s to 02:14, 20 s for the last six minutes), 'slow' about 20 minutes
+const RATE = { fast: 2.0, slow: 160 / 1200, pause: 0 };
+const FINALE = 154, FINALE_RATE = 0.3;
+const BOAT_REF = 160 / 300;     // clock rate at which the davits work at their own (real-time) pace
 
 // trim (degrees, bow down), sinkage (m), list (degrees, port down) of the whole ship – minutes after 23:40
 const KEYS_A = [
@@ -132,7 +136,7 @@ export class Sinking {
 
   cycle() {
     this.speed = this.speed === 'fast' ? 'slow' : this.speed === 'slow' ? 'pause' : 'fast';
-    this.ui.toast?.(this.speed === 'fast' ? 'Zeit: schnell (5 Minuten)' : this.speed === 'slow' ? 'Zeit: langsam (20 Minuten)' : 'Zeit angehalten', 1.6);
+    this.ui.toast?.(this.speed === 'fast' ? 'Zeit: schnell (2 Minuten)' : this.speed === 'slow' ? 'Zeit: langsam (20 Minuten)' : 'Zeit angehalten', 1.6);
   }
 
   _prewarm() {
@@ -240,8 +244,8 @@ export class Sinking {
     ENGINE.order = 0;
     ENGINE.steam = 1;
     this.shake = 10;
-    this.sound.scrape(11);
-    this.sound.steamRoar(42);
+    this.sound.scrape(SCRAPE + 1);
+    this.sound.steamRoar(14);
   }
 
   _ice() {
@@ -383,7 +387,7 @@ export class Sinking {
     this.t += dt;
     // the night's clock: real time until the scraping is over, then compressed
     let rate = 1 / 60;
-    if (this.t > HIT + 12) { rate = RATE[this.speed]; if (this.m >= FINALE) rate = Math.min(rate, FINALE_RATE); }
+    if (this.t > HIT + SCRAPE) { rate = RATE[this.speed]; if (this.m >= FINALE) rate = Math.min(rate, FINALE_RATE); }
     const dtMin = Math.min(dt, 0.1) * rate;
     if (this.m < END + 1) this.m += dtMin;
     const m = this.m;
@@ -405,10 +409,10 @@ export class Sinking {
     // events
     if (!this.hitDone && this.t >= HIT) this._collide();
     if (this.t < HIT + 60) this._moveBerg(dt);
-    if (ENGINE.steam > 0 && this.t > HIT) ENGINE.steam = Math.max(0, ENGINE.steam - dt / 45);
+    if (ENGINE.steam > 0 && this.t > HIT) ENGINE.steam = clamp01(1 - Math.max(0, m) / 25); // blowing off for the first 25 minutes
     if (this.ice) for (const I of this.ice) { if (I.t < 1) { I.t += dt * 1.4; const k = clamp01(I.t); I.m.position.y = lerp(I.m.position.y, I.y1, k * k); I.m.position.z = lerp(I.m.position.z, I.z1, k); } }
     this._boats();
-    this.interact.boats.sink.timeScale = this.t > HIT + 12 ? rate / RATE.fast : 1;
+    this.interact.boats.sink.timeScale = this.t > HIT + SCRAPE ? rate / BOAT_REF : 1;
     this._row(dtMin, dt);
     while (this.rocketNo < ROCKETS.length && m >= ROCKETS[this.rocketNo]) { this.rocketNo++; this._rocket(); }
     this._moveRockets(dt);
@@ -439,7 +443,7 @@ export class Sinking {
     const total = 23 * 3600 + 40 * 60 + m * 60, h = Math.floor(total / 3600) % 24, mi = Math.floor(total / 60) % 60;
     const txt = `${pad(h)}:${pad(mi)}`;
     if (txt !== this._txt) { this._txt = txt; this.clockT.textContent = txt; }
-    const sp = this.t < HIT + 12 ? '' : this.speed === 'pause' ? '❚❚ angehalten (U)' : this.speed === 'slow' ? '▶ langsam (U)' : '▶▶ schnell (U)';
+    const sp = this.t < HIT + SCRAPE ? '' : this.speed === 'pause' ? '❚❚ angehalten (U)' : this.speed === 'slow' ? '▶ langsam (U)' : '▶▶ schnell (U)';
     if (sp !== this._sp) { this._sp = sp; this.clockS.textContent = sp; }
   }
 

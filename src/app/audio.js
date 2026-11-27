@@ -172,8 +172,11 @@ export class Sound {
 
     // sea and wind
     const nearSea = clamp01(1 - (h - 12) / 45);
-    set(L.sea, outside ? 0.1 + 0.2 * nearSea : h > DECK_Y.C - 1 ? 0.012 : 0);
-    set(L.wind, outside ? 0.035 + 0.05 * clamp01((h - 20) / 40) + 0.03 * sp : 0);
+    // (less hiss: the sea is a soft wash, on the calm night of 14 April hardly more than a murmur; the wind is the ship's own
+    // headwind and dies away when she stops)
+    const calm = st.night ? 0.35 : 0.7;
+    set(L.sea, (outside ? 0.06 + 0.14 * nearSea : h > DECK_Y.C - 1 ? 0.008 : 0) * calm);
+    set(L.wind, outside ? (0.015 + 0.03 * clamp01((h - 20) / 40)) * calm + 0.025 * sp : 0);
 
     // machinery (falls off with distance; a faint tremor everywhere inside the lower decks)
     const yT = DECK_Y.tank, dy = (h - yT) * 1.6;
@@ -353,8 +356,8 @@ export class Sound {
   splash() {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
-    this._burst(this.fx, t, 1.4, 0.5, 'lowpass', 900, 0.6);
-    this._burst(this.fx, t + 0.05, 0.9, 0.35, 'bandpass', 2600, 0.6);
+    this._burst(this.fx, t, 1.2, 0.22, 'lowpass', 600, 0.6);
+    this._burst(this.fx, t + 0.05, 0.6, 0.08, 'bandpass', 1800, 0.8);
     this._burst(this.fx, t, 0.5, 0.6, 'lowpass', 180, 0.8, this.brown);
   }
 
@@ -431,18 +434,18 @@ export class Sound {
   scrape(seconds = 10) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
-    this._burst(this.fx, t, seconds, 0.7, 'lowpass', 140, 0.9, this.brown);
-    this._burst(this.fx, t, seconds * 0.9, 0.18, 'bandpass', 700, 0.8);
-    for (let i = 0; i < seconds * 4; i++) this._burst(this.fx, t + Math.random() * seconds, 0.05 + Math.random() * 0.1, 0.2 + Math.random() * 0.25, 'bandpass', 900 + Math.random() * 2400, 2);
+    this._burst(this.fx, t, seconds, 0.75, 'lowpass', 140, 0.9, this.brown);
+    this._burst(this.fx, t, seconds * 0.9, 0.22, 'bandpass', 420, 1.2, this.brown);
+    for (let i = 0; i < seconds * 1.5; i++) this._burst(this.fx, t + Math.random() * seconds, 0.04 + Math.random() * 0.06, 0.12 + Math.random() * 0.12, 'bandpass', 700 + Math.random() * 900, 4, this.brown);
     for (let i = 0; i < 6; i++) this._tone(this.fx, 70 + Math.random() * 40, t + i * seconds / 6, seconds / 5, 0.06, { type: 'sawtooth', cutoff: 260, attack: 0.3, sustain: true, release: 0.6, vibrato: true });
   }
 
   /** steam blowing off at the funnels: a deafening roar */
   steamRoar(seconds = 30) {
     if (!this.ready) return;
-    const c = this.ctx, t = c.currentTime, s = c.createBufferSource(), g = c.createGain(), f = this._filter('bandpass', 1600, 0.35);
-    s.buffer = this.white; s.loop = true;
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.22, t + 1.2); g.gain.setValueAtTime(0.22, t + seconds * 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+    const c = this.ctx, t = c.currentTime, s = c.createBufferSource(), g = c.createGain(), f = this._filter('lowpass', 520, 0.6);
+    s.buffer = this.brown; s.loop = true;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.32, t + 1.2); g.gain.setValueAtTime(0.32, t + seconds * 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
     s.connect(f); f.connect(g); g.connect(this.fx);
     s.start(t); s.stop(t + seconds + 0.1);
   }
@@ -451,9 +454,9 @@ export class Sound {
   rocket(up = 1.8) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
-    this._burst(this.fx, t, up, 0.18, 'highpass', 2500, 0.7);
+    this._burst(this.fx, t, up * 0.6, 0.05, 'bandpass', 1400, 1.2);
     this._burst(this.fx, t + up, 0.5, 0.5, 'lowpass', 300, 0.7, this.brown);
-    this._burst(this.fx, t + up, 0.06, 0.35, 'bandpass', 1200, 1.5);
+    this._burst(this.fx, t + up, 0.05, 0.16, 'bandpass', 900, 2, this.brown);
   }
 
   /** steel giving way: groaning, the crack of plates, the thunder of things falling inside */

@@ -20,7 +20,7 @@ const HELP = [
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
   ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Schotttüren, Aufzüge, Turngeräte (aufsteigen), Schwimmbad (hineinsteigen und schwimmen), Squash (Ball schlagen), Kesselfeuertüren (öffnen, Kohle nachlegen), Hauptschalter im Dynamoraum, eigener Funkspruch, Ankerspill, Sitzmöbel und Liegestühle (hinsetzen), Uhren, Bücherschränke, Kamine, Shuffleboard, Rettungsboote (ausschwenken, einsteigen, fieren, aufholen), Schränke, Schubladen, Bullaugen, Lichtschalter und Klingel in den Kabinen, Wasserhähne, Badewannen, Toilettenspülung, Klaviere, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Morsetaste)'],
-  ['U', 'Nacht des 14. April: Zeit schnell (5 Min.), langsam (20 Min.) oder angehalten'],
+  ['U', 'Nacht des 14. April: Zeit schnell (2 Min.), langsam (20 Min.) oder angehalten'],
   ['I', 'Info lesen (wenn daneben eine Aktion mit E angezeigt wird)'],
   ['T', 'Ton an/aus'],
   ['Klick / Antippen', 'Info-Marke direkt öffnen'],
