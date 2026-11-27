@@ -156,8 +156,8 @@ export async function run(d) {
     const sat = !!F.seat && player.mode === 'fly' && Math.abs(player.pos.x - seat.x) < 0.1 && interact.nearest === 'seat';
     interact.run('seat'); await wait(0.3);
     const up = !F.seat && player.mode === 'walk' && Math.abs(player.pos.x - x0) < 0.3 && Math.abs(player.pos.z - z0) < 0.3;
-    const games = interact.items.filter((i) => /Shuffleboard|Wurfring/.test(i.label())).length, c = F.count;
-    return { ok: sat && up && games === 4 && c.seat > 100, note: `${c.seat} Sitzplätze, ${c.clock} Uhren, ${c.book} Bücherschränke, ${c.fire} Kamine (geladene Decks), ${games} Spielpunkte · hingesetzt: ${sat}, aufgestanden: ${up}` };
+    const games = interact.items.filter((i) => /Shuffleboard/.test(i.label())).length, c = F.count;
+    return { ok: sat && up && games === 2 && c.seat > 100, note: `${c.seat} Sitzplätze, ${c.clock} Uhren, ${c.book} Bücherschränke, ${c.fire} Kamine (geladene Decks), ${games} Spielpunkte · hingesetzt: ${sat}, aufgestanden: ${up}` };
   });
 
   await check('Schwimmbad, Turngerät, Squash', async () => {

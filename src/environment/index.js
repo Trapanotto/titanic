@@ -42,11 +42,16 @@ const smooth = (x) => x * x * (3 - 2 * x);
 const lerp = (a, b, t) => a + (b - a) * t;
 const approach = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
 const C = (r, g, b) => new THREE.Color(r, g, b);
+const WEATHER = {
+  klar:   { fog: 1.0, sun: 1.0,  tint: C(0.60, 0.69, 0.79) },
+  diesig: { fog: 3.2, sun: 0.85, tint: C(0.66, 0.72, 0.78) },
+  nebel:  { fog: 9.0, sun: 0.55, tint: C(0.70, 0.75, 0.80) },
+};
 
 // ---- colour grade / post presets per situation -------------------------------------------------
 function grade(o) {
   return {
-    exposure: 1, contrast: 1.05, saturation: 1, vignette: 0.25, grain: 0.012,
+    exposure: 1, contrast: 1.05, saturation: 1, vignette: 0.25, grain: 0.003,
     lift: C(0, 0, 0), gain: C(1, 1, 1), bloom: 0.1, bloomThreshold: 1.8, bloomKnee: 0.7,
     haze: 0, hazeMax: 0.3, hazeColor: C(0, 0, 0), aoStrength: 0.8, aoRadius: 0.7, aoIntensity: 1.2, rays: 0,
     aeKey: -2, aeMin: 1, aeMax: 1, aeStrength: 0, ...o,
@@ -57,12 +62,12 @@ function grade(o) {
 const AE_ROOM = { aeKey: -2.6, aeMin: 0.55, aeMax: 1.6, aeStrength: 0.55 };
 const AE_MACHINE = { aeKey: -3.8, aeMin: 0.7, aeMax: 2.6, aeStrength: 0.65 };
 const GRADES = {
-  day: grade({ exposure: 1.0, contrast: 1.07, saturation: 1.03, vignette: 0.2, grain: 0.008, lift: C(0.0, 0.004, 0.012), gain: C(0.985, 1.0, 1.025), bloom: 0.08, bloomThreshold: 2.4, aoStrength: 0.65, aoRadius: 1.1, aoIntensity: 1.0, rays: 0.32 }),
-  night: grade({ exposure: 1.55, contrast: 1.12, saturation: 0.92, vignette: 0.38, grain: 0.022, lift: C(0.0, 0.005, 0.016), gain: C(1.02, 0.99, 0.95), bloom: 0.2, bloomThreshold: 1.0, bloomKnee: 0.6, aoStrength: 0.6, aoRadius: 0.9 }),
-  first: grade({ exposure: 1.3, contrast: 1.07, saturation: 1.02, vignette: 0.3, grain: 0.012, lift: C(0.012, 0.006, 0.0), gain: C(1.03, 0.995, 0.93), bloom: 0.14, bloomThreshold: 1.5, haze: 0.022, hazeMax: 0.22, hazeColor: C(0.11, 0.075, 0.042), aoStrength: 0.95, aoRadius: 0.95, aoIntensity: 1.45, ...AE_ROOM }),
-  other: grade({ exposure: 1.25, contrast: 1.06, saturation: 0.9, vignette: 0.32, grain: 0.015, lift: C(0.004, 0.006, 0.007), gain: C(1.0, 1.0, 0.96), bloom: 0.12, bloomThreshold: 1.5, haze: 0.014, hazeMax: 0.18, hazeColor: C(0.07, 0.062, 0.05), aoStrength: 0.95, aoRadius: 0.85, aoIntensity: 1.45, ...AE_ROOM }),
-  machine: grade({ exposure: 1.55, contrast: 1.1, saturation: 0.9, vignette: 0.38, grain: 0.026, lift: C(0.008, 0.008, 0.008), gain: C(1.02, 1.0, 0.95), bloom: 0.18, bloomThreshold: 1.3, haze: 0.022, hazeMax: 0.3, hazeColor: C(0.05, 0.044, 0.036), aoStrength: 0.9, aoRadius: 0.9, aoIntensity: 1.35, ...AE_MACHINE }),
-  boiler: grade({ exposure: 1.6, contrast: 1.12, saturation: 0.98, vignette: 0.4, grain: 0.03, lift: C(0.016, 0.008, 0.002), gain: C(1.07, 0.96, 0.84), bloom: 0.24, bloomThreshold: 1.2, haze: 0.035, hazeMax: 0.38, hazeColor: C(0.085, 0.04, 0.015), aoStrength: 0.9, aoRadius: 0.9, aoIntensity: 1.35, ...AE_MACHINE }),
+  day: grade({ exposure: 1.0, contrast: 1.07, saturation: 1.03, vignette: 0.2, grain: 0.002, lift: C(0.0, 0.004, 0.012), gain: C(0.985, 1.0, 1.025), bloom: 0.08, bloomThreshold: 2.4, aoStrength: 0.65, aoRadius: 1.1, aoIntensity: 1.0, rays: 0.32 }),
+  night: grade({ exposure: 1.55, contrast: 1.12, saturation: 0.92, vignette: 0.38, grain: 0.005, lift: C(0.0, 0.005, 0.016), gain: C(1.02, 0.99, 0.95), bloom: 0.2, bloomThreshold: 1.0, bloomKnee: 0.6, aoStrength: 0.6, aoRadius: 0.9 }),
+  first: grade({ exposure: 1.3, contrast: 1.07, saturation: 1.02, vignette: 0.3, grain: 0.003, lift: C(0.012, 0.006, 0.0), gain: C(1.03, 0.995, 0.93), bloom: 0.14, bloomThreshold: 1.5, haze: 0.022, hazeMax: 0.22, hazeColor: C(0.11, 0.075, 0.042), aoStrength: 0.72, aoRadius: 0.95, aoIntensity: 1.15, ...AE_ROOM }),
+  other: grade({ exposure: 1.25, contrast: 1.06, saturation: 0.9, vignette: 0.32, grain: 0.004, lift: C(0.004, 0.006, 0.007), gain: C(1.0, 1.0, 0.96), bloom: 0.12, bloomThreshold: 1.5, haze: 0.014, hazeMax: 0.18, hazeColor: C(0.07, 0.062, 0.05), aoStrength: 0.72, aoRadius: 0.85, aoIntensity: 1.15, ...AE_ROOM }),
+  machine: grade({ exposure: 1.55, contrast: 1.1, saturation: 0.9, vignette: 0.38, grain: 0.006, lift: C(0.008, 0.008, 0.008), gain: C(1.02, 1.0, 0.95), bloom: 0.18, bloomThreshold: 1.3, haze: 0.022, hazeMax: 0.3, hazeColor: C(0.05, 0.044, 0.036), aoStrength: 0.70, aoRadius: 0.9, aoIntensity: 1.10, ...AE_MACHINE }),
+  boiler: grade({ exposure: 1.6, contrast: 1.12, saturation: 0.98, vignette: 0.4, grain: 0.007, lift: C(0.016, 0.008, 0.002), gain: C(1.07, 0.96, 0.84), bloom: 0.24, bloomThreshold: 1.2, haze: 0.035, hazeMax: 0.38, hazeColor: C(0.085, 0.04, 0.015), aoStrength: 0.70, aoRadius: 0.9, aoIntensity: 1.10, ...AE_MACHINE }),
 };
 const NUM_KEYS = ['exposure', 'contrast', 'saturation', 'vignette', 'grain', 'bloom', 'bloomThreshold', 'bloomKnee', 'haze', 'hazeMax', 'aoStrength', 'aoRadius', 'aoIntensity', 'rays', 'aeKey', 'aeMin', 'aeMax', 'aeStrength'];
 const COL_KEYS = ['lift', 'gain', 'hazeColor'];
@@ -87,7 +92,8 @@ export async function build(world) {
 
   // ---------- fog / background ----------
   const fogDay = new THREE.Color(0.60, 0.69, 0.79), fogNight = new THREE.Color(0.0035, 0.0055, 0.010);
-  const fog = new THREE.FogExp2(fogDay.clone(), FOG_DAY);
+  const fogDayCur = fogDay.clone();
+  const fog = new THREE.FogExp2(fogDayCur.clone(), FOG_DAY);
   scene.fog = fog;
   const background = fogDay.clone();
   scene.background = background;
@@ -113,9 +119,9 @@ export async function build(world) {
   sc.left = -SHADOW_HALF; sc.right = SHADOW_HALF; sc.top = SHADOW_HALF; sc.bottom = -SHADOW_HALF;
   sc.near = 20; sc.far = SHADOW_DIST * 2;
   sc.updateProjectionMatrix();
-  sun.shadow.bias = -0.0004;
-  sun.shadow.normalBias = 0.035;
-  sun.shadow.radius = 2;
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.06;
+  sun.shadow.radius = 2.5;
   sun.shadow.autoUpdate = false;   // the ship is static: re-render only when the frustum moves (+ a slow refresh)
   sun.shadow.needsUpdate = true;
   sun.position.copy(SUN_DIR).multiplyScalar(SHADOW_DIST);
@@ -144,7 +150,7 @@ export async function build(world) {
       const s = light.shadow;
       s.mapSize.set(SH_MAP[world.quality] || 512, SH_MAP[world.quality] || 512);
       s.camera.near = SH_NEAR; s.camera.far = SH_RANGE;
-      s.bias = -0.004; s.normalBias = 0.025; s.radius = 1.5;
+      s.bias = -0.0015; s.normalBias = 0.045; s.radius = 2.5;
       s.autoUpdate = false; s.needsUpdate = false;
     }
     light.position.set(0, -50, 0);
@@ -196,11 +202,16 @@ export async function build(world) {
   let nightTarget = world.state.night ? 1 : 0, nightLin = nightTarget, first = true;
   let insideLin = world.state.inside ? 1 : 0;
   let daylight = 1, machineLin = 0, firstLin = 0, fireLin = 0;
+  let weatherTarget = world.state.weather || 'klar';
+  let fogScale = WEATHER[weatherTarget]?.fog ?? 1.0;
+  let sunWeather = WEATHER[weatherTarget]?.sun ?? 1.0;
+  if (WEATHER[weatherTarget]) fogDayCur.copy(WEATHER[weatherTarget].tint);
   world.onTimeChange((night) => {
     nightTarget = night ? 1 : 0;
     if (first) { first = false; nightLin = nightTarget; }
     applyNightToMaterials(!!night);
   });
+  world.onWeatherChange((m) => { if (WEATHER[m]) weatherTarget = m; });
 
   // grade state (current values, blended towards the situation targets)
   const cur = grade({});
@@ -241,10 +252,10 @@ export async function build(world) {
     // deep inside the hull the sun does not matter: skip the shadow-map pass, refresh once when it does again
     const skip = ins > 0.98 && daylight < 0.25;
     if (skip || hold) { if (need) shadowStale = true; }
-    else if (need || shadowStale) { sun.shadow.needsUpdate = true; shadowTimer = busy ? 0.5 : dirKey ? 6 : 4; shadowStale = false; } // slow refresh (was twice a second: a periodic hitch on desktops)
+    else if (need || shadowStale) { sun.shadow.needsUpdate = true; shadowTimer = busy ? 0.5 : dirKey ? 15 : 12; shadowStale = false; } // slow refresh (was twice a second: a periodic hitch on desktops)
     const dayK = Math.max(0, 1 - 2 * n), nightK = Math.max(0, 2 * n - 1);
-    sun.intensity = (SUN_INTENSITY * dayK + STAR_INTENSITY * nightK) * lerp(1, daylight * 0.5, ins);
-    return SUN_INTENSITY * dayK;
+    sun.intensity = (SUN_INTENSITY * dayK * sunWeather + STAR_INTENSITY * nightK) * lerp(1, daylight * 0.5, ins);
+    return SUN_INTENSITY * dayK * sunWeather;
   }
 
   // ---------- lamp pool ----------
@@ -623,8 +634,13 @@ export async function build(world) {
     }
 
     // fog / background / environment map
-    fog.color.lerpColors(fogDay, fogNight, n);
-    fog.density = lerp(FOG_DAY, FOG_NIGHT, n);
+    const wCfg = WEATHER[weatherTarget] || WEATHER.klar;
+    const wk = dt > 0 ? Math.min(1, dt / 1.8) : 1;
+    fogScale += (wCfg.fog - fogScale) * wk;
+    sunWeather += (wCfg.sun - sunWeather) * wk;
+    fogDayCur.lerp(wCfg.tint, wk);
+    fog.color.lerpColors(fogDayCur, fogNight, n);
+    fog.density = lerp(FOG_DAY, FOG_NIGHT, n) * fogScale;
     background.copy(fog.color);
     if (envDay) {
       const inEnv = insideLin > 0.5;

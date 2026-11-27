@@ -398,18 +398,21 @@ export function frond(len = 0.9, n = 12, rise = 0.25, droop = 0.55, seed = 1) {
   return metreUV(g);
 }
 
-/** Heap (coal, sand): w (z) × d (x) footprint, height h, lumpy surface; bottom at y = 0, open bottom. */
+/** Heap (coal, sand): w (z) × d (x) footprint, height h, lumpy surface; skirt sinks slightly below y = 0 so it never z-fights. */
 export function heap(w, d, h, nx = 10, nz = 14, seed = 3) {
   let s = seed; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  const pos = [], idx = [], peaks = [[0, 0, 1], [-d * 0.1, -w * 0.26, 0.7], [d * 0.05, w * 0.27, 0.62]];
+  const pos = [], ys = [], idx = [], peaks = [[0, 0, 1], [-d * 0.1, -w * 0.26, 0.7], [d * 0.05, w * 0.27, 0.62]];
   for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) {
     const x = -d / 2 + (d * i) / nx, z = -w / 2 + (w * j) / nz;
     let y = 0;
     for (const [px, pz, k] of peaks) { const r = Math.hypot((x - px) / (d * 0.5), (z - pz) / (w * 0.36)); y = Math.max(y, h * k * Math.max(0, 1 - r) ** 1.2); }
     if (i === 0 || j === 0 || i === nx || j === nz) y = 0; else if (y > 0) y += (rnd() - 0.5) * 0.06;
-    pos.push(x, Math.max(0, y), z);
+    const clamped = Math.max(0, y);
+    ys.push(clamped);
+    pos.push(x, clamped > 1e-4 ? clamped : -0.025, z);
   }
-  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const a = i * (nz + 1) + j, b = a + 1, c = a + nz + 1, e = c + 1; idx.push(a, b, e, a, e, c); }
+  const tri = (a, b, c) => { if (ys[a] > 1e-4 || ys[b] > 1e-4 || ys[c] > 1e-4) idx.push(a, b, c); };
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const a = i * (nz + 1) + j, b = a + 1, c = a + nz + 1, e = c + 1; tri(a, b, e); tri(a, e, c); }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx); g.computeVertexNormals();

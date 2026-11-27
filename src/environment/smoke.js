@@ -6,7 +6,7 @@ import { ENGINE } from '../core/engine.js';
 // Funnel smoke: stateless GPU particles (one Points draw call). Every particle's position is a pure
 // function of time, so there are no per-frame buffer uploads.
 
-const COUNT = 420;
+const COUNT = 1200;
 
 const VERT = /* glsl */ `
 attribute vec2 aSeed;      // x = funnel index 0..2, y = random
@@ -24,16 +24,16 @@ void main() {
   vec3 top = aSeed.x < 0.5 ? uTops[0] : (aSeed.x < 1.5 ? uTops[1] : uTops[2]);
   float ang = position.z * 6.2831853;
   vec2 rd = vec2(cos(ang), sin(ang));
-  float spread = (0.5 + 1.5 * sqrt(age)) * (0.4 + 0.6 * aSeed.y);
+  float spread = (0.35 + 1.25 * sqrt(age)) * (0.4 + 0.6 * aSeed.y);
   vec3 p = top;
   p.x += rd.x * (0.9 * aSeed.y + spread * 0.5) - ${SHIP_SPEED.toFixed(1)} * uShip * (age - 1.6 * (1.0 - exp(-age / 1.6)));
   p.y += 11.0 * (1.0 - exp(-age / 2.5)) + 0.35 * age + sin(age * 0.7 + ang) * 0.08 * age;
   p.z += rd.y * (0.7 * aSeed.y + spread * 0.8) + sin(age * 0.5 + ang * 3.0) * 0.12 * age;
   vec4 mv = viewMatrix * vec4(p, 1.0);
   gl_Position = projectionMatrix * mv;
-  float size = 3.4 + 1.5 * age * (0.6 + 0.4 * aSeed.y);
+  float size = 4.2 + 1.8 * age * (0.6 + 0.4 * aSeed.y);
   gl_PointSize = min(size * uScale / max(-mv.z, 0.5), 600.0);
-  vAlpha = smoothstep(0.0, 0.05, age01) * pow(1.0 - age01, 1.4) * uOpacity;
+  vAlpha = smoothstep(0.0, 0.04, age01) * pow(1.0 - age01, 1.15) * uOpacity;
   vAge = age01;
 }
 `;
@@ -44,9 +44,9 @@ varying float vAlpha;
 varying float vAge;
 void main() {
   vec2 c = gl_PointCoord - vec2(0.5);
-  float a = exp(-dot(c, c) * 14.0) - 0.03;
+  float a = exp(-dot(c, c) * 9.5) - 0.03;
   if (a <= 0.0) discard;
-  vec3 col = uColor * (1.0 + 2.6 * vAge) * (0.75 + 0.6 * (0.5 - c.y));
+  vec3 col = uColor * (0.75 + 1.4 * vAge) * (0.7 + 0.5 * (0.5 - c.y));
   gl_FragColor = vec4(col, a * vAlpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -108,9 +108,9 @@ export function createSmoke(shared, world) {
       const fov = camera && camera.isPerspectiveCamera ? camera.fov : 70;
       uniforms.uScale.value = h / (2 * Math.tan((fov * Math.PI) / 360));
       uniforms.uShip.value = 0.12 + 0.88 * ENGINE.speed; // a light breeze remains
-      uniforms.uOpacity.value = (0.13 - 0.1 * n) * (0.3 + 0.7 * ENGINE.speed);        // barely visible at night
-      const c = 0.12 - 0.11 * n;                        // coal smoke: brown-grey, lit by the sun
-      uniforms.uColor.value.setRGB(c * 1.05, c, c * 0.95);
+      uniforms.uOpacity.value = (0.34 - 0.24 * n) * (0.35 + 0.65 * ENGINE.speed);        // dense coal smoke by day, subtle at night
+      const c = 0.045 - 0.04 * n;                        // coal smoke: dark charcoal-black, slightly warmer in sunlight
+      uniforms.uColor.value.setRGB(c * 1.05, c, c * 0.92);
     },
   };
 }

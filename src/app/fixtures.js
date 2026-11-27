@@ -257,9 +257,9 @@ export class Fixtures {
     // swimming bath (steps at the after end, ladder forward) and squash court
     for (const x of [POOL.x0 - 1.3, POOL.x1 + 0.9]) this.addItem({ x, y: DECK_Y.F, z: 6.7, r: 1.6, label: () => 'Ins Becken steigen', act: () => this.swim() });
     this.addItem({ x: (COURT.x0 + COURT.x1) / 2 - 1, y: COURT.y, z: 0, r: 3.2, low: true, label: () => 'Squash: Ball schlagen', act: () => this._serve() });
-    const disc = new THREE.CylinderGeometry(0.075, 0.075, 0.026, 12), ring = new THREE.TorusGeometry(0.1, 0.016, 5, 14).rotateX(Math.PI / 2);
+    const disc = new THREE.CylinderGeometry(0.075, 0.075, 0.026, 12);
     for (const s of [-1, 1]) {
-      const cz = s * (BOAT_HOUSES[1].hw + 2.9), qx = cx + 9.2;
+      const cz = s * (BOAT_HOUSES[1].hw + 2.9);
       this.addItem({ x: cx - 5.3, y: BY, z: cz, r: 1.5, label: () => 'Shuffleboard: Scheibe stoßen', act: () => {
         const tx = cx + 0.8 + Math.random() * 3.9, tz = cz + (Math.random() - 0.5) * 1.3;
         const m = new THREE.Mesh(disc, this.flying.length % 2 ? mats.woodDark : mats.hullRed);
@@ -271,12 +271,6 @@ export class Fixtures {
           this.score += pts;
           this.toast(`${pts > 0 ? pts + ' Punkte' : pts < 0 ? '10 ab!' : 'Daneben'} · Summe ${this.score}`, 2.5);
         } });
-      } });
-      this.addItem({ x: qx - 2.4, y: BY, z: cz, r: 1.3, label: () => 'Wurfring werfen', act: () => {
-        const hit = Math.random() < 0.3, tx = qx + (hit ? 0 : (Math.random() - 0.5) * 0.9), tz = cz + (hit ? 0 : (Math.random() - 0.5) * 0.9);
-        const m = new THREE.Mesh(ring, mats.rope);
-        this.root.add(m);
-        this.flying.push({ m, t: 0, dur: 0.9, a: [qx - 2.2, BY + 1.1, cz], b: [tx, BY + (hit ? 0.06 : 0.02), tz], arc: 0.7, done: () => { this.sound.thud(); this.toast(hit ? 'Treffer – der Ring sitzt auf dem Pflock!' : 'Knapp daneben.', 2.5); } });
       } });
     }
   }

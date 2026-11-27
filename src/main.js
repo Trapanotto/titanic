@@ -13,6 +13,7 @@ import { MirrorView } from './app/mirrors.js';
 import { Sound } from './app/audio.js';
 import { Interact } from './app/interact.js';
 import { ENGINE } from './core/engine.js';
+import { texturesReady } from './core/materials.js';
 
 const params = new URLSearchParams(location.search);
 const flag = (name) => { const v = params.get(name); return v !== null && v !== '0' && v !== 'false'; };
@@ -51,7 +52,7 @@ const MEMORY_FAIL = 'Dieses Gerät hat nicht genug Arbeits- oder Grafikspeicher 
 const canvas = document.getElementById('view');
 const scene = new THREE.Scene();
 const world = new World(scene);
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / Math.max(1, window.innerHeight), 0.15, 6000); // near 0.15: twice the depth precision of 0.08 (less z-fighting), still inside the player's 0.3 m radius
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / Math.max(1, window.innerHeight), 0.2, 6000); // near 0.2: high depth precision (less z-fighting), still inside the player's 0.3 m radius
 world.camera = camera;
 world.renderer = null;
 
@@ -158,17 +159,17 @@ function step(dt) {
   // window frames, doors and rivets seen from afar no longer flicker (z-fighting).
   {
     const p = camera.position, st = world.state;
-    let near = 0.15;
+    let near = 0.18;
     if (!st.inside) {
-      near = 0.2;
+      near = 0.22;
       if (player.mode === 'fly') {
         const dx = Math.max(0, Math.abs(p.x) - 137), dz = Math.max(0, Math.abs(p.z) - 15.5), dy = Math.max(0, p.y - 64, 9.5 - p.y);
-        near = Math.min(25, Math.max(0.2, 0.3 * Math.hypot(dx, dy, dz)), Math.max(0.2, 0.5 * Math.abs(p.y - 10.5))); // (never cuts into the sea below)
+        near = Math.min(25, Math.max(0.22, 0.3 * Math.hypot(dx, dy, dz)), Math.max(0.22, 0.5 * Math.abs(p.y - 10.5))); // (never cuts into the sea below)
       }
     }
     if (Math.abs(near - camera.near) > camera.near * 0.04) { camera.near = near; camera.updateProjectionMatrix(); }
   }
-  world.updateVisibility(camera.position);
+  world.updateVisibility(camera.position, undefined, player.mode === 'walk' ? player.pos.y : undefined);
   try {
     world.update(dt, time);
     for (let i = 0; i < updates.length; i++) updates[i](dt, time);
@@ -316,6 +317,8 @@ async function buildModules() {
   const flush = () => { kit.flushKitCaches(); rooms.flushRoomCaches(); };
   const fixed = TIER.streaming ? list.filter((m) => !STREAMABLE(m)) : list;
   const streamed = TIER.streaming ? list.filter(STREAMABLE) : [];
+  const fixedLoads = fixed.map((m) => m.load());
+  for (const m of streamed) m.load();
   let done = 0;
   const fail = (m, e) => {
     console.error(`[app] Modul "${m.id}" konnte nicht gebaut werden:`, e);
@@ -323,13 +326,14 @@ async function buildModules() {
     if (isOOM(e)) throw e;
     ui.loadingWarn(`⚠ ${m.label} (${m.id}): ${e?.message || e}`);
   };
-  for (const m of fixed) {
+  for (let idx = 0; idx < fixed.length; idx++) {
+    const m = fixed[idx];
     ui.setProgress(done / total, m.label + ' …');
     await nextPaint();
     try {
       world.colliderTag = m.id; // exterior colliders (windows!) never occlude the interior
       const t0 = performance.now();
-      const mod = await m.load();
+      const mod = await fixedLoads[idx];
       const t1 = performance.now();
       const res = await mod.build(world);
       debug.timings.push({ id: m.id, load: Math.round(t1 - t0), build: Math.round(performance.now() - t1), heap: peak(), at: Math.round(performance.now()) });
@@ -353,8 +357,11 @@ async function buildModules() {
         if (phase === 'start') { ui.setProgress(done / total, m.label + ' …'); await nextPaint(); return; }
         debug.timings.push({ id: m.id, build: m.buildMs, heap: peak(), at: Math.round(performance.now()) });
         done++;
-        // a little idle time: the garbage of the dropped deck geometry gets collected before the next deck (heap peak)
-        if (!document.hidden) await new Promise((r) => setTimeout(r, 40));
+        // on low-memory tiers give GC a brief breather between dry-pass decks; on desktop yield immediately
+        if (!document.hidden) {
+          if (TIER.name === 'mobile' || TIER.name === 'low') await new Promise((r) => setTimeout(r, 40));
+          else await yieldTask();
+        }
       });
     } catch (e) { fail({ id: 'stream', label: 'Decks' }, e); }
   }
@@ -445,7 +452,7 @@ async function main() {
   await nextPaint();
   try { // the procedural textures are generated in a worker while the ship is built
     const t0 = performance.now();
-    await (await import('./core/materials.js')).texturesReady();
+    await texturesReady();
     debug.timings?.push({ id: 'texWait', build: Math.round(performance.now() - t0), tex: Math.round(window.__titanicTexMs || 0) });
   } catch (e) { console.warn('[app] Texturen', e); }
   try {
@@ -457,7 +464,7 @@ async function main() {
     // first frame under the loading screen: compiles shaders, uploads textures; then compile the programs of every
     // object (also the culled interior zones), so that walking around never stalls on a shader compile
     const t0 = performance.now();
-    world.updateVisibility(camera.position);
+    world.updateVisibility(camera.position, undefined, player.mode === 'walk' ? player.pos.y : undefined);
     // compile in parallel (KHR_parallel_shader_compile) while the loading screen keeps animating
     try {
       if (renderer.compileAsync) await renderer.compileAsync(scene, camera);

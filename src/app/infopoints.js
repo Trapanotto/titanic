@@ -2,8 +2,8 @@
 import * as THREE from 'three';
 import { DECK_Y, deckAtY } from '../core/constants.js';
 
-const VIEW_DIST = 40;
-const PICK_DIST = 16;      // tapping / clicking a marker opens it up to this distance (m)
+const VIEW_DIST = 25;
+const PICK_DIST = 4.5;     // tapping / clicking a marker opens it up to this distance (m)
 const STORE_KEY = 'titanic.entdeckt.v1';
 
 function tokenTexture() {
@@ -109,8 +109,8 @@ export class InfoPoints {
         colorDirty = true;
       }
       n++;
-      const r = Math.min(it.info.radius, 3.5); // the E bar only right next to the marker
-      if (mode === 'walk' && d2 < r * r && Math.abs(dy) < 2.4 && d2 < bestD) { bestD = d2; best = i; }
+      const r = Math.min(it.info.radius, 1.35); // the E bar only right next to the marker
+      if (mode === 'walk' && d2 < r * r && Math.abs(dy) < 1.8 && d2 < bestD) { bestD = d2; best = i; }
     }
     vis.length = n;
     this.mesh.count = n;

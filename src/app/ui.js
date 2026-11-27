@@ -11,19 +11,21 @@ const HELP = [
   ['Maus', 'umsehen'],
   ['Shift', 'rennen (im Flug: schnell)'],
   ['Leertaste', 'springen'],
+  ['C', 'kriechen / ducken an/aus'],
   ['F', 'Flugmodus an/aus – im Flug: Q/Strg ab, E/Leertaste auf, Mausrad Tempo'],
   ['N', 'Tag / Nacht'],
+  ['V', 'Wetter (klar / diesig / Nebel)'],
   ['M', 'Deckplan'],
   ['J', 'Minikarte ein/aus'],
   ['K', 'Minikarte: Blickrichtung oben / Bug oben'],
   ['+ / −', 'Minikarte zoomen (30 / 60 / 120 m) – oder Klick auf die Karte'],
-  ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Schotttüren, Aufzüge, Turngeräte (aufsteigen), Schwimmbad (hineinsteigen und schwimmen), Squash (Ball schlagen), Kesselfeuertüren (öffnen, Kohle nachlegen), Hauptschalter im Dynamoraum, eigener Funkspruch, Ankerspill, Sitzmöbel und Liegestühle (hinsetzen), Uhren, Bücherschränke, Kamine, Shuffleboard und Wurfringe, Rettungsboote (ausschwenken, einsteigen, fieren, aufholen), Schränke, Schubladen, Bullaugen, Lichtschalter und Klingel in den Kabinen, Wasserhähne, Badewannen, Toilettenspülung, Klaviere, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Fernglas, Morsetaste)'],
+  ['E', 'Info lesen (in der Nähe einer Marke) oder etwas bedienen (Türen, Schotttüren, Aufzüge, Turngeräte (aufsteigen), Schwimmbad (hineinsteigen und schwimmen), Squash (Ball schlagen), Kesselfeuertüren (öffnen, Kohle nachlegen), Hauptschalter im Dynamoraum, eigener Funkspruch, Ankerspill, Sitzmöbel und Liegestühle (hinsetzen), Uhren, Bücherschränke, Kamine, Shuffleboard, Rettungsboote (ausschwenken, einsteigen, fieren, aufholen), Schränke, Schubladen, Bullaugen, Lichtschalter und Klingel in den Kabinen, Wasserhähne, Badewannen, Toilettenspülung, Klaviere, Telegraf, Steuerrad, Glocke, Pfeife, Telefon, Morsetaste)'],
   ['T', 'Ton an/aus'],
   ['Klick / Antippen', 'Info-Marke direkt öffnen'],
   ['1 – 9', 'Schnellreise zu Höhepunkten'],
   ['P', 'Leistungsanzeige (FPS, Zeichenaufrufe, Dreiecke, Speicher)'],
   ['G', 'Grafikqualität (niedrig / mittel / hoch)'],
-  ['B', 'Kopfwippen an/aus'],
+  ['B', 'Kopfwippen & Seegang an/aus'],
   ['H', 'Hilfe'],
   ['Esc', 'Maus freigeben'],
 ];
@@ -195,14 +197,21 @@ export class UI {
         else if (!this.modal && p.mode === 'walk' && this.info.nearest >= 0) this.openInfo(this.info.nearest);
         break;
       case 'night': if (this.modal !== 'plan') { this.world.setNight(!this.world.state.night); this.toast(this.world.state.night ? 'Nacht' : 'Tag', 1.5); } break;
+      case 'weather': if (this.modal !== 'plan') {
+        const order = ['klar', 'diesig', 'nebel'];
+        const next = order[(order.indexOf(this.world.state.weather) + 1) % order.length];
+        this.world.setWeather(next);
+        this.toast({ klar: 'Wetter: Klar', diesig: 'Wetter: Diesig', nebel: 'Wetter: Nebel' }[next], 1.8);
+      } break;
       case 'fly':
         if (this.modal) break;
         if (p.toggleFly() === 'fly') this.toast('Flugmodus – F zum Landen', 2.5); else this.toast('Zu Fuß', 1.5);
         break;
+      case 'crouch': if (!this.modal && p.mode === 'walk') p.toggleCrouch(); break;
       case 'flyspeed': this.toast(`Fluggeschwindigkeit × ${p.changeFlySpeed(arg).toFixed(2)}`, 1.2); break;
       case 'fps': this._fps.on = !this._fps.on; this.fpsEl.hidden = !this._fps.on; this._fps.frames = 0; this._fps.t0 = 0; if (this._fps.on) this.fpsEl.textContent = '…'; break;
       case 'sound': if (this.sound) this.toast(this.sound.toggle() ? 'Ton an' : 'Ton aus', 1.5); break;
-      case 'bob': p.headBob = !p.headBob; this.toast(p.headBob ? 'Kopfwippen an' : 'Kopfwippen aus', 1.5); break;
+      case 'bob': p.headBob = !p.headBob; this.toast(`Kopfwippen & Seegang ${p.headBob ? 'an' : 'aus'}`, 1.5); break;
       case 'quick': { const t = this.quick[arg - 1]; if (!this.modal && t) this.teleportTo(t); break; }
       case 'touchmode': this.entered = true; this.enableTouch(); break;
       case 'tap': {
@@ -312,7 +321,7 @@ export class UI {
     const high = p.mode === 'fly' && p.pos.y > DECK_Y.roof + 6;
     const deck = high ? 'Über dem Schiff' : DECK_NAMES[st.deck] || '';
     if (deck !== L.deck) { L.deck = deck; this.deckEl.textContent = deck; }
-    const sub = (high ? 'Freier Flug' : st.inside ? 'Innen' : 'Außendeck') + ' · ' + (p.mode === 'fly' ? 'Flugmodus' : 'Zu Fuß');
+    const sub = (high ? 'Freier Flug' : st.inside ? 'Innen' : 'Außendeck') + ' · ' + (p.mode === 'fly' ? 'Flugmodus' : p.crouch ? 'Kriechend' : 'Zu Fuß');
     if (sub !== L.sub) { L.sub = sub; this.subEl.textContent = sub; }
     const a = Math.abs(deg);
     const head = a <= 45 ? 'Blick zum Bug' : a >= 135 ? 'Blick zum Heck' : deg > 0 ? 'Blick nach Backbord' : 'Blick nach Steuerbord';

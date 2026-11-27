@@ -436,8 +436,8 @@ class DeckPlan {
     for (const r of this.rooms) {
       yield;
       const fm = r.floor ?? this.def.floor;
-      if (fm) this._overlay(matOf(fm), r, Y + 0.005, false, r.stairs ? this.holes : []);
-      if (r.ceiling) this._overlay(matOf(r.ceiling), r, top - 0.005, true, r.stairs ? upHoles : []);
+      if (fm) this._overlay(matOf(fm), r, Y + 0.012, false, r.stairs ? this.holes : []);
+      if (r.ceiling) this._overlay(matOf(r.ceiling), r, top - 0.012, true, r.stairs ? upHoles : []);
       r.doorsAll = doorsOfRoom.get(r);
       const s = r.safe, usable = s.x1 - s.x0 > 0.5 && s.z1 - s.z0 > 0.5;
       const lamp = r.lamp ?? this.def.lamp;
@@ -818,7 +818,7 @@ class DeckPlan {
       const door = this.world.addDoor(dkey, {
         deck: this.deck, x: X ? mid : l.c, y: Y, z: X ? l.c : mid, w: d.w, open: !closed,
         box: X ? [da, Y, l.c - T2, db, yh, l.c + T2] : [l.c - T2, Y, da, l.c + T2, yh, db],
-        leaves: leaves.map(([, dirA]) => ({ X, e: dirA > 0 ? da : db, dir: dirA, c: l.c, T2, sgn, ang: closed ? (95 * Math.PI) / 180 : ang })),
+        leaves: leaves.map(([, dirA, lw]) => ({ X, e: dirA > 0 ? da : db, dir: dirA, c: l.c, T2, sgn, ang: closed ? (95 * Math.PI) / 180 : ang, lw })),
       });
       leaves.forEach(([, , lw], li) => {
         const L = door.leaves[li], tpl = doorLeaf(lw, d.h - 0.02, dstyle, variant);

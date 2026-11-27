@@ -14,8 +14,10 @@ ohne externe Modelle oder Texturen.
 | Maus | umsehen |
 | Shift | rennen |
 | Leertaste | springen |
+| C | kriechen / ducken |
 | F | Flugmodus |
 | N | Tag / Nacht |
+| V | Wetter (klar / diesig / Nebel) |
 | M | Deckplan mit Schnellreise |
 | J / K / + − | Minikarte ein/aus, Ausrichtung, Zoom |
 | E | Info-Tafel lesen |

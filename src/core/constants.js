@@ -191,6 +191,8 @@ export function isInterior(x, y, z) {
   return false;
 }
 
+// First-class lifts: three shafts forward of the forward Grand Staircase (E..A deck).
+export const LIFT1 = { x0: 45.65, x1: 47.25, z0: -2.4, z1: 2.4, decks: ['E', 'D', 'C', 'B', 'A'] };
 // Second-class lift: shaft in the forward landing of the second-class staircase, port of the centre line (below the
 // lift machinery room on the boat deck). Footprint of the shaft, gate on the +z face (towards the landing).
 export const LIFT2 = { x0: -39.78, x1: -38.62, z0: -1.62, z1: -0.6, decks: ['F', 'E', 'D', 'C', 'B', 'A', 'boat'] };

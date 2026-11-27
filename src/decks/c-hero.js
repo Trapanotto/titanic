@@ -94,10 +94,10 @@ function group(plan, x, z, o = {}) {
 
 export function grandLobby(plan, L) {
   const Y = plan.y, h = plan.h, b = plan.batch, w = plan.world;
-  for (const z of [-1.6, 0, 1.6]) plan.prop(liftCage(), 46.3, z, NX);
-  b.box(mats.oakPanel, 47.1, Y, -2.45, 47.92, Y + h, 2.45, 'xzZ');
-  b.box(mats.oak, 45.46, Y + 2.4, -2.45, 47.1, Y + h, 2.45, 'xyzZ');
-  for (const z of [-2.45, 2.45]) b.box(mats.oakPanel, 45.5, Y, z - 0.03, 47.1, Y + 2.4, z + 0.03, 'xzZ');
+  for (const z of [-1.6, 0, 1.6]) plan.prop(liftCage(), 46.45, z, NX);
+  b.box(mats.oakPanel, 47.25, Y, -2.45, 47.92, Y + h, 2.45, 'xzZ');
+  b.box(mats.oak, 45.46, Y + 2.4, -2.45, 45.55, Y + h, 2.45, 'xyzZ');
+  for (const z of [-2.45, 2.45]) b.box(mats.oakPanel, 45.5, Y, z - 0.03, 47.25, Y + 2.4, z + 0.03, 'xzZ');
   for (const z of [-2.4, -0.8, 0.8, 2.4]) plan.prop(pilaster({ h: 2.4, w: 0.16, mat: 'oak', capital: 'gold' }), 45.46, z, NX);
   b.box(mats.gold, 45.44, Y + 2.38, -2.45, 45.47, Y + 2.42, 2.45, 'xyY');
   w.addCollider(45.5, Y, -2.48, 47.92, Y + h, 2.48);

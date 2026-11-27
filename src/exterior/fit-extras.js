@@ -1,5 +1,5 @@
 // Open decks – things people left there: benches and coiled mooring ropes on the poop and the well decks, a bucket
-// and mop by the bulwark, shuffleboard courts with cues and discs and a quoits pitch on the boat deck amidships.
+// and mop by the bulwark, and shuffleboard courts with cues and discs on the boat deck amidships.
 import * as THREE from 'three';
 import { mats } from '../core/materials.js';
 import { DECK_Y, BOAT_HOUSES } from '../core/constants.js';
@@ -61,17 +61,12 @@ export function buildExtras(world, parent) {
   const midH = BOAT_HOUSES[1], court = courtGeo();
   const disc = merge([cylG([0, 0.006, 0], [0, 0.03, 0], 0.075, 10)]);
   const cue = merge([cylG([0, 0.018, 0], [1.55, 0.018, 0], 0.012, 5), boxG(0.03, 0.02, 0.2, 1.57, 0.018, 0)]);
-  const quoit = torusG(0.1, 0.016, 5, 12).rotateX(Math.PI / 2).translate(0, 0.02, 0);
   for (const s of [-1, 1]) {
     const cx = 0.5, cz = s * (midH.hw + 2.9);
     root.add(mk(court, mats.paintWhite, cx, BY, cz));
     // a game in progress: discs round the far triangle, the cues laid down at the near end
     [[2.4, 0.2, 0], [3.0, -0.35, 1], [3.3, 0.3, 0], [2.0, -0.1, 1], [3.9, 0.45, 1], [-3.9, -0.5, 0], [-3.9, -0.3, 1], [-4.1, -0.1, 0]].forEach(([dx, dz, k]) => root.add(mk(disc, k ? mats.woodDark : mats.hullRed, cx + dx, BY, cz + dz)));
     for (const [dz, a] of [[0.55, 0.08], [0.7, -0.05]]) { const m = mk(cue, mats.oak, cx - 6.0, BY, cz + dz); m.rotation.y = a; root.add(m); }
-    // quoits: a pegged board and rope rings thrown at it
-    const qx = cx + 9.2;
-    root.add(mk(merge([boxG(0.36, 0.035, 0.36, 0, 0.018, 0), cylG([0, 0.03, 0], [0, 0.24, 0], 0.014, 6)]), mats.oak, qx, BY, cz));
-    [[0, 0, 0.035], [0.26, 0.12, 0], [-0.1, 0.34, 0], [0.33, -0.25, 0], [-1.9, 0.1, 0], [-1.95, -0.08, 0.03]].forEach(([dx, dz, dy]) => root.add(mk(quoit, mats.rope, qx + dx, BY + dy, cz + dz)));
   }
   return {};
 }

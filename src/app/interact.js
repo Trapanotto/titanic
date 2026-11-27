@@ -160,12 +160,6 @@ export class Interact {
       this.sound.alarm();
       this.toast(this._wtShut ? `${n} wasserdichte Türen auf dem Tank Top fahren herunter` : `${n} wasserdichte Türen werden geöffnet`, 4);
     });
-    // binoculars on the bridge wings
-    for (const s of [-1, 1]) add(69, YB, s * 9.3, 1.3, () => (this._zoom?.on ? 'Fernglas absetzen' : 'Fernglas: Ausschau halten'), () => {
-      const cam = this.world.camera;
-      if (!cam) return;
-      if (this._zoom) this._zoom.on = !this._zoom.on; else this._zoom = { on: true, base: cam.fov, x: 69, z: s * 9.3 };
-    });
   }
 
   /** things registered by the deck modules (pianos) */
@@ -223,6 +217,7 @@ export class Interact {
       try { localStorage.setItem('titanic.tueren', JSON.stringify([...S].slice(0, 400))); } catch { /* private mode */ }
     }
     if (d.open) d.col.y1 = -1e9; // passable as soon as it starts to swing
+    else if (d.leafCols) for (const lb of d.leafCols) lb.y1 = -1e9;
     // the leaves are instances in the meshes of their zone
     d._ims = d.leaves.map((L, li) => {
       const zg = this.world.zone(d.deck, L.X ? L.e : L.c), tag = d.key + '#' + li, out = [];
@@ -244,10 +239,19 @@ export class Interact {
         leafMatrix(L, d.y, e, _m);
         for (const [im, i] of d._ims[li]) { im.setMatrixAt(i, _m); im.instanceMatrix.needsUpdate = true; }
       });
-      if (d.t !== to) continue;
       if (!d.open) {
-        if (this._inDoorway(d, pos)) { d.open = true; continue; } // somebody stepped in: swing open again
+        if (d.t <= 0.4 && !this._inDoorway(d, pos)) d.col.y1 = d.col.top;
+        if (d.t !== to) continue;
+        if (this._inDoorway(d, pos)) { d.open = true; d.col.y1 = -1e9; continue; } // somebody stepped in: swing open again
         d.col.y1 = d.col.top;
+      } else {
+        if (d.leafCols && d.t >= 0.85) {
+          for (const lb of d.leafCols) {
+            const hit = pos.x > lb.x0 - 0.3 && pos.x < lb.x1 + 0.3 && pos.z > lb.z0 - 0.3 && pos.z < lb.z1 + 0.3 && Math.abs(pos.y - d.y) < 1;
+            if (!hit || d.t === to) lb.y1 = lb.top;
+          }
+        }
+        if (d.t !== to) continue;
       }
       d._ims = null;
       this._swing.delete(d);
@@ -332,18 +336,6 @@ export class Interact {
     }
   }
 
-  // ------------------------------------------------------------------ binoculars
-
-  _stepZoom(dt, player) {
-    const z = this._zoom, cam = this.world.camera;
-    if (!z || !cam) return;
-    if (z.on && (player.mode !== 'walk' || Math.hypot(player.pos.x - z.x, player.pos.z - z.z) > 1.8)) z.on = false;
-    const to = z.on ? 15 : z.base;
-    if (Math.abs(cam.fov - to) < 0.05) { if (!z.on) { cam.fov = z.base; cam.updateProjectionMatrix(); this._zoom = null; } return; }
-    cam.fov += (to - cam.fov) * (1 - Math.exp(-dt * 9));
-    cam.updateProjectionMatrix();
-  }
-
   label(i) {
     if (i === 'boat') return this.boats.riderLabel();
     if (i === 'seat') return this.fixtures.seat?.up || 'Aufstehen';
@@ -373,7 +365,6 @@ export class Interact {
     stepEngine(dt);
     if (this._swing.size) this._swingDoors(dt, feet);
     this._stepRide(dt);
-    this._stepZoom(dt, player);
     this.fixtures.update(dt, feet, player);
     this.boats.update(dt, player);
     this.technik.update(dt);

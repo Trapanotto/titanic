@@ -382,6 +382,21 @@ export const portCurtain = def('portCurtain', (o) => [2 * (o.r ?? 0.2) + 0.4, 0.
 
 // ============================================================ piano, lift
 
+/** 88-key 3D piano keyboard (52 ivory naturals + 36 ebony accidentals), back edge at xBack, key bottoms at yBase. */
+function pianoKeys(p, xBack, yBase, width = 1.24, depth = 0.145) {
+  const keyW = width / 52, z0 = -width / 2 + keyW / 2;
+  p.b(M.woodDark, depth + 0.01, 0.008, width + 0.01, xBack + depth / 2, yBase - 0.004, 0);
+  p.b(M.fabricRed, 0.01, 0.006, width, xBack + 0.005, yBase + 0.018, 0);
+  for (let i = 0; i < 52; i++) {
+    p.bb(M.paintCream, depth, 0.018, keyW - 0.0022, xBack + depth / 2, yBase, z0 + i * keyW, 0.0015);
+  }
+  const sharps = new Set([0, 2, 3, 5, 6]); // A#, C#, D#, F#, G# starting from A0
+  for (let i = 0; i < 51; i++) {
+    if (!sharps.has(i % 7)) continue;
+    p.bb(M.iron, depth * 0.62, 0.013, keyW * 0.58, xBack + depth * 0.31, yBase + 0.017, -width / 2 + (i + 1) * keyW, 0.0018);
+  }
+}
+
 export const piano = def('piano', (o) => (o.grand ? [1.5, 2.1, 1.05] : [1.5, 0.66, 1.3]), (p, o) => {
   const m = matOf(o.mat, M.woodDark);
   if (o.grand) {
@@ -390,7 +405,7 @@ export const piano = def('piano', (o) => (o.grand ? [1.5, 2.1, 1.05] : [1.5, 0.6
     p.extY(m, out.map(([x, z]) => [x, -z]), 0.28, 0, 0.66, 0, 0.01);
     p.extY(m, out.map(([x, z]) => [x * 0.98, -z * 0.98]), 0.02, 0, 0.94, 0, 0.004);
     p.bb(m, 0.3, 0.2, 1.48, 0.9, 0.62, 0, 0.01);
-    p.b(K.keys, 0.15, 0.012, 1.26, 0.92, 0.82, 0); p.bb(m, 0.06, 0.06, 1.3, 0.82, 0.82, 0, 0.008);
+    pianoKeys(p, 0.85, 0.82, 1.24, 0.145); p.bb(m, 0.06, 0.06, 1.3, 0.82, 0.82, 0, 0.008);
     for (const s of [-1, 1]) p.bb(m, 0.32, 0.12, 0.08, 0.9, 0.78, s * 0.7, 0.01);
     const lg = G.extrude(out.map(([x, z]) => [x, -(z - 0.72)]), 0.018, 0.004); lg.rotateX(-Math.PI / 2);
     p.add(lg, m, 0, 0.97, 0.72, 0.55, 0, 0);
@@ -406,7 +421,7 @@ export const piano = def('piano', (o) => (o.grand ? [1.5, 2.1, 1.05] : [1.5, 0.6
   p.bb(m, 0.34, 1.26, 1.5, -0.16, 0, 0, 0.01); p.bb(m, 0.36, 0.04, 1.54, -0.15, 1.26, 0, 0.012);
   for (let i = 0; i < 3; i++) p.fp(m, 0.42, 0.42, 0.012, 0.5 + 0.24, -0.47 + i * 0.47, 0.008, 0.035);
   p.bb(m, 0.3, 0.06, 1.5, 0.17, 0.66, 0, 0.008);
-  p.b(K.keys, 0.14, 0.012, 1.26, 0.2, 0.72, 0); p.bb(m, 0.04, 0.05, 1.3, 0.28, 0.69, 0, 0.006);
+  pianoKeys(p, 0.115, 0.722, 1.24, 0.14); p.bb(m, 0.04, 0.045, 1.3, 0.28, 0.68, 0, 0.006);
   for (const s of [-1, 1]) { p.bb(m, 0.3, 0.14, 0.08, 0.17, 0.66, s * 0.71, 0.01); p.lathe(m, [[0, 0], [0.04, 0], [0.04, 0.06], [0.03, 0.2], [0.045, 0.4], [0.03, 0.6], [0, 0.6]], 0.28, 0.06, s * 0.66, 8); p.bb(m, 0.36, 0.06, 0.1, 0.12, 0, s * 0.66, 0.008); }
   p.bb(m, 0.03, 0.3, 1.0, 0.02, 0.8, 0, 0.006);
   p.extX(m, [[-0.4, 0], [0.4, 0], [0.4, 0.04], [-0.4, 0.04]], 0.02, 0.06, 0.95, 0, 0.003).rotation.z = 0.15;
@@ -416,20 +431,16 @@ export const piano = def('piano', (o) => (o.grand ? [1.5, 2.1, 1.05] : [1.5, 0.6
   for (let i = -1; i <= 1; i++) p.bb(M.brass, 0.08, 0.012, 0.02, 0.2, 0.05, i * 0.05, 0.003);
 });
 
-/** electric lift car (1st class): panelled mahogany, upholstered seat, gilt gate */
+/** open electric lift shaft bay (1st class): panelled mahogany enclosure & gilt gate; the moving car is drawn by app/interact.js */
 export const liftCage = def('liftCage', [1.6, 1.6, 2.4], (p) => {
-  p.b(M.mahogany, 1.6, 0.06, 1.6); p.bb(M.mahogany, 1.6, 0.08, 1.6, 0, 2.3, 0, 0.01);
-  p.bb(M.mahogany, 0.04, 2.24, 1.6, -0.78, 0.06, 0, 0.006);
-  for (const s of [-1, 1]) p.bb(M.mahogany, 1.6, 2.24, 0.04, 0, 0.06, s * 0.78, 0.006);
+  p.bb(M.mahogany, 0.04, 2.36, 1.6, -0.78, 0, 0, 0.006);
+  for (const s of [-1, 1]) p.bb(M.mahogany, 1.6, 2.36, 0.04, 0, 0, s * 0.78, 0.006);
   for (let i = 0; i < 3; i++) { p.fp(M.mahogany, 0.42, 0.9, -0.76, 1.3, -0.5 + i * 0.5, 0.01, 0.04).rotation.y = 0; for (const s of [-1, 1]) { const f = p.fp(M.mahogany, 0.42, 0.9, 0, 1.3, 0, 0.01, 0.04); f.position.set(-0.5 + i * 0.5, 1.3, s * 0.76); f.rotation.y = s > 0 ? Math.PI / 2 : -Math.PI / 2; } }
   for (const s of [-1, 1]) p.bb(M.gold, 1.5, 0.02, 0.01, 0, 0.9, s * 0.758, 0.003);
-  p.bb(M.mahogany, 0.4, 0.42, 1.2, -0.56, 0.06, 0, 0.01); p.pil(M.fabricRed, 0.38, 0.1, 1.16, -0.55, 0.48, 0, 0.35, 0.2, 3, 14);
-  p.pil(M.fabricRed, 0.08, 0.5, 1.1, -0.72, 0.6, 0, 0.5, 0.25, 3, 12);
   // gilt folding gate
   for (let i = 0; i <= 8; i++) p.b(M.gold, 0.015, 2.16, 0.015, 0.78, 0.08, -0.74 + i * 0.09);
   for (const y of [0.15, 1.05, 2.16]) p.b(M.gold, 0.02, 0.02, 0.75, 0.78, y, -0.38);
   for (let i = 0; i < 4; i++) p.t(M.gold, 0.06, 0.007, 0.78, 1.6, -0.65 + i * 0.18, 'x', 12, 3);
-  p.lathe(M.gold, [[0, 0], [0.18, 0], [0.16, -0.03], [0, -0.04]], 0, 2.3, 0, 16); p.lathe(M.lampGlow, [[0, -0.13], [0.08, -0.12], [0.14, -0.08], [0.15, -0.03]], 0, 2.3, 0, 16); // bottom → top: faces outwards
   p.cz(M.brass, 0.015, 1.4, -0.72, 0.95, 0, 8);
 });
 
@@ -526,7 +537,7 @@ export const coalPile = def('coalPile', (o) => [o.w ?? 3, o.d ?? 2, o.h ?? 1.2],
   const w = o.w ?? 3, d = o.d ?? 2, h = o.h ?? 1.2;
   p.add(G.heap(w, d, h, Math.max(6, Math.round(d * 6)), Math.max(8, Math.round(w * 6))), M.coal, 0, 0, 0);
   const r = rngOf(Math.round(w * 10 + d));
-  for (let i = 0; i < 10; i++) p.bb(M.coal, 0.1 + r() * 0.08, 0.07, 0.12 + r() * 0.08, (r() - 0.5) * d * 0.9, 0, (r() - 0.5) * w * 0.9, 0.02).rotation.y = r() * 3;
+  for (let i = 0; i < 10; i++) p.bb(M.coal, 0.1 + r() * 0.08, 0.07, 0.12 + r() * 0.08, (r() - 0.5) * d * 0.9, -0.01, (r() - 0.5) * w * 0.9, 0.02).rotation.y = r() * 3;
 });
 export const wheelbarrow = def('wheelbarrow', [0.62, 1.4, 0.62], (p) => {
   const tray = p.rev(M.iron, [{ o: -0.04, y: 0 }, { o: 0, y: 0.02 }, { o: 0.06, y: 0.26 }, { o: 0.07, y: 0.28 }, { o: 0.05, y: 0.28 }, { o: -0.005, y: 0.04 }], { perim: G.rectLoop(0.5, 0.44, 0.06, 2), capTop: true }, 0.1, 0.3, 0);

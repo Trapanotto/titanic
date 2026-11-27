@@ -2,16 +2,20 @@
 // Pure movement core – no DOM access here, so it can be tested headless. Input is written into
 // `player.input` by src/app/controls.js (keyboard / mouse / touch).
 import { SHIP, hullHalfWidth } from '../core/constants.js';
+import { ENGINE } from '../core/engine.js';
 
 export const PLAYER = {
   radius: 0.3,
   height: 1.7,
+  crouchHeight: 0.85,
   eye: 1.65,
+  crouchEye: 0.72,
   walkSpeed: 2.4,
+  crouchSpeed: 1.1,
   runSpeed: 6,
   flySpeed: 12,
   flyFast: 40,
-  jumpSpeed: 2.8,     // ~0.4 m jump
+  jumpSpeed: 3.6,     // ~0.66 m jump
   gravity: 9.81,
   maxStep: 0.75,      // follow the ground up/down to this difference
   subStep: 0.2,       // max horizontal distance per collision step
@@ -39,6 +43,7 @@ export class Player {
     this.yaw = 0;
     this.pitch = 0;
     this.mode = 'walk';
+    this.crouch = false;
     this.grounded = false;
     this.headBob = true;
     this.flySpeedScale = 1;
@@ -60,6 +65,8 @@ export class Player {
     this._eyeY = PLAYER.eye;   // smoothed camera height (stairs / steps)
     this._bobPhase = 0;
     this._bobAmp = 0;
+    this._swellTime = 0;
+    this._swellAmp = 0;
     this._setMode('walk', true);
   }
 
@@ -72,6 +79,7 @@ export class Player {
     if (t.yaw !== undefined) this.yaw = t.yaw;
     this.pitch = t.pitch ?? 0;
     this.vel.x = this.vel.y = this.vel.z = 0;
+    this.crouch = false;
     this._setMode('walk');
     // settle on the real ground if the given height is slightly off
     const g = this.world.groundAt(p.x, p.z, p.y + 0.3);
@@ -91,6 +99,7 @@ export class Player {
     if (yaw !== undefined) this.yaw = yaw;
     if (pitch !== undefined) this.pitch = clamp(pitch, -PLAYER.maxPitch, PLAYER.maxPitch);
     this.vel.x = this.vel.y = this.vel.z = 0;
+    this.crouch = false;
     this._setMode('fly');
     this._eyeY = y;
     this.applyCamera();
@@ -114,12 +123,20 @@ export class Player {
   /** Toggle walk <-> fly. Returns the resulting mode. */
   toggleFly() {
     if (this.mode === 'walk') {
+      this.crouch = false;
       this._setMode('fly');
       this.vel.y = 0;
     } else if (!this.tryLand()) {
       this.onHint?.('Kein Deck unter dir – fliege zu einem Deck');
     }
     return this.mode;
+  }
+
+  /** Toggle crouch / crawl in walk mode. Returns the resulting crouch state. */
+  toggleCrouch() {
+    if (this.mode !== 'walk') return false;
+    this.crouch = !this.crouch;
+    return this.crouch;
   }
 
   /** fly -> walk if there is ground within PLAYER.landRange below the camera. */
@@ -157,17 +174,28 @@ export class Player {
     const cam = this.camera;
     if (!cam) return;
     const p = this.pos;
-    const target = p.y + PLAYER.eye;
+    const eye = this.mode === 'walk' && this.crouch ? PLAYER.crouchEye : PLAYER.eye;
+    const target = p.y + eye;
     if (this.mode === 'fly' || dt <= 0) this._eyeY = target;
     else {
-      // smooth steps and stair treads, but never lag far behind
+      // smooth steps, stair treads and crouch transitions, but never lag far behind
       this._eyeY += (target - this._eyeY) * (1 - Math.exp(-16 * dt));
-      this._eyeY = clamp(this._eyeY, target - 0.35, target + 0.35);
+      this._eyeY = clamp(this._eyeY, target - 1.0, target + 1.0);
     }
     let bob = 0;
-    if (this.headBob && this.mode === 'walk') bob = Math.sin(this._bobPhase * 2) * 0.028 * this._bobAmp;
-    cam.position.set(p.x, this._eyeY + bob, p.z);
-    cam.rotation.set(this.pitch, this.yaw - HALF_PI, 0);
+    if (this.headBob && this.mode === 'walk') bob = Math.sin(this._bobPhase * 2) * (this.crouch ? 0.015 : 0.028) * this._bobAmp;
+    if (dt > 0) this._swellTime += dt;
+    const wantSwell = this.headBob && this.mode === 'walk' ? (0.45 + 0.55 * (ENGINE.speed ?? 1)) : 0;
+    this._swellAmp += (wantSwell - this._swellAmp) * (dt > 0 ? Math.min(1, dt * 2.5) : 1);
+    const st = this._swellTime, a = this._swellAmp;
+    const shipRoll = (Math.sin(st * 0.57) * 0.0065 + Math.sin(st * 0.37 + 1.4) * 0.0025) * a;
+    const shipPitch = (Math.sin(st * 0.74 + 0.8) * 0.0032 + Math.sin(st * 0.43 + 2.6) * 0.0012) * a;
+    const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
+    const camPitchOff = shipPitch * cy - shipRoll * sy;
+    const camRollOff = shipRoll * cy + shipPitch * sy;
+    const heave = Math.sin(st * 0.74 + 0.8) * 0.018 * a;
+    cam.position.set(p.x, this._eyeY + bob + heave, p.z);
+    cam.rotation.set(this.pitch + camPitchOff, this.yaw - HALF_PI, camRollOff);
   }
 
   // ---------------------------------------------------------------- internals
@@ -206,7 +234,8 @@ export class Player {
     let tz = -inp.f * sy + inp.s * cy;
     const len = Math.hypot(tx, tz);
     if (len > 1) { tx /= len; tz /= len; }
-    const speed = inp.run ? PLAYER.runSpeed : PLAYER.walkSpeed;
+    const speed = this.crouch ? PLAYER.crouchSpeed : (inp.run ? PLAYER.runSpeed : PLAYER.walkSpeed);
+    const height = this.crouch ? PLAYER.crouchHeight : PLAYER.height;
     const k = 1 - Math.exp(-(this.grounded ? (len > 0.01 ? 10 : 14) : 2.5) * dt);
     v.x += (tx * speed - v.x) * k;
     v.z += (tz * speed - v.z) * k;
@@ -220,7 +249,7 @@ export class Player {
       const n = Math.ceil(dist / PLAYER.subStep);
       const sx = dx / n, sz = dz / n;
       for (let i = 0; i < n; i++) {
-        const c = w.collide(p.x + sx, p.z + sz, p.y, PLAYER.radius, PLAYER.height);
+        const c = w.collide(p.x + sx, p.z + sz, p.y, PLAYER.radius, height);
         p.x = c.x; p.z = c.z;
         if (this.grounded) this._followGround();
       }
@@ -235,7 +264,7 @@ export class Player {
     // --- vertical ---
     if (this.grounded) {
       this._followGround();
-      if (this.grounded && inp.jump) { v.y = PLAYER.jumpSpeed; this.grounded = false; }
+      if (this.grounded && inp.jump) { this.crouch = false; v.y = PLAYER.jumpSpeed; this.grounded = false; }
     }
     if (!this.grounded) {
       v.y = Math.max(v.y - PLAYER.gravity * dt, -40);

@@ -241,15 +241,12 @@ export function bulkhead(world, deck, x, opts = {}) {
   const F = mats.steelDark;
   for (const d of doors) {
     const za = d.z - d.w / 2, zb = d.z + d.w / 2, yt = y0 + d.h;
-    b.poly(M, [[x - t, y0, za], [x + t, y0, za], [x + t, yt, za], [x - t, yt, za]], [0, 0, 1], undefined, x);
-    b.poly(M, [[x - t, y0, zb], [x + t, y0, zb], [x + t, yt, zb], [x - t, yt, zb]], [0, 0, -1], undefined, x);
-    b.poly(M, [[x - t, yt, za], [x + t, yt, za], [x + t, yt, zb], [x - t, yt, zb]], [0, -1, 0], undefined, x);
     if (wt) {
       const e = t + 0.04;
       // can be lowered (app/interact.js): by hand at the door, the ones on the tank top also from the bridge
-            b.box(F, x - e, y0, za - 0.09, x + e, yt + 0.09, za);
+      b.box(F, x - e, y0, za - 0.09, x + e, yt + 0.09, za);
       b.box(F, x - e, y0, zb, x + e, yt + 0.09, zb + 0.09);
-      b.box(F, x - e, yt, za, x + e, yt + 0.09, zb);
+      b.box(F, x - e, yt, za, x + e, yt + 0.09, zb, 'xXyY');
       b.box(F, x - e, y0, za, x + e, y0 + 0.12, zb, 'xXY');
       const top = Math.min(y1 - 0.05, yt + 0.15 + d.h);
       // can be lowered (app/interact.js): by hand at the door, the ones on the tank top also from the bridge.
@@ -259,6 +256,10 @@ export function bulkhead(world, deck, x, opts = {}) {
         for (const z of [za - 0.12, zb + 0.06]) b.box(mats.iron, x + e, y0, z, x + e + 0.07, top, z + 0.06);
         b.box(mats.brass, x + e + 0.05, yt + 0.5, d.z - 0.05, x + e + 0.09, yt + 0.6, d.z + 0.05);
       }
+    } else {
+      b.poly(M, [[x - t, y0, za], [x + t, y0, za], [x + t, yt, za], [x - t, yt, za]], [0, 0, 1], undefined, x);
+      b.poly(M, [[x - t, y0, zb], [x + t, y0, zb], [x + t, yt, zb], [x - t, yt, zb]], [0, 0, -1], undefined, x);
+      b.poly(M, [[x - t, yt, za], [x + t, yt, za], [x + t, yt, zb], [x - t, yt, zb]], [0, -1, 0], undefined, x);
     }
   }
   b.flush();

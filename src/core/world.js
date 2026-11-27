@@ -18,7 +18,7 @@ const REST_X = 12;                  // everything else: 12 m cells (half zones) 
 const LOD_SMALL = { r: 0.2, d: 60 }; // objects with bounding radius < r are not drawn beyond d (m) from their chunk box
 const LOD_TINY = { r: 0.08, d: 30 };
 const TINY_INST = { r: 0.06, d: 60 }; // exterior instanced details (rivets) beyond d from their slice
-const EXT_TAGS = new Set(['environment', 'exterior', 'fittings']); // colliders of these modules never occlude (windows)
+const EXT_TAGS = new Set(['environment', 'exterior', 'fittings', 'stairs']); // colliders of these modules never occlude (windows, stair balustrades/closures, open lift grilles)
 const EMPTY = [];
 
 /** Yield to the event loop without timer throttling (background tabs clamp setTimeout to >= 1 s). */
@@ -59,7 +59,8 @@ export class World {
     this.lamps = [];
     this.updaters = [];
     this._timeListeners = [];
-    this.state = { night: false, inside: false, deck: 'boat', mode: 'walk' };
+    this._weatherListeners = [];
+    this.state = { night: false, inside: false, deck: 'boat', mode: 'walk', weather: 'klar' };
     /** false: draw every chunk of the zones in range (old behaviour, for comparisons) */
     this.culling = true;
     this.chunks = [];             // interior chunks (baked meshes + static instanced meshes with a world box)
@@ -105,10 +106,10 @@ export class World {
    * baked chunks of those zones are additionally tested against the area visible from the camera (2D rays at eye
    * height against the full-height interior walls) – walls occlude everything behind them.
    */
-  updateVisibility(p, now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000) {
+  updateVisibility(p, now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000, feetY = p.y - 1.6) {
     const st = this.state;
-    st.inside = isInterior(p.x, p.y - 1.2, p.z);
-    st.deck = deckAtY(p.y - 1.6);
+    st.inside = isInterior(p.x, feetY + 0.4, p.z);
+    st.deck = deckAtY(feetY);
     const nearShip = Math.abs(p.z) < 45;
     // Occlusion by the interior walls – inside, and also on the open decks (exterior walls never occlude, so the
     // rooms seen through windows stay visible). Outside, the adjacent deck keeps the plain distance rule (views
@@ -439,14 +440,29 @@ export class World {
     const open = this.doorSaved?.has(key) ? !init.open : init.open; // left differently on an earlier visit
     d = { key, ...init, open, open0: init.open, t: open ? 1 : 0 };
     const [x0, y0, z0, x1, y1, z1] = init.box;
-    const b = (d.col = { x0, x1, y0, y1: open ? -1e9 : y1, z0, z1, s: 0, tag: 'door', top: y1 });
-    for (let cx = Math.floor(b.x0 / CELL); cx <= Math.floor(b.x1 / CELL); cx++) {
-      for (let cz = Math.floor(b.z0 / CELL); cz <= Math.floor(b.z1 / CELL); cz++) {
-        const k = key2(cx, cz);
-        let a = this._grid.get(k);
-        if (!a) this._grid.set(k, (a = []));
-        a.push(b);
+    const addBox = (b) => {
+      for (let cx = Math.floor(b.x0 / CELL); cx <= Math.floor(b.x1 / CELL); cx++) {
+        for (let cz = Math.floor(b.z0 / CELL); cz <= Math.floor(b.z1 / CELL); cz++) {
+          const k = key2(cx, cz);
+          let a = this._grid.get(k);
+          if (!a) this._grid.set(k, (a = []));
+          a.push(b);
+        }
       }
+      return b;
+    };
+    d.col = addBox({ x0, x1, y0, y1: open ? -1e9 : y1, z0, z1, s: 0, tag: 'door', top: y1 });
+    if (!init.kind && init.leaves?.length) {
+      d.leafCols = init.leaves.map((L) => {
+        const hi = 0.036, off = L.sgn * (L.T2 + 0.02), al = Math.cos(L.ang) * L.dir, pr = Math.sin(L.ang) * L.sgn;
+        const dx = L.X ? al : pr, dz = L.X ? pr : al, lw = L.lw ?? (init.w - 0.02), ht = 0.025;
+        const hx = L.X ? L.e + L.dir * hi : L.c + off, hz = L.X ? L.c + off : L.e + L.dir * hi;
+        const tx = hx + dx * lw, tz = hz + dz * lw;
+        return addBox({
+          x0: Math.min(hx, tx) - ht, x1: Math.max(hx, tx) + ht, y0, y1: open ? y1 : -1e9,
+          z0: Math.min(hz, tz) - ht, z1: Math.max(hz, tz) + ht, s: 0, tag: 'doorLeaf', top: y1,
+        });
+      });
     }
     this.doors.set(key, d);
     return d;
@@ -549,6 +565,8 @@ export class World {
   onUpdate(fn) { this.updaters.push(fn); }
   onTimeChange(fn) { this._timeListeners.push(fn); fn(this.state.night); }
   setNight(night) { this.state.night = !!night; for (const fn of this._timeListeners) fn(this.state.night); }
+  onWeatherChange(fn) { this._weatherListeners.push(fn); fn(this.state.weather); }
+  setWeather(mode) { if (mode === 'klar' || mode === 'diesig' || mode === 'nebel') { this.state.weather = mode; for (const fn of this._weatherListeners) fn(mode); } }
   update(dt, t) { for (const fn of this.updaters) fn(dt, t); }
 
   // ---------- static batching ----------

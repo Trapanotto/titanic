@@ -1,7 +1,7 @@
 // Interior kit – all STAIRS of the ship (scene module) + floor-hole / keep-out helpers for deck layouts.
 import * as THREE from 'three';
 import { mats } from '../core/materials.js';
-import { DECK_Y, STAIRS, MACHINERY_ACCESS, SLAB, ceilingY, LIFT2 } from '../core/constants.js';
+import { DECK_Y, STAIRS, MACHINERY_ACCESS, SLAB, ceilingY, LIFT1, LIFT2 } from '../core/constants.js';
 import { Batch, kitMats, overlap } from './batch.js';
 import { def, place } from './props-core.js';
 import { ceilingLight, ceilingRose, chandelier, pilaster, sconce } from './props-decor.js';
@@ -58,15 +58,20 @@ export function stairFlights() {
 /** well rectangle (floor hole) of an imperial interval */
 const wellRect = (f) => ({ id: f.st.id, x0: f.x0, x1: f.xf, z0: f.zc - f.hwi, z1: f.zc + f.hwi });
 
-/** Openings in the FLOOR of `deck`: lane rectangle of every flight arriving from below / imperial well (+ machinery access on F). */
+/** Openings in the FLOOR of `deck`: lane rectangle of every flight arriving from below / imperial well (+ lift shafts & machinery access). */
 export function stairHoles(deck) {
   const out = stairFlights().filter((f) => f.to === deck).map((f) => (f.type === 'imperial' ? wellRect(f) : { id: f.st.id, x0: f.st.x0, x1: f.st.x1, z0: f.z0, z1: f.z1 }));
+  if (LIFT1.decks.indexOf(deck) > 0) out.push({ id: 'lift1', x0: LIFT1.x0, x1: LIFT1.x1, z0: LIFT1.z0, z1: LIFT1.z1 });
+  if (LIFT2.decks.indexOf(deck) > 0) out.push({ id: 'lift2', x0: LIFT2.x0, x1: LIFT2.x1, z0: LIFT2.z0, z1: LIFT2.z1 });
   if (deck === 'F') for (const m of MACHINERY_ACCESS) out.push({ id: m.id, x0: m.x0, x1: m.x1, z0: m.z0, z1: m.z1 });
   return out;
 }
-/** Rectangles occupied by the flights that RISE from `deck` (scissor: the enclosed lane; imperial: the whole well). */
+/** Rectangles occupied by the flights (and lift shafts) that RISE from `deck` (scissor: the enclosed lane; imperial: the whole well). */
 export function stairSolids(deck) {
-  return stairFlights().filter((f) => f.from === deck).map((f) => (f.type === 'imperial' ? wellRect(f) : { id: f.st.id, x0: f.st.x0, x1: f.st.x1, z0: f.z0, z1: f.z1 }));
+  const out = stairFlights().filter((f) => f.from === deck).map((f) => (f.type === 'imperial' ? wellRect(f) : { id: f.st.id, x0: f.st.x0, x1: f.st.x1, z0: f.z0, z1: f.z1 }));
+  if (LIFT1.decks.slice(0, -1).includes(deck)) out.push({ id: 'lift1', x0: LIFT1.x0, x1: LIFT1.x1, z0: LIFT1.z0, z1: LIFT1.z1 });
+  if (LIFT2.decks.slice(0, -1).includes(deck)) out.push({ id: 'lift2', x0: LIFT2.x0, x1: LIFT2.x1, z0: LIFT2.z0, z1: LIFT2.z1 });
+  return out;
 }
 /** Rectangles deck layouts must keep free of walls and furniture (scissor: both lanes, +2 m in x, +0.3 m in z; imperial: `keep`). */
 export function stairKeepouts(deck) {
@@ -785,16 +790,27 @@ function buildImperial(world, st, B) {
 function liftShaft(world, deck, b) {
   const { x0, x1, z0, z1 } = LIFT2, Y = DECK_Y[deck], H = Math.min(2.34, ceilingY(deck) - Y - 0.02), oak = mats.oak, gold = mats.gold, iron = kitMats.ironwork;
   const dado = 0.92, head = H - 0.14, t = 0.035;
-  for (const x of [x0, x1]) for (const z of [z0, z1]) b.post(oak, x, z, Y, Y + H, 0.07);
-  // head frame and plinth
+  const isTop = deck === LIFT2.decks[LIFT2.decks.length - 1];
+  const yBot = deck === LIFT2.decks[0] ? Y : Y - SLAB;
+  for (const x of [x0, x1]) for (const z of [z0, z1]) b.post(oak, x, z, yBot, Y + H, 0.07);
+  // head frame and plinth (solid shaft top cap only on the highest deck)
   b.box(oak, x0, Y + head, z0 - 0.02, x1, Y + H, z0 + 0.02); b.box(oak, x0, Y + head, z1 - 0.02, x1, Y + H, z1 + 0.02);
   b.box(oak, x0 - 0.02, Y + head, z0, x0 + 0.02, Y + H, z1); b.box(oak, x1 - 0.02, Y + head, z0, x1 + 0.02, Y + H, z1);
-  b.box(oak, x0, Y + H - 0.03, z0, x1, Y + H, z1, 'yY');
-  // closed sides: panelled dado, grille above (aft, forward and outboard face)
+  if (isTop) b.box(oak, x0, Y + H - 0.03, z0, x1, Y + H, z1, 'yY');
+  // closed sides: panelled dado, double-sided grille above (aft, forward and outboard face)
   const side = (xa, za, xb, zb) => {
     const X = za === zb;
-    if (X) { b.box(oak, xa, Y, za - t / 2, xb, Y + dado, za + t / 2, 'zZY'); b.box(oak, xa + 0.1, Y + 0.14, za - t / 2 - 0.008, xb - 0.1, Y + dado - 0.12, za + t / 2 + 0.008, 'zZ'); b.wallX(iron, za, xa, xb, Y + dado, Y + head, 1); b.box(oak, xa, Y + dado, za - 0.025, xb, Y + dado + 0.04, za + 0.025); }
-    else { b.box(oak, xa - t / 2, Y, za, xa + t / 2, Y + dado, zb, 'xXY'); b.box(oak, xa - t / 2 - 0.008, Y + 0.14, za + 0.1, xa + t / 2 + 0.008, Y + dado - 0.12, zb - 0.1, 'xX'); b.wallZ(iron, xa, za, zb, Y + dado, Y + head, 1); b.box(oak, xa - 0.025, Y + dado, za, xa + 0.025, Y + dado + 0.04, zb); }
+    if (X) {
+      b.box(oak, xa, yBot, za - t / 2, xb, Y + dado, za + t / 2, 'zZY');
+      b.box(oak, xa + 0.1, Y + 0.14, za - t / 2 - 0.008, xb - 0.1, Y + dado - 0.12, za + t / 2 + 0.008, 'zZ');
+      for (const sd of [-1, 1]) b.wallX(iron, za + sd * 0.002, xa, xb, Y + dado, Y + head, sd);
+      b.box(oak, xa, Y + dado, za - 0.025, xb, Y + dado + 0.04, za + 0.025);
+    } else {
+      b.box(oak, xa - t / 2, yBot, za, xa + t / 2, Y + dado, zb, 'xXY');
+      b.box(oak, xa - t / 2 - 0.008, Y + 0.14, za + 0.1, xa + t / 2 + 0.008, Y + dado - 0.12, zb - 0.1, 'xX');
+      for (const sd of [-1, 1]) b.wallZ(iron, xa + sd * 0.002, za, zb, Y + dado, Y + head, sd);
+      b.box(oak, xa - 0.025, Y + dado, za, xa + 0.025, Y + dado + 0.04, zb);
+    }
   };
   side(x0, z0, x1, z0); side(x0, z0, x0, z1); side(x1, z0, x1, z1);
   // gate (+z face): gilt bars with rails, brass sill, indicator plate with a pointer
