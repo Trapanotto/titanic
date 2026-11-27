@@ -274,9 +274,9 @@ export const bookcase = def('bookcase', (o) => [o.w ?? 1.4, 0.4, 2.05], (p, o) =
 export const shelves = def('shelves', (o) => [o.w ?? 1.5, 0.45, 1.9], (p, o) => {
   const w = o.w ?? 1.5, m = matOf(o.mat, M.pine), kind = o.kind ?? 'stores', r = rngOf(17 + (o.v ?? 0) * 31 + w * 10);
   for (const s of [-1, 1]) p.b(m, 0.45, 1.9, 0.035, 0, 0, s * (w / 2 - 0.018));
-  if (w > 1.3) p.b(m, 0.43, 1.88, 0.025, 0, 0, 0);
+  if (w > 1.3) p.b(m, 0.39, 1.87, 0.025, -0.02, 0, 0);
   const lv = [0.12, 0.6, 1.08, 1.56];
-  for (const y of lv) { p.b(m, 0.43, 0.025, w - 0.07, 0, y, 0); p.b(m, 0.02, 0.05, w - 0.07, 0.205, y + 0.025, 0); } // board + fiddle rail
+  for (const y of lv) { p.b(m, 0.41, 0.025, w - 0.07, -0.01, y, 0); p.b(m, 0.02, 0.05, w - 0.07, 0.205, y + 0.025, 0); } // board + fiddle rail
   p.b(m, 0.43, 0.025, w - 0.07, 0, 1.875, 0);
   const cells = (fn) => { for (let i = 0; i < lv.length; i++) { const y = lv[i] + 0.025; if (kind === 'stores' && i === 0 && r() < 0.6) continue; if (w > 1.3) { fn(y, -w / 2 + 0.04, -0.015, i, 0); fn(y, 0.015, w / 2 - 0.04, i, 1); } else fn(y, -w / 2 + 0.04, w / 2 - 0.04, i, 0); } };
   if (kind === 'crockery') {

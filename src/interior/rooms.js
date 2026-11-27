@@ -436,8 +436,8 @@ class DeckPlan {
     for (const r of this.rooms) {
       yield;
       const fm = r.floor ?? this.def.floor;
-      if (fm) this._overlay(matOf(fm), r, Y + 0.012, false, r.stairs ? this.holes : []);
-      if (r.ceiling) this._overlay(matOf(r.ceiling), r, top - 0.012, true, r.stairs ? upHoles : []);
+      if (fm) this._overlay(matOf(fm), r, Y + 0.01, false, r.stairs ? this.holes : []);
+      if (r.ceiling) this._overlay(matOf(r.ceiling), r, top - 0.01, true, r.stairs ? upHoles : []);
       r.doorsAll = doorsOfRoom.get(r);
       const s = r.safe, usable = s.x1 - s.x0 > 0.5 && s.z1 - s.z0 > 0.5;
       const lamp = r.lamp ?? this.def.lamp;
@@ -794,7 +794,7 @@ class DeckPlan {
       }
       // threshold strip (steppable)
       const tm = steelDoor ? mats.steelDark : st.grand ? mats.brass : (dstyle === 'pine' || dstyle === 'white' ? mats.oak : matOf(DOOR_MATS[dstyle] ?? 'oak'));
-      box(tm, da, Y, l.c - T2 - 0.03, db, Y + (steelDoor ? 0.03 : 0.012), l.c + T2 + 0.03, 'xXYzZ');
+      box(tm, da, Y, l.c - T2 - 0.03, db, Y + (steelDoor ? 0.035 : 0.022), l.c + T2 + 0.03, 'xXYzZ');
     } else {
       this._cap(l, da, Y, yh, 1, run.sn.wall); this._cap(l, db, Y, yh, -1, run.sn.wall);
       if (X) b.poly(run.sn.wall, [[da, yh, l.c - T2], [db, yh, l.c - T2], [db, yh, l.c + T2], [da, yh, l.c + T2]], [0, -1, 0]);

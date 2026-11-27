@@ -138,15 +138,15 @@ function windowDetail(batch, P, fpiece, piece, { u0, u1, v0, v1, t, op, frameMat
     batch.oquad(mats.glass, P(u0, v0, wm), P(u1, v0, wm), P(u1, v1, wm), P(u0, v1, wm), outN);
   }
   const fa = 0.065, fs = 0.05;
-  // architrave (proud of the wall)
-  fpiece(u0 + r - (r ? 0 : fa), u1 - r + (r ? 0 : fa), v1, v1 + fa, -0.035, 0.005, frameMat);
-  fpiece(u0 - fa, u0, v0 - 0.01, v1 - r, -0.035, 0.005, frameMat);
-  fpiece(u1, u1 + fa, v0 - 0.01, v1 - r, -0.035, 0.005, frameMat);
-  // sash inside the opening
-  fpiece(u0 + r, u1 - r, v1 - fs, v1, wm - 0.03, wm + 0.03, frameMat);
-  fpiece(u0, u1, v0, v0 + fs, wm - 0.03, wm + 0.03, frameMat);
-  fpiece(u0, u0 + fs, v0 + fs, v1 - Math.max(r, fs), wm - 0.03, wm + 0.03, frameMat);
-  fpiece(u1 - fs, u1, v0 + fs, v1 - Math.max(r, fs), wm - 0.03, wm + 0.03, frameMat);
+  // architrave (proud of the wall, flush with exterior face w=0 so it never overlaps the reveal)
+  fpiece(u0 + r - (r ? 0 : fa), u1 - r + (r ? 0 : fa), v1, v1 + fa, -0.035, 0, frameMat, 'pz');
+  fpiece(u0 - fa, u0, v0 - 0.01, v1 - r, -0.035, 0, frameMat, 'pz');
+  fpiece(u1, u1 + fa, v0 - 0.01, v1 - r, -0.035, 0, frameMat, 'pz');
+  // sash inside the opening (skip faces pressed flush against the white wall reveals)
+  fpiece(u0 + r, u1 - r, v1 - fs, v1, wm - 0.03, wm + 0.03, frameMat, r ? 'py' : 'py px nx');
+  fpiece(u0, u1, v0, v0 + fs, wm - 0.03, wm + 0.03, frameMat, 'ny px nx');
+  fpiece(u0, u0 + fs, v0 + fs, v1 - Math.max(r, fs), wm - 0.03, wm + 0.03, frameMat, 'nx py ny');
+  fpiece(u1 - fs, u1, v0 + fs, v1 - Math.max(r, fs), wm - 0.03, wm + 0.03, frameMat, 'px py ny');
   // glazing bars
   const panes = op.panes || (u1 - u0 > 1.0 ? 2 : 1);
   for (let k = 1; k < panes; k++) { const m = u0 + ((u1 - u0) * k) / panes; fpiece(m - 0.022, m + 0.022, v0 + fs, v1 - (r ? 0.02 : fs), wm - 0.025, wm + 0.025, frameMat); }
@@ -326,7 +326,7 @@ function roofSlab(world, batch, x0, x1, hw, y, holes = []) {
   batch.cast = true;
   for (const h of holes) {
     // coaming around the opening
-    const c = 0.08, ct = y + 0.35, cb = y - SLAB + 0.03;
+    const c = 0.08, ct = y + 0.35, cb = y - SLAB + 0.05;
     batch.box(mats.paintWhite, h.x0 - c, cb, h.z0 - c, h.x1 + c, ct, h.z0);
     batch.box(mats.paintWhite, h.x0 - c, cb, h.z1, h.x1 + c, ct, h.z1 + c);
     batch.box(mats.paintWhite, h.x0 - c, cb, h.z0, h.x0, ct, h.z1);

@@ -662,7 +662,7 @@ export function ceilingDetails(plan, { domeF, domeA }) {
     b.box(o, h.x0 - e, top - 0.1, h.z0, h.x0, top, h.z1, 'xXzZy');
     b.box(o, h.x1, top - 0.1, h.z0, h.x1 + e, top, h.z1, 'xXzZy');
     const E = e + 0.05;
-    for (const [x0, x1, z0, z1] of [[h.x0 - E, h.x1 + E, h.z0 - E, h.z0 - e + 0.04], [h.x0 - E, h.x1 + E, h.z1 + e - 0.04, h.z1 + E], [h.x0 - E, h.x0 - e + 0.04, h.z0 - e, h.z1 + e], [h.x1 + e - 0.04, h.x1 + E, h.z0 - e, h.z1 + e]]) {
+    for (const [x0, x1, z0, z1] of [[h.x0 - E, h.x1 + E, h.z0 - E, h.z0 - e + 0.04], [h.x0 - E, h.x1 + E, h.z1 + e - 0.04, h.z1 + E], [h.x0 - E, h.x0 - e + 0.04, h.z0 - e + 0.04, h.z1 + e - 0.04], [h.x1 + e - 0.04, h.x1 + E, h.z0 - e + 0.04, h.z1 + e - 0.04]]) {
       b.box(g, x0, top - 0.13, z0, x1, top - 0.1, z1, 'xXzZy');
     }
     for (const [x0, x1, z0, z1] of [[h.x0, h.x1, h.z0 - 0.01, h.z0], [h.x0, h.x1, h.z1, h.z1 + 0.01], [h.x0 - 0.01, h.x0, h.z0, h.z1], [h.x1, h.x1 + 0.01, h.z0, h.z1]]) b.box(g, x0, top, z0, x1, top + 0.05, z1, 'xXzZ');
