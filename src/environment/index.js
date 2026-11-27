@@ -32,7 +32,7 @@ const LAMP_EVERY = 0.12;
 const SH_POOL = Math.max(0, TIER.lampShadows ?? 2), POOL = Math.max(1, (TIER.lamps ?? 12) - SH_POOL);
 const LAMP_DAY_OUT = 0.6, LAMP_NIGHT_OUT = 14, LAMP_INSIDE = 9, LAMP_MACHINE = 1.35, VOL_NIGHT = 13;
 const RANGE_INSIDE = 11, RANGE_OUT = 15, RANGE_MACHINE = 13;
-const SH_RANGE = 9, SH_NEAR = 0.3, SH_EVERY = 0.1, SH_MAP = { niedrig: 256, mittel: 512, hoch: 512 };
+const SH_RANGE = 9, SH_NEAR = 0.3, SH_EVERY = 0.35, SH_MAP = { niedrig: 256, mittel: 512, hoch: 512 };
 const OTHER_ROOM = 5;   // squared-distance penalty of lamps outside the camera's room
 const BUCKET = 8, BUCKET_X0 = -168, BUCKETS = 42, LAMP_SEARCH = 30;
 // share of the sky light that reaches into the interior, per deck (windows / skylights / open doors)
@@ -164,37 +164,50 @@ export async function build(world) {
   const halos = createHalos();
   scene.add(halos.points);
 
-  // ---------- PBR environment maps ----------
+  // ---------- PBR environment maps (day upfront, night/inside/machine lazily on first switch) ----------
   let envDay = null, envNight = null, envInside = null, envMachine = null;
-  if (renderer) {
+  function bakeEnv(kind) {
+    if (!renderer) return null;
+    const prevNight = shared.uNight.value;
+    let pmrem, envScene, geo, insideMat;
     try {
-      const pmrem = new THREE.PMREMGenerator(renderer);
-      const envScene = new THREE.Scene();
-      const geo = new THREE.SphereGeometry(20, 48, 24);
-      const ball = new THREE.Mesh(geo, sky.material);
+      pmrem = new THREE.PMREMGenerator(renderer);
+      envScene = new THREE.Scene();
+      geo = new THREE.SphereGeometry(20, 48, 24);
+      let mat = sky.material, blur = 0.02;
+      if (kind === 'day' || kind === 'night') {
+        sky.uniforms.uEnv.value = 1;
+        shared.uNight.value = kind === 'night' ? 1 : 0;
+      } else {
+        insideMat = createInteriorEnvMaterial(kind === 'machine' ? 1 : 0);
+        mat = insideMat; blur = 0.03;
+      }
+      const ball = new THREE.Mesh(geo, mat);
       ball.frustumCulled = false;
       envScene.add(ball);
-      sky.uniforms.uEnv.value = 1;
-      shared.uNight.value = 0;
-      envDay = pmrem.fromScene(envScene, 0.02, 0.1, 100).texture;
-      const all = TIER.envMaps !== 'min'; // phones: one outside + one inside map
-      shared.uNight.value = 1;
-      envNight = all ? pmrem.fromScene(envScene, 0.02, 0.1, 100).texture : envDay;
-      const insideMat = createInteriorEnvMaterial(0);
-      ball.material = insideMat;
-      envInside = pmrem.fromScene(envScene, 0.03, 0.1, 100).texture;
-      insideMat.uniforms.uKind.value = 1;
-      envMachine = all ? pmrem.fromScene(envScene, 0.03, 0.1, 100).texture : envInside;
+      return pmrem.fromScene(envScene, blur, 0.1, 100).texture;
+    } catch (e) {
+      console.warn(`[environment] PMREM (${kind}) failed`, e);
+      return null;
+    } finally {
       sky.uniforms.uEnv.value = 0;
-      shared.uNight.value = 0;
-      pmrem.dispose(); geo.dispose(); insideMat.dispose();
+      shared.uNight.value = prevNight;
+      pmrem?.dispose(); geo?.dispose(); insideMat?.dispose();
+    }
+  }
+  function ensureEnv(kind) {
+    if (!envDay) return null;
+    const all = TIER.envMaps !== 'min'; // phones: one outside + one inside map
+    if (kind === 'night') return (envNight ??= all ? (bakeEnv('night') || envDay) : envDay);
+    if (kind === 'inside') return (envInside ??= bakeEnv('inside') || envDay);
+    if (kind === 'machine') return (envMachine ??= all ? (bakeEnv('machine') || ensureEnv('inside')) : ensureEnv('inside'));
+    return envDay;
+  }
+  if (renderer) {
+    envDay = bakeEnv('day');
+    if (envDay) {
       scene.environment = envDay;
       scene.environmentIntensity = ENV_DAY;
-    } catch (e) {
-      sky.uniforms.uEnv.value = 0;
-      shared.uNight.value = 0;
-      envDay = envNight = envInside = envMachine = null;
-      console.warn('[environment] PMREM failed', e);
     }
   }
 
@@ -619,10 +632,9 @@ export async function build(world) {
     ocean.mesh.visible = out;
     ocean.spray.visible = smoke.points.visible = out && TIER.particles !== false;
     if (renderer) sky.starUniforms.uPx.value = renderer.getPixelRatio();
-    ocean.update(camPos, time, n, sunI, pxScale);
-    smoke.update(dt, n, cam);
-    berg.update(n);
-    if (!out) berg.mesh.visible = false;
+    if (out) ocean.update(camPos, time, n, sunI, pxScale);
+    if (smoke.points.visible) smoke.update(dt, n, cam, pxScale);
+    if (out) berg.update(n); else berg.mesh.visible = false;
     dust.points.visible = TIER.particles !== false && ins > 0.01;
     if (dust.points.visible) {
       const U = dust.uniforms;
@@ -652,8 +664,8 @@ export async function build(world) {
     }
     if (envDay) {
       const inEnv = insideLin > 0.5;
-      const envIn = machineLin > 0.5 ? envMachine : envInside;
-      scene.environment = inEnv ? envIn : (nightLin < 0.5 ? envDay : envNight);
+      const envIn = machineLin > 0.5 ? ensureEnv('machine') : ensureEnv('inside');
+      scene.environment = inEnv ? envIn : (nightLin < 0.5 ? envDay : ensureEnv('night'));
       const dipInside = Math.abs(2 * insideLin - 1);
       const dipNight = inEnv ? 1 : Math.abs(2 * nightLin - 1);
       const dipMachine = inEnv ? Math.abs(2 * machineLin - 1) : 1;

@@ -88,7 +88,7 @@ export class InfoPoints {
       m[12] = it.x; m[13] = it.y + Math.sin(t * 1.8 + it.z) * 0.04; m[14] = it.z; m[15] = 1;
       arr.set(m, k * 16);
     }
-    this.mesh.instanceMatrix.needsUpdate = true;
+    if (vis.length > 0) this.mesh.instanceMatrix.needsUpdate = true;
   }
 
   _scan(feet, mode) {

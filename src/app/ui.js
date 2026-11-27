@@ -423,10 +423,25 @@ export class UI {
   }
 
   _stick(tm) {
-    if (!tm || tm.id === -1) { this.stickEl.classList.remove('show'); return; }
     const s = this.stickEl.style;
-    s.left = tm.x0 + 'px'; s.top = tm.y0 + 'px';
-    this.stickKnob.style.transform = `translate(${tm.s * 40}px, ${-tm.f * 40}px)`;
+    if (!tm || tm.id === -1) {
+      s.left = ''; s.top = '';
+      this.stickKnob.style.transform = '';
+      this.stickEl.classList.remove('show', 'floating');
+      return;
+    }
+    const W = window.innerWidth || 0, H = window.innerHeight || 0;
+    const size = W <= 480 ? 96 : 112, pad = W <= 480 ? 12 : 16;
+    const cx = pad + size / 2, cy = H - pad - size / 2;
+    if (Math.hypot(tm.x0 - cx, tm.y0 - cy) <= size * 0.65) {
+      s.left = ''; s.top = '';
+      this.stickEl.classList.remove('floating');
+    } else {
+      s.left = tm.x0 + 'px'; s.top = tm.y0 + 'px';
+      this.stickEl.classList.add('floating');
+    }
+    const travel = size <= 96 ? 32 : 40;
+    this.stickKnob.style.transform = `translate(${tm.s * travel}px, ${-tm.f * travel}px)`;
     this.stickEl.classList.add('show');
   }
 

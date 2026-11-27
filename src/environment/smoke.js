@@ -91,7 +91,7 @@ export function createSmoke(shared, world) {
   const size = new THREE.Vector2();
   return {
     points,
-    update(dt, n, camera) {
+    update(dt, n, camera, pxScale) {
       check -= dt;
       if (check <= 0) {
         check = 1;
@@ -103,10 +103,14 @@ export function createSmoke(shared, world) {
           }
         }
       }
-      let h = 900;
-      if (world.renderer) h = world.renderer.getDrawingBufferSize(size).y;
-      const fov = camera && camera.isPerspectiveCamera ? camera.fov : 70;
-      uniforms.uScale.value = h / (2 * Math.tan((fov * Math.PI) / 360));
+      if (Number.isFinite(pxScale)) {
+        uniforms.uScale.value = pxScale;
+      } else {
+        let h = 900;
+        if (world.renderer) h = world.renderer.getDrawingBufferSize(size).y;
+        const fov = camera && camera.isPerspectiveCamera ? camera.fov : 70;
+        uniforms.uScale.value = h / (2 * Math.tan((fov * Math.PI) / 360));
+      }
       uniforms.uShip.value = 0.12 + 0.88 * ENGINE.speed; // a light breeze remains
       uniforms.uOpacity.value = (0.34 - 0.24 * n) * (0.35 + 0.65 * ENGINE.speed);        // dense coal smoke by day, subtle at night
       const c = 0.045 - 0.04 * n;                        // coal smoke: dark charcoal-black, slightly warmer in sunlight

@@ -279,14 +279,15 @@ export class Minimap {
     if (vis !== this._shown) { this._shown = vis; this.root.hidden = !vis; if (vis) this._dirty = true; }
     if (!vis) return;
     this._t += dt;
-    if (this._t < 0.1) return; // at most ~10 redraws per second
+    const minDt = this.ui.root?.classList?.contains?.('touch') ? 0.16 : 0.1;
+    if (this._t < minDt) return; // at most ~6 (touch) / ~10 (desktop) redraws per second
     const p = this.player, pos = p.pos, L = this._last;
     const high = p.mode === 'fly' && pos.y > DECK_Y.roof + 6;
     let deck = this.world.state.deck;
     if (high || !(deck in this._deckIndex())) deck = 'boat';
     const found = this.ui.info?.foundCount ?? 0;
     let dyaw = Math.abs(p.yaw - L.yaw); if (dyaw > Math.PI) dyaw = 2 * Math.PI - dyaw;
-    const moved = !(Math.abs(pos.x - L.x) < 0.05 && Math.abs(pos.z - L.z) < 0.05) || !(dyaw < 0.01);
+    const moved = !(Math.abs(pos.x - L.x) < 0.12 && Math.abs(pos.z - L.z) < 0.12) || !(dyaw < 0.025);
     if (!moved && !this._dirty && deck === L.deck && found === L.found && high === L.high) return;
     this._t = 0;
     this._bucket();
@@ -314,7 +315,7 @@ export class Minimap {
 
   /** Size the canvases for the current viewport / devicePixelRatio. */
   _fit() {
-    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2.5);
+    const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
     if (this._size && dpr === this._dpr) return;
     const W = window.innerWidth || 1280, H = window.innerHeight || 720;
     const touch = !!this.ui.root?.classList?.contains?.('touch');

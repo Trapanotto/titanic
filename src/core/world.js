@@ -10,8 +10,19 @@ const key2 = key; // (addDoor has a parameter called key)
 const GX0 = -140, GZ0 = -16, GW = 280, GH = 32;
 const OCC = 2;                      // occluder grid cell (m)
 const OW = GW / OCC, OH = GH / OCC;
-const RAYS = 720;                   // 0.5° – a 0.9 m door at 100 m is still hit by a ray
+const RAYS = 360;                   // 1° spacing (clusters are padded by 1 m in _maskHit)
 const RAY_MAX = 110;
+const RAY_COS = new Float64Array(RAYS);
+const RAY_SIN = new Float64Array(RAYS);
+const RAY_IC = new Float64Array(RAYS);
+const RAY_IS = new Float64Array(RAYS);
+for (let r = 0; r < RAYS; r++) {
+  const ang = (r / RAYS) * Math.PI * 2, rx = Math.cos(ang), rz = Math.sin(ang);
+  RAY_COS[r] = rx;
+  RAY_SIN[r] = rz;
+  RAY_IC[r] = 1 / (Math.abs(rx) < 1e-9 ? 1e-9 : rx);
+  RAY_IS[r] = 1 / (Math.abs(rz) < 1e-9 ? 1e-9 : rz);
+}
 const BIG_ROOM = 100;               // m² – larger rooms get their own chunks
 const ROOM_TILE = 10;                // big rooms are cut into tiles of about this size (m)
 const REST_X = 12;                  // everything else: 12 m cells (half zones) per ship side
@@ -281,7 +292,7 @@ export class World {
     const O = this._occ;
     const dx = ox - V.x, dz = oz - V.z;
     const rk = rects ? rects.length : -1;
-    if (V.valid && V.occN === O.n && V.rk === rk && dx * dx + dz * dz < 0.04 && Math.abs(eye - V.eye) < 0.15) return V;
+    if (V.valid && V.occN === O.n && V.rk === rk && dx * dx + dz * dz < (rects ? 0.36 : 0.25) && Math.abs(eye - V.eye) < 0.2) return V;
     V.rk = rk;
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
     V.x = ox; V.z = oz; V.eye = eye; V.valid = true; V.occN = O.n;
@@ -293,8 +304,7 @@ export class World {
     // the camera's neighbourhood is always visible
     if (!rects) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) mark(S, cur, ox + a, oz + b);
     for (let r = 0; r < RAYS; r++) {
-      const ang = (r / RAYS) * Math.PI * 2, rx = Math.cos(ang), rz = Math.sin(ang);
-      const irx = 1 / (Math.abs(rx) < 1e-9 ? 1e-9 : rx), irz = 1 / (Math.abs(rz) < 1e-9 ? 1e-9 : rz);
+      const rx = RAY_COS[r], rz = RAY_SIN[r], irx = RAY_IC[r], irz = RAY_IS[r];
       let t0r = 0;
       if (rects) { // entry into the nearest opening (0 if the camera stands in it)
         t0r = Infinity;
@@ -328,7 +338,7 @@ export class World {
         if (tmx < tmz) { tmx += tdx; cx += sx; } else { tmz += tdz; cz += sz; }
       }
       const end = Math.min(RAY_MAX, tHit + 0.4);
-      for (let t = t0r + 0.25; t <= end; t += 0.5) mark(S, cur, ox + rx * t, oz + rz * t);
+      for (let t = t0r + 0.25; t <= end; t += 0.85) mark(S, cur, ox + rx * t, oz + rz * t);
       mark(S, cur, ox + rx * end, oz + rz * end);
     }
     // summed-area table of the mask -> O(1) box queries
