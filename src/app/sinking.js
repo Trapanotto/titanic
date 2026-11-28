@@ -181,6 +181,11 @@ export class Sinking {
     F.classList.add('show', 'title');
     const t0 = performance.now();
     try { if (this.preload) await this.preload(); } catch (e) { console.warn('[sinking] Kesselraum', e); }
+    // the light of the interiors (wheelhouse, Marconi room) is baked the first time the camera is inside: now
+    this._warmInside = true;
+    await wait(1800);
+    this._warmInside = false;
+    this.world.noOutside = false; this.outside.visible = true;
     await wait(400); // (a few frames: the night's environment light is in place before the shaders are compiled for it)
     try { await this._warm(); } catch (e) { console.warn('[sinking] Shader', e); }
     await wait(Math.max(600, 2600 - (performance.now() - t0))); // (the title stays a moment; grade and lamps settle meanwhile)
@@ -197,11 +202,21 @@ export class Sinking {
     const showAll = (root) => root.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
     for (const o of [this.carpathia, this.iceField, this.wreck?.surf, this.spur]) if (o && !o.visible) { hidden.push(o); o.visible = true; }
     showAll(this.scene);
+    // every texture onto the graphics card now (the rooms' textures would otherwise go up the first time they are seen)
+    if (r.initTexture) {
+      const seen = new Set();
+      this.scene.traverse((o) => {
+        for (const m of [].concat(o.material || [])) for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'bumpMap', 'alphaMap']) {
+          const t = m[k];
+          if (t && !seen.has(t)) { seen.add(t); try { r.initTexture(t); } catch { /* later */ } }
+        }
+      });
+    }
     const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
     try {
       // three variants: whole, cut (the two halves after the break), cut without the outside world (its starlight)
       const cut = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 1e5)];
-      for (const [planes, outside] of [[[], true], [cut, true], [cut, false]]) {
+      for (const [planes, outside] of [[[], true], [[], false], [cut, true], [cut, false]]) {
         r.clippingPlanes = planes;
         this.outside.visible = outside;
         // (the film is drawn into the post pipeline's linear target, without it straight to the screen: the shaders differ)
@@ -700,6 +715,7 @@ export class Sinking {
     if (!this.ready) dt = 0;
     const p = this.player, cam = this.camera;
     if (this.cine) {
+      if (this._warmInside) { cam.position.set(50.2, 30.0, 0.4); cam.lookAt(52, 29.5, 1.5); cam.updateMatrixWorld(); p.pos.set(50.2, 28.4, 0.4); this.world.noOutside = true; this.outside.visible = false; this.world.updateVisibility(cam.position); return; } // (the Marconi room: its light and lamp shadows are made now)
       const cut = this.director.apply(cam, dt);
       if (this.shake > 0) {
         this.shake -= dt;
@@ -760,7 +776,7 @@ export class Sinking {
     P.grain = 0.028;
     P.bloom = u ? 0.25 : 0.42; P.bloomThreshold = 0.8; P.bloomKnee = 0.7;
     P.exposure *= (u ? 1.05 : 1.15) * (this.director?.shot?.expo ?? 1);
-    if (this.m >= DAWN) { P.contrast = 1.2; P.saturation = 0.7; P.vignette = 0.35; P.grain = 0.022; P.exposure *= 0.5; P.bloom = 0.5; P.lift.setRGB(0.051, 0.059, 0.094); P.gain.setRGB(1.0, 0.81, 0.66); return; }
+    if (this.m >= DAWN) { P.contrast = 1.2; P.saturation = 0.7; P.vignette = 0.35; P.grain = 0.022; P.exposure *= 0.6; P.bloom = 0.5; P.lift.setRGB(0.04, 0.05, 0.1); P.gain.setRGB(1.08, 0.86, 0.68); return; }
     if (this.director?.shot?.cold) { P.exposure *= 0.7; P.contrast = 1.25; P.gain.setRGB(0.75, 0.85, 1.0); P.lift.setRGB(0, 0.005, 0.02); return; }
     if (u) { P.lift.setRGB(0.0, 0.02, 0.03); P.gain.setRGB(0.82, 1.02, 1.06); }
     else { P.lift.setRGB(0.0, 0.008, 0.022); P.gain.setRGB(1.07, 1.0, 0.9); }
@@ -812,8 +828,9 @@ export class Sinking {
 
   _dawn() {
     const W = this.world;
-    W.nightOverride = 0.58;
-    W.sunDirOverride = new THREE.Vector3(0.82, 0.004, -0.56).normalize();
+    W.nightOverride = 0.52;
+    W.sunDirOverride = new THREE.Vector3(0.82, 0.035, -0.56).normalize();
+    this.carpathia.traverse((o) => { if (o.isPoints && o.material.blending === THREE.AdditiveBlending) o.material.opacity = 0.25; }); // (the lights pale in the morning)
     W.starBoost = 1;
     this.carpathia.position.set(300, WL - 0.4, -330);
     this.carpathia.rotation.y = 2.2;

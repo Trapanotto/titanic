@@ -440,9 +440,12 @@ export class Crowd {
     for (let k = 0; k < n; k++) {
       const row = k < rowers, woman = !row && Math.random() < 0.7;
       let x, z, mode, yaw;
-      if (row) { x = -1.6 + (k >> 1) * 1.2; z = (k & 1 ? 1 : -1) * 0.55; mode = FIG.row; yaw = Math.PI; }
+      if (row) { x = (family ? 2.6 : -1.6) + (k >> 1) * 1.2; z = (k & 1 ? 1 : -1) * 0.55; mode = FIG.row; yaw = Math.PI; }
       else if (k === rowers) { x = -4.0; z = 0; mode = FIG.idle; yaw = 0; } // at the tiller
-      else { const S = seats[k]; x = S[0]; z = S[1]; mode = FIG.seat; yaw = Math.random() < 0.5 ? 0 : Math.PI; }
+      else {
+        const S = seats[k]; x = S[0]; z = S[1]; mode = FIG.seat; yaw = Math.random() < 0.5 ? 0 : Math.PI;
+        if (family && x > -2.3 && x < 2.3 && Math.abs(z) < 0.9) { pool.hide(k); continue; } // (a clear view of the mother)
+      }
       const y = mode === FIG.idle ? 0.25 : 0.04;
       pool.put(k, x, y, z, yaw + rnd(-0.3, 0.3), 0, null);
       pool.colour(k, row ? CREW : woman ? pick(DRESSES) : pick(COATS));
@@ -555,7 +558,7 @@ export class Crowd {
         _v.set(33.5, by + 0.3, fz).applyMatrix4(s.TA);
         if (_v.y < WL + 0.1) { F.gone = true; this.deck.hide(F.father); this._toSea({ i: F.father, jacket: true, woman: false }, _v.setY(WL), false); }
       } else if (!F.gone) this.deck.hide(F.father);
-      if (m < 20) { this.deck.put(this.officers[0], 69.6, by, -0.6, 0.05, 0, null); this.deck.put(this.officers[1], 70.3, by, 1.3, -0.2, 0, null); }
+      if (m < 20) { this.deck.put(this.officers[0], 70.2, by, 11.6, 0.3, 0, null); this.deck.put(this.officers[1], 69.8, by, 1.3, -0.2, 0, null); } // (one of them out on the starboard wing)
       else for (const i of this.officers) this.deck.hide(i);
       // the operator: at the key until the captain released him (about 02:17)
       if (m < 137) this.deck.put(this.operator, 51.3, by - 0.36, 0.75, 0, 0.12, this._qComp(51, 0.85));
