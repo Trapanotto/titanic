@@ -140,14 +140,14 @@ let sinking = null;
 try {
   sinking = debug.sinking = new Sinking({ world, scene, camera, player, renderer, sound, ui, interact, post });
   ui.onSinking = () => {
-    sinking.start();
-    if (post) post.sceneRender = (r, s, c) => sinking.renderScene(r, s, c);
-    // the film looks into boiler room 6 when the sea bursts in: build that part of the tank top in the background
+    // the film looks into boiler room 6 when the sea bursts in: that part of the tank top is built before it starts
     // (not on phones and weak tiers: there the shot is left out)
     if (streamer && TIER.name !== 'mobile' && TIER.name !== 'low') {
       const Z = streamer.zonesByDeck, want = [...(Z.tank || []), ...(Z.orlop || [])].filter((g) => g.userData.x1 > 50 && g.userData.x0 < 68);
-      setTimeout(() => streamer.load(want).then(() => { sinking.boilerReady = want.every((g) => streamer.loaded.has(g)); }), 1500);
+      sinking.preload = () => streamer.load(want, { rush: true }).then(() => { sinking.boilerReady = want.every((g) => streamer.loaded.has(g)); });
     } else if (!streamer) sinking.boilerReady = true;
+    sinking.start();
+    if (post) post.sceneRender = (r, s, c) => sinking.renderScene(r, s, c);
   };
 } catch (e) { console.warn('[app] Untergang', e); }
 

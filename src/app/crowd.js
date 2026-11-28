@@ -34,21 +34,35 @@ function figureGeometry() {
     parts.push(g);
   };
   const box = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
-  const cyl = (r0, r1, h, s, y) => new THREE.CylinderGeometry(r0, r1, h, s, 1).translate(0, y, 0);
+  // round parts, flattened front to back (the figure faces +x): sx scales the depth
+  const cyl = (r0, r1, h, seg, y, sx = 1, x = 0, z = 0) => new THREE.CylinderGeometry(r0, r1, h, seg, 1).scale(sx, 1, 1).translate(x, y, z);
+  const ball = (r, w, hh, x, y, z, sx = 1, sy = 1, sz = 1, cap = Math.PI) => new THREE.SphereGeometry(r, w, hh, 0, Math.PI * 2, 0, cap).scale(sx, sy, sz).translate(x, y, z);
+  const SHIRT = C(0xe8e4da), HAIR = C(0x2a1d14);
   for (const s of [-1, 1]) {
-    add(box(0.14, 0.84, 0.15, 0, 0.43, s * 0.1), s < 0 ? 2 : 3, DARK, 0);              // legs (trousers)
-    add(box(0.1, 0.62, 0.11, 0, 1.12, s * 0.27), s < 0 ? 4 : 5, TINT, 1);              // arms (coat sleeves)
-    add(box(0.08, 0.1, 0.08, 0, 0.76, s * 0.27), s < 0 ? 4 : 5, SKIN, 0);              // hands
+    const L = s < 0 ? 2 : 3, A = s < 0 ? 4 : 5;
+    add(cyl(0.072, 0.056, 0.8, 6, 0.46, 0.9, 0, s * 0.1), L, DARK, 0);                  // trouser legs
+    add(box(0.25, 0.07, 0.1, 0.05, 0.035, s * 0.1), L, C(0x0c0b0b), 0);                // shoes
+    add(cyl(0.058, 0.048, 0.34, 6, 1.25, 1, 0, s * 0.265), A, TINT, 1);                // upper arm (sleeve)
+    add(cyl(0.048, 0.042, 0.3, 6, 0.93, 1, 0, s * 0.265), A, TINT, 1);                 // forearm
+    add(ball(0.045, 5, 4, 0, 0.75, s * 0.265, 0.8, 1.3, 0.9), A, SKIN, 0);             // hand
   }
-  add(box(0.27, 0.64, 0.44, 0, 1.14, 0), 0, TINT, 1);                                    // body (coat)
-  add(box(0.3, 0.32, 0.42, 0, 0.68, 0), 0, TINT, 1);                                     // skirts of the coat
-  add(new THREE.IcosahedronGeometry(0.108, 0).translate(0.012, 1.6, 0), 1, SKIN, 0);     // head
-  add(cyl(0.1, 0.112, 0.1, 6, 1.72), 6, HAT, 0);                                         // men: bowler or cap
-  add(cyl(0.165, 0.165, 0.02, 7, 1.675), 6, HAT, 0);
-  add(cyl(0.21, 0.34, 0.9, 7, 0.48), 8, TINT, 1);                                       // women: long skirt
-  add(cyl(0.25, 0.25, 0.025, 8, 1.69), 9, HAT, 0);                                      // and a broad hat
-  add(cyl(0.1, 0.12, 0.09, 6, 1.735), 9, HAT, 0);
-  add(box(0.37, 0.46, 0.5, 0, 1.2, 0), 7, JACKET, 0);                                    // cork life jacket
+  add(cyl(0.235, 0.2, 0.58, 8, 1.15, 0.6), 0, TINT, 1);                                // body: broad shoulders, the waist
+  add(ball(0.235, 8, 3, 0, 1.42, 0, 0.6, 0.35, 1, Math.PI / 2), 0, TINT, 1);           // round of the shoulders
+  add(cyl(0.2, 0.25, 0.36, 8, 0.7, 0.62), 0, TINT, 1);                                 // skirts of the coat
+  add(box(0.02, 0.2, 0.1, 0.135, 1.33, 0), 0, SHIRT, 0);                               // shirt front, collar
+  add(cyl(0.048, 0.054, 0.1, 6, 1.5), 1, SKIN, 0);                                     // neck
+  add(ball(0.1, 8, 6, 0.012, 1.62, 0, 1, 1.15, 0.9), 1, SKIN, 0);                      // head
+  add(ball(0.104, 8, 3, -0.008, 1.64, 0, 1, 1.1, 0.92, Math.PI * 0.55), 1, HAIR, 0);   // hair
+  add(ball(0.11, 7, 3, 0, 1.69, 0, 1, 1, 0.95, Math.PI / 2), 6, HAT, 0);               // men: bowler or cap
+  add(cyl(0.165, 0.165, 0.016, 10, 1.69, 1), 6, HAT, 0);
+  add(cyl(0.2, 0.36, 0.92, 10, 0.48, 0.8), 8, TINT, 1);                                // women: long skirt
+  add(ball(0.11, 7, 4, -0.07, 1.64, 0, 0.8, 0.8, 0.8), 9, HAIR, 0);                    // and their hair up
+  add(cyl(0.25, 0.25, 0.022, 12, 1.73, 1), 9, HAT, 0);                                 // a broad hat
+  add(cyl(0.1, 0.12, 0.08, 7, 1.78, 1), 9, HAT, 0);
+  add(box(0.08, 0.44, 0.38, 0.15, 1.2, 0), 7, JACKET, 0);                              // cork life jacket, front and back
+  add(box(0.08, 0.44, 0.38, -0.15, 1.2, 0), 7, JACKET, 0);
+  add(box(0.3, 0.06, 0.12, 0, 1.44, -0.13), 7, JACKET, 0);
+  add(box(0.3, 0.06, 0.12, 0, 1.44, 0.13), 7, JACKET, 0);
   _geo = mergeGeometries(parts, false);
   for (const g of parts) g.dispose();
   _geo.computeBoundingSphere();
@@ -175,7 +189,7 @@ function clampOpen(x, z) {
   let lim = edge;
   if (x > -72 && x < 74) for (const sx of STATIONS_X) if (Math.abs(x - sx) < 5) lim = Math.min(lim, 10.1);
   z = Math.max(-lim, Math.min(lim, z));
-  if (x > 44.6 && x < 51.4 && z > 7 && z < 11.2) x = x < 48 ? 44.6 : 51.4; // (the band's place)
+  if (x > 44.6 && x < 57.8 && z > 7 && z < 11.2) x = x < 48 ? 44.6 : 57.8; // (the band's place, and room to film them from forward)
   if (x > -72 && x < 74) {
     for (const H of BOAT_HOUSES) if (x > H.x0 - 0.4 && x < H.x1 + 0.4 && Math.abs(z) < H.hw + 0.45) z = Math.sign(z || 1) * (H.hw + 0.45);
     for (const H of BOAT_LOW_ROOFS) if (x > H.x0 - 0.4 && x < H.x1 + 0.4 && Math.abs(z) < H.hw + 0.45) z = Math.sign(z || 1) * (H.hw + 0.45);
@@ -205,7 +219,7 @@ export class Crowd {
   constructor(sink) {
     this.s = sink;
     const f = TIER.fine ?? 2;
-    const N = [260, 420, 640, 900][f] ?? 640;
+    const N = [240, 380, 560, 800][f] ?? 560;
     this.N = N;
     this.deck = new Pool(N + 14, sink.scene, 'crowdDeck');
     this.sea = new Pool(N + 8, sink.outside, 'crowdSea');

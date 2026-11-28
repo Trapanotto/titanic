@@ -97,6 +97,7 @@ export class Sinking {
     W.sinkMode = true;
     W.starBoost = 2.2; // starlight: enough to make out the dark ship against the sea after the lights went out
     W.setNight(true);
+    W.nightOverride = 1; // (dark from the first frame: no fade from the day)
     ENGINE.order = 3; ENGINE.speed = 1;
     // the outside world, drawn through the inverse of the ship's transform
     this.outside = new THREE.Group();
@@ -140,8 +141,10 @@ export class Sinking {
     if (!this.cine) p.teleport({ deck: 'B', x: 122, y: DECK_Y.B, z: 2.5, yaw: -0.12 }); // beside the anchor crane, clear view ahead to starboard
     p.pitch = 0.0;
     this._ui();
-    // the clipping variants of every shader for the break, compiled now (no hitch later)
-    this._prewarm();
+    // behind a black title card: the boiler room built, every shader of the film compiled (also the variants with the
+    // cut of the break), the grade settled in the dark – then the film starts without a hitch
+    this.ready = false;
+    this._prepare();
   }
 
   _ui() {
@@ -171,19 +174,50 @@ export class Sinking {
     this.ui.toast?.(this.speed === 'fast' ? 'Zeit: schnell (2 Minuten)' : this.speed === 'slow' ? 'Zeit: langsam (20 Minuten)' : 'Zeit angehalten', 1.6);
   }
 
-  _prewarm() {
+  async _prepare() {
+    const F = this.fadeEl, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    F.firstChild.innerHTML = '14. April 1912<br><small>Nordatlantik, 23:39</small>';
+    F.classList.add('show', 'title');
+    const t0 = performance.now();
+    try { if (this.preload) await this.preload(); } catch (e) { console.warn('[sinking] Kesselraum', e); }
+    await wait(400); // (a few frames: the night's environment light is in place before the shaders are compiled for it)
+    try { await this._warm(); } catch (e) { console.warn('[sinking] Shader', e); }
+    await wait(Math.max(600, 2600 - (performance.now() - t0))); // (the title stays a moment; grade and lamps settle meanwhile)
+    this.ready = true;
+    F.classList.remove('show');
+    setTimeout(() => F.classList.remove('title'), 1400);
+  }
+
+  /** compile every material the film will use: all objects shown for a moment, without and with the clipping plane */
+  async _warm() {
     const r = this.renderer;
     if (!r?.compileAsync) return;
-    setTimeout(async () => {
-      try {
-        r.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 1e5)];
-        const rt = new THREE.WebGLRenderTarget(1, 1);
-        r.setRenderTarget(rt); r.render(new THREE.Scene(), this.camera); r.setRenderTarget(null); // sets the clipping state
-        await r.compileAsync(this.scene, this.camera);
-        if (this.wreck) await r.compileAsync(this.wreck.fxBow, this.camera);
-        rt.dispose();
-      } catch { /* compiled when needed */ } finally { r.clippingPlanes = []; }
-    }, 1500);
+    const hidden = [];
+    const showAll = (root) => root.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    for (const o of [this.carpathia, this.iceField, this.wreck?.surf, this.spur]) if (o && !o.visible) { hidden.push(o); o.visible = true; }
+    showAll(this.scene);
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
+    try {
+      // three variants: whole, cut (the two halves after the break), cut without the outside world (its starlight)
+      const cut = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 1e5)];
+      for (const [planes, outside] of [[[], true], [cut, true], [cut, false]]) {
+        r.clippingPlanes = planes;
+        this.outside.visible = outside;
+        // (the film is drawn into the post pipeline's linear target, without it straight to the screen: the shaders differ)
+        const target = this.post ? rt : null;
+        r.setRenderTarget(target); r.render(new THREE.Scene(), this.camera); // (sets the clipping state)
+        if (this.wreck) this.wreck.fxBow.fog = this.wreck.fxStern.fog = this.scene.fog;
+        const jobs = [r.compileAsync(this.scene, this.camera)];
+        if (this.wreck) jobs.push(r.compileAsync(this.wreck.fxBow, this.camera));
+        r.setRenderTarget(null);
+        await Promise.all(jobs);
+      }
+    } finally {
+      r.clippingPlanes = [];
+      this.outside.visible = true;
+      for (const o of hidden) o.visible = false;
+      rt.dispose();
+    }
   }
 
   // ------------------------------------------------------------------ the water inside the hull
@@ -482,7 +516,7 @@ export class Sinking {
   // ------------------------------------------------------------------ per frame
 
   update(dt) {
-    if (!this.active) return;
+    if (!this.active || !this.ready) return;
     const W0 = this.world;
     this.t += dt;
     // the night's clock: real time until the scraping is over, then compressed
@@ -598,7 +632,7 @@ export class Sinking {
       // a cold fill light from the camera where the shot asks for it (the people on the dark stern)
       const fill = this.director?.shot?.fill;
       if (fill && Wk.flashT <= 0) { Wk.flash.color.setHex(0xa8bcdc); Wk.flash.intensity = fill; const fp = Wk.flash.position.copy(this.camera.position).applyMatrix4(this.TA); fp.y += 8;
-        fp.applyMatrix4(this.broken ? (this._TBi ||= new THREE.Matrix4()).copy(this.TB).invert() : this.TAi); // (the stern's pass: in its own frame)
+        fp.applyMatrix4(this.broken && this.m < END + 0.6 && this.director.shot.name !== 'Bruch' ? (this._TBi ||= new THREE.Matrix4()).copy(this.TB).invert() : this.TAi); // (the stern's pass: in its own frame)
       }
       else if (Wk.flashT > 0) Wk.flash.color.setHex(0xfff0dc);
       // the surface seen from below
@@ -631,6 +665,7 @@ export class Sinking {
   /** after the visitor's own update: camera in the world frame (rowing away, in the water), shaking, the end */
   lateUpdate(dt) {
     if (!this.active) return;
+    if (!this.ready) dt = 0;
     const p = this.player, cam = this.camera;
     if (this.cine) {
       const cut = this.director.apply(cam, dt);

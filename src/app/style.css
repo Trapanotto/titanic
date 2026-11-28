@@ -350,3 +350,5 @@ body.cine .sink-under { background: radial-gradient(ellipse at 50% 40%, rgba(10,
 .cine-fade div { color: #efe3c4; font: 400 clamp(15px, 2.6vw, 24px) Georgia, 'Times New Roman', serif; letter-spacing: 0.08em; opacity: 0; transition: opacity 1.6s; text-align: center; padding: 0 16px; }
 .cine-fade.title { opacity: 1; background: transparent; }
 .cine-fade.title div { opacity: 1; text-shadow: 0 1px 8px #000; }
+.cine-fade.show.title { background: #000; }
+.cine-fade div small { display: block; margin-top: 10px; font-size: 0.62em; letter-spacing: 0.14em; opacity: 0.75; }

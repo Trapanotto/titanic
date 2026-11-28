@@ -14,6 +14,7 @@ const WL = SHIP.waterline;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const smooth = (t) => { t = clamp01(t); return t * t * (3 - 2 * t); };
 const ease = (t) => { t = clamp01(t); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+const _q2 = new THREE.Quaternion(), _Zax = new THREE.Vector3(0, 0, 1);
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(), _v = new THREE.Vector3();
 
 // ------------------------------------------------------------------ the shots
@@ -21,105 +22,137 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Eule
 // cam / look: world points (c.S = a point of the ship, moving with it; c.W = a fixed point in the sea).
 // up 'ship': the camera stands on deck and tilts with her; otherwise the horizon stays level.
 const SHOTS = [
-  { name: 'Krähennest', t: 0, dur: 5, fov: 46, up: 'ship', sway: 0.04,
+  // ---- the approach (real seconds)
+  { name: 'Nacht', t: 0, dur: 3.5, fov: (k) => 50 - 8 * k, sway: 0.3,
+    cam: (c, k) => c.S(175 - 50 * ease(k), 44 - 18 * ease(k), 62 - 22 * ease(k)),
+    look: (c, k) => c.S(50 - 10 * k, 18, 0) },
+  { name: 'Krähennest', t: 3.5, dur: 3, fov: (k) => 46 - 18 * ease(k), up: 'ship', sway: 0.04,
     cam: (c, k) => c.S(99.5, 39.6 - k * 0.3, 0.6),
-    look: (c, k) => c.S(420, 24, 0).lerp(c.berg(10), smooth(k * 1.4)) },
-  { name: 'Vom Meer', t: 5, dur: 5, fov: 40, sway: 0.25,
-    cam: (c, k) => c.W(c.B.x + 30 - k * 6, WL + 4.5, -48 + k * 6),
-    look: (c, k) => c.S(126, 16, 0).lerp(c.berg(8), 0.35 - 0.2 * k) },
-  { name: 'Brücke', t: 10, dur: 3.2, fov: 32, up: 'ship', sway: 0.03,
+    look: (c) => c.berg(10) },
+  { name: 'Bugwelle', t: 6.5, dur: 3.5, fov: 60, up: 'ship', sway: 0.05, roll: 0.06,
+    cam: (c, k) => c.S(108 - 4 * k, 13.0, 15.5),
+    look: (c, k) => c.S(140, 15, 1).lerp(c.berg(8), 0.3 + 0.2 * k) },
+  { name: 'Brücke', t: 10, dur: 3.2, fov: (k) => 34 - 8 * ease(k), up: 'ship', sway: 0.03,
     cam: (c, k) => c.S(67 + k * 0.6, 33.6, 12.6),
     look: (c, k) => c.berg(13 - 3 * k) },
   // under water: the spur of the berg, the bow coming out of the murk and tearing along it
-  { name: 'Sporn', t: 13.2, dur: 4.3, fov: 54, sway: 0.18, under: true,
+  { name: 'Sporn', t: 13.2, dur: 4.3, fov: 54, sway: 0.18, under: true, shake: 0.05,
     cam: (c, k) => c.W(c.cx() + 20 - 4 * k, WL - 4.8 - 0.6 * k, c.hu(c.cx() + 20) + 8.5),
     look: (c) => c.W(c.cx() - 4, WL - 6.4, c.hu(Math.min(126, c.cx() - 4)) - 0.5) },
-  { name: 'Kollision', t: 17.5, dur: 3, fov: 50, up: 'ship', sway: 0.05,
-    cam: (c, k) => c.S(64 - k * 3, 47, -22),
+  { name: 'Kollision', t: 17.5, dur: 3, fov: (k) => 54 - 8 * k, up: 'ship', sway: 0.05, roll: -0.05, shake: 0.06,
+    cam: (c, k) => c.S(64 - k * 5, 47 - 3 * k, -22),
     look: (c, k) => c.S(90 - k * 14, 13, 17) },
-  { name: 'Riss', t: 20.5, dur: 4.5, fov: 48, sway: 0.08, under: true,
+  { name: 'Riss', t: 20.5, dur: 4, fov: 48, sway: 0.08, under: true,
     cam: (c, k) => c.S(95.5 - 1.5 * k, 5.2 - 0.3 * k, c.hu(95) + 5.6 - 2.2 * ease(k)),
     look: (c, k) => c.S(100.5 + k, 5.0, c.hu(100) - 0.4) },
   // inside: the sea bursting through the plating into boiler room 6, the stokers running for the door
-  { name: 'Kesselraum', t: 24.5, dur: 4.5, fov: 60, up: 'ship', sway: 0.06, need: 'boilerReady', inside: true,
-    cam: (c, k) => c.S(64.9 - 0.8 * k, 4.5, -4.5),
+  { name: 'Kesselraum', t: 24.5, dur: 4.5, fov: 62, up: 'ship', sway: 0.06, need: 'boilerReady', inside: true, shake: 0.04, roll: 0.05,
+    cam: (c, k) => c.S(64.9 - 1.2 * k, 4.5, -4.5),
     look: (c, k) => c.S(62.6, 3.7 + k * 0.4, 9) },
-  { name: 'Eis an Deck', m: 0.3, dur: 7.7, fov: 50, up: 'ship', sway: 0.04,
-    cam: (c, k) => c.S(99.5 - k, 25.2, -5.5),
+  // ---- the night (minutes after 23:40; 2 minutes of the night pass in a second)
+  { name: 'Eis an Deck', m: 0.3, dur: 5.7, fov: 50, up: 'ship', sway: 0.04,
+    cam: (c, k) => c.S(99.5 - k, 27.8 - 2.8 * ease(k), -5.5),
     look: (c, k) => c.S(85, 20.2, 2 + k) },
-  { name: 'Weite', m: 8, dur: 12, fov: 38, sway: 0.3,
-    cam: (c, k) => c.orbit(0.75 + 0.6 * ease(k), 240 - 30 * k, 40 - 12 * k),
-    look: (c) => c.S(5, 16, 0) },
-  { name: 'Schwimmwesten', m: 20, dur: 10, fov: 52, up: 'ship', sway: 0.05,
-    cam: (c, k) => c.S(21.5 + 2.5 * k, 30.1, 11.4),
-    look: (c, k) => c.S(46, 28.9, 8.4 - k) },
-  { name: 'Kapelle', m: 30, dur: 10, fov: 42, up: 'ship', sway: 0.03, band: true,
-    cam: (c, k) => c.S(53.6 - 0.9 * k, 29.6, 10.0),
-    look: (c) => c.S(47.8, 29.2, 9.2) },
-  { name: 'Bug', m: 40, dur: 10, fov: 40, sway: 0.25,
-    cam: (c, k) => c.W(178 - 12 * k, WL + 2.4, 64 - 4 * k),
-    look: (c) => c.S(92, 14, 0) },
-  { name: 'Boot 7', m: 50, dur: 12, fov: 46, sway: 0.12,
+  { name: 'Weite', m: 6, dur: 6, fov: 36, sway: 0.3,
+    cam: (c, k) => c.orbit(0.6 + 0.9 * ease(k), 230 - 40 * k, 55 - 20 * k),
+    look: (c) => c.S(10, 16, 0) },
+  { name: 'Schwimmwesten', m: 12, dur: 6, fov: 50, up: 'ship', sway: 0.05,
+    cam: (c, k) => c.S(14 + 14 * ease(k), 30.0, 11.2),
+    look: (c) => c.S(48, 28.9, 8.4) },
+  { name: 'Kapelle', m: 18, dur: 7, fov: (k) => 42 - 10 * ease(k), up: 'ship', sway: 0.03, band: true,
+    cam: (c, k) => c.S(55.5 - 2.5 * ease(k), 29.8, 9.1 + 0.8 * k),
+    look: (c) => c.S(47.8, 29.3, 9.3) },
+  { name: 'Kran', m: 25, dur: 6, fov: 54, up: 'ship', sway: 0.05,
+    cam: (c, k) => c.S(0, 30 + 22 * ease(k), 13 + 4 * ease(k)),
+    look: (c, k) => c.S(20 - 10 * k, 28.5, 4) },
+  { name: 'Bug vom Meer', m: 31, dur: 6, fov: (k) => 30 - 4 * k, sway: 0.25,
+    cam: (c, k) => c.W(185 - 12 * k, WL + 2, 70),
+    look: (c) => c.S(95, 14, 0) },
+  { name: 'Überflug', m: 37, dur: 7, fov: 46, sway: 0.2, roll: 0.08,
+    cam: (c, k) => c.S(-150 + 260 * ease(k), 70 - 10 * k, -40),
+    look: (c, k) => c.S(-100 + 220 * ease(k), 20, 0) },
+  { name: 'Beladen', m: 44, dur: 7, fov: 54, up: 'ship', sway: 0.05,
+    cam: (c, k) => c.S(25 + 2 * k, 34.2, 5),
+    look: (c) => c.S(33.5, 28.4, 12.4) },
+  { name: 'Reling', m: 51, dur: 6, fov: 62, up: 'ship', sway: 0.05, roll: -0.12,
+    cam: (c, k) => c.S(25.5, 30.6, 13.9 + 0.4 * k),
+    look: (c, k) => c.S(31, 12 + 3 * k, 18) },
+  { name: 'Boot 7', m: 57, dur: 8, fov: 46, sway: 0.12,
     cam: (c, k) => c.S(14 + 8 * k, 15 - k, 44),
     look: (c, k) => c.S(34, 21 - 5 * ease(k), 13) },
-  { name: 'Beladen', m: 62, dur: 11, fov: 54, up: 'ship', sway: 0.05,
-    cam: (c, k) => c.S(35.5 + 2 * k, 34.2, 5.2),
-    look: (c) => c.S(44.5, 28.4, 12.2) },
-  { name: 'Rakete', m: 73, dur: 7, fov: 62, up: 'ship', sway: 0.05,
-    cam: (c, k) => c.S(61.2, 29.7, 8.2 - 0.4 * k),
+  { name: 'Abfieren', m: 65, dur: 7, fov: 58, up: 'ship', sway: 0.04, roll: 0.08,
+    cam: (c) => c.S(27.5, 31.2, 13.6),
+    look: (c, k) => c.S(33.2, 18 - 6 * k, 16.5) },
+  { name: 'Rakete', m: 72, dur: 6, fov: 62, up: 'ship', sway: 0.05,
+    cam: (c, k) => c.S(59, 29.7, 10.2 - 0.4 * k),
     look: (c, k) => c.S(76, 30 + 95 * smooth(k * 1.6), -3) },
-  { name: 'Raketen', m: 80, dur: 8, fov: 52, sway: 0.25,
+  { name: 'Raketen', m: 78, dur: 7, fov: 52, sway: 0.25,
     cam: (c, k) => c.W(150 - 30 * k, WL + 4, 250 - 10 * k),
     look: (c, k) => c.S(55, 85 + 10 * k, 0) },
-  { name: 'Aus dem Boot', m: 88, dur: 12, fov: 44, sway: 0.35, boat: true,
+  { name: 'Aus dem Boot', m: 85, dur: 7, fov: 44, sway: 0.35, boat: true,
     cam: (c) => c.boat(1.6),
     look: (c) => c.S(10, 17, 0) },
-  { name: 'Panik', m: 100, dur: 10, fov: 50, up: 'ship', sway: 0.07,
-    cam: (c, k) => c.S(-27 + 2 * k, 30.0, 10.6),
-    look: (c) => c.S(12, 29.0, 8.5) },
-  { name: 'Von oben', m: 110, dur: 14, fov: 40, sway: 0.2,
-    cam: (c, k) => c.orbit(-0.7 + 0.9 * ease(k), 225 - 25 * k, 90 - 30 * k),
+  { name: 'Kapelle nah', m: 92, dur: 6, fov: (k) => 26 - 4 * k, up: 'ship', sway: 0.02, band: true,
+    cam: (c, k) => c.S(56.5, 29.8, 9.2 + 0.6 * k),
+    look: (c) => c.S(47.8, 29.4, 9.4) },
+  { name: 'Panik', m: 98, dur: 7, fov: 52, up: 'ship', sway: 0.06, shake: 0.05,
+    cam: (c, k) => c.S(5 - 28 * ease(k), 30.0, 10.5),
+    look: (c, k) => c.S(25 - 28 * ease(k), 29.2, 9) },
+  { name: 'Von oben', m: 105, dur: 8, fov: 40, sway: 0.2,
+    cam: (c, k) => c.orbit(-0.7 + 1.0 * ease(k), 225 - 35 * k, 90 - 35 * k),
     look: (c) => c.S(25, 10, 0) },
+  { name: 'Schlagseite', m: 113, dur: 6, fov: 48, up: 'ship', sway: 0.04, roll: 0.18,
+    cam: (c, k) => c.S(20 + 4 * k, 28.9, -11),
+    look: (c) => c.S(75, 27.5, -9) },
   // under water at the bow: the lit portholes of the flooded forward decks
-  { name: 'Unter dem Bug', m: 124, dur: 6, fov: 56, sway: 0.15, under: true,
+  { name: 'Unter dem Bug', m: 119, dur: 6, fov: 56, sway: 0.15, under: true,
     cam: (c, k) => c.S(113 - 4 * k, 12.5 - k, 21),
     look: (c, k) => c.S(99 - 3 * k, 15.5, 9) },
-  { name: 'Choral', m: 130, dur: 10, fov: 46, up: 'ship', sway: 0.03, band: true,
+  { name: 'Choral', m: 125, dur: 8, fov: (k) => 44 - 14 * ease(k), up: 'ship', sway: 0.03, band: true,
     cam: (c, k) => c.S(53.6 - 1.4 * k, 29.5, 11.3),
     look: (c) => c.S(47.4, 29.4, 9.0) },
-  { name: 'Bootsdeck', m: 140, dur: 8, fov: 56, up: 'ship', sway: 0.04,
-    cam: (c, k) => c.S(14 + 6 * k, 30.2, 9.2),
-    look: (c, k) => c.S(80, 27 - 3 * k, 2) },
-  { name: 'Heck', m: 148, dur: 3.5, fov: 54, up: 'ship', sway: 0.05,
+  { name: 'Boote', m: 133, dur: 6, fov: 32, sway: 0.35, boat: true,
+    cam: (c) => c.boat(1.5, 3),
+    look: (c) => c.S(5, 18, 0) },
+  { name: 'Wasser', m: 139, dur: 6, fov: 40, sway: 0.2,
+    cam: (c, k) => c.W(158 - 10 * k, WL + 1.6, 48 - 4 * k),
+    look: (c) => c.S(80, 22, 0) },
+  { name: 'Flucht', m: 145, dur: 4, fov: 50, up: 'ship', sway: 0.06, shake: 0.05,
+    cam: (c, k) => c.S(-20 - 25 * ease(k), 31.5, 13.5),
+    look: (c, k) => c.S(-10 - 25 * ease(k), 29, 6) },
+  { name: 'Heck', m: 149, dur: 3, fov: 54, up: 'ship', sway: 0.05, shake: 0.03,
     cam: (c, k) => c.S(-103.5 - 1.5 * k, 24.4, 5.5),
     look: (c) => c.S(-126, 24.2, -1.5) },
-  { name: 'Backbord', m: 151.5, dur: 3.1, fov: 36, sway: 0.25,
+  { name: 'Backbord', m: 152, dur: 2.6, fov: 36, sway: 0.25,
     cam: (c, k) => c.W(-40 + 25 * k, WL + 3.2, -235),
     look: (c) => c.S(0, 18, 0) },
   { name: 'Schornstein', m: 154.6, dur: 1.2, fov: 44, sway: 0.2, fixed: true,
     cam: (c, k) => c.at('fun', () => c.S(FUNNELS[0].x, 32, 0).add(_v.set(46, 0, 70))).clone().setY(WL + 5 + 2 * k),
     look: (c) => c.S(FUNNELS[0].x - 2, 40, 6) },
-  { name: 'Gedränge', m: 155.8, dur: 1.2, fov: 50, up: 'ship', sway: 0.08,
+  { name: 'Gedränge', m: 155.8, dur: 0.6, fov: 50, up: 'ship', sway: 0.08, shake: 0.04,
     cam: (c, k) => c.S(-88 - 3 * k, 33.5, -3 + 2 * k),
     look: (c) => c.S(-118, 23, 0.5) },
-  { name: 'Bruch', m: 157, dur: 1.6, fov: 42, sway: 0.15, fixed: true,
+  { name: 'Lichter', m: 156.4, dur: 0.6, fov: 34, sway: 0.2,
+    cam: (c, k) => c.W(60 - 5 * k, WL + 3, 200),
+    look: (c) => c.S(0, 20, 0) },
+  { name: 'Bruch', m: 157, dur: 1.6, fov: 42, sway: 0.15, fixed: true, shake: 0.08, fill: 5000,
     cam: (c, k) => c.at('brk', () => c.S(-12, 0, 0).setY(WL + 9).add(_v.set(0, 0, 88))).clone().add(_v.set(-6 * k, -2 * k, 0)),
     look: (c, k) => c.at('brkL', () => c.S(2, 0, 0).setY(WL + 8)).clone().add(_v.set(0, 6 * k, 0)) },
-  { name: 'Heck steigt', m: 158.6, dur: 0.35, fov: 46, sway: 0.15,
+  { name: 'Heck steigt', m: 158.6, dur: 0.35, fov: 46, sway: 0.15, fill: 40000,
     cam: (c, k) => c.W(-40 + 3 * k, WL + 2.2, 150),
     look: (c) => c.W(c.s.P0.x, 36, 0) },
   // close: the stern standing up, people holding on to the rails, falling
   { name: 'Absturz', m: 158.95, dur: 0.6, fov: 44, sway: 0.2, fixed: true, fill: 9000,
     cam: (c, k) => c.at('fallC', () => c.S(-112, 24, 0).add(_v.set(40, 0, 36)).setY(WL + 5)).clone().add(_v.set(0, 2 * k, 0)),
     look: (c) => c.S(-112, 25, 0) },
-  { name: 'Versinken', m: 159.55, dur: 0.65, fov: 46, sway: 0.15,
+  { name: 'Versinken', m: 159.55, dur: 0.65, fov: 46, sway: 0.15, fill: 40000,
     cam: (c, k) => c.W(-36 + 9 * k, WL + 2.2, 150),
     look: (c, k) => c.W(c.s.P0.x, 30 - 12 * k, 0) },
   { name: 'Danach', m: 160.2, dur: 1.8, fov: 50, sway: 0.35, boat: true,
     cam: (c) => c.boat(1.5),
     look: (c, k) => c.W(0, WL + 2 + 30 * ease(k), 0) },
   // the people in the water, the cries; one boat goes back with a lantern
-  { name: 'Im Wasser', m: 162, dur: 4, fov: 50, sway: 0.3,
+  { name: 'Im Wasser', m: 162, dur: 4, fov: 50, sway: 0.3, fill: 2500,
     cam: (c, k) => c.sea().clone().add(_v.set(16 - 4 * k, 1.1, 13 - 2 * k)),
     look: (c) => c.sea().clone().add(_v.set(0, 0.3, 0)) },
   { name: 'Zurück', m: 166, dur: 6, fov: 44, sway: 0.3,
@@ -149,8 +182,8 @@ export class Director {
       S: (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(s.broken && x < 1 ? s.TB : s.TA),
       berg: (dy) => new THREE.Vector3(s.berg.x, WL + dy, s.berg.z),
       orbit: (a, r, y) => new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r),
-      boat: (h) => {
-        const S = s.away[0];
+      boat: (h, j = 0) => {
+        const S = s.away[Math.min(j, s.away.length - 1)];
         if (!S) return new THREE.Vector3(60, WL + h, 165);
         S.L.boat.updateWorldMatrix(true, false);
         return new THREE.Vector3(-1.2, 0.4 + h, 0).applyMatrix4(S.L.boat.matrix); // (a rowing boat hangs in the world group)
@@ -178,7 +211,9 @@ export class Director {
     if (cut) { this.i = i; this.shotT = 0; }
     this.shotT += dt;
     const k = h.t !== undefined ? (s.t - h.t) / h.dur : (s.m - h.m) / h.dur;
-    const pos = h.cam(this.c, clamp01(k)), look = h.look(this.c, clamp01(k));
+    const kk = clamp01(k), pos = h.cam(this.c, kk), look = h.look(this.c, kk);
+    // a hand-held camera in the rough moments: a quick, small unrest
+    if (h.shake) { const T2 = s.t, a2 = h.shake; pos.x += (Math.sin(T2 * 7.3) + Math.sin(T2 * 11.9)) * a2 * 0.5; pos.y += (Math.sin(T2 * 8.7 + 1) + Math.sin(T2 * 13.1)) * a2 * 0.5; look.y += Math.sin(T2 * 6.1 + 2) * a2 * 2; look.x += Math.sin(T2 * 5.3) * a2 * 2; }
     // a hand on the camera: slow drift, never a jitter
     const T = s.t, a = h.sway ?? 0.05;
     pos.x += Math.sin(T * 0.37 + i) * a; pos.y += Math.sin(T * 0.53 + 2 * i) * a * 0.6; pos.z += Math.sin(T * 0.29 + 3 * i) * a;
@@ -186,11 +221,13 @@ export class Director {
     const up = h.up === 'ship' ? _s.set(0, 1, 0).transformDirection(s.TA) : _s.set(0, 1, 0);
     _m.lookAt(pos, look, up);
     _q.setFromRotationMatrix(_m);
+    if (h.roll) _q.multiply(_q2.setFromAxisAngle(_Zax, h.roll * (0.7 + 0.3 * Math.sin(s.t * 0.4)))); // (a tilted horizon)
     cam.position.copy(pos).applyMatrix4(s.TAi);
     cam.quaternion.copy(s.qAi).multiply(_q);
     // lens: the shot's field of view is meant for a 16:9 picture; narrower screens (phones upright) see as wide
-    const asp = Math.max(0.3, cam.aspect || 1.78), fh = 2 * Math.atan(Math.tan((h.fov * Math.PI) / 360) * 1.78);
-    const fov = asp >= 1.78 ? h.fov : Math.min(100, (2 * Math.atan(Math.tan(fh / 2) / asp) * 180) / Math.PI);
+    const f0 = typeof h.fov === 'function' ? h.fov(kk) : h.fov;
+    const asp = Math.max(0.3, cam.aspect || 1.78), fh = 2 * Math.atan(Math.tan((f0 * Math.PI) / 360) * 1.78);
+    const fov = asp >= 1.78 ? f0 : Math.min(100, (2 * Math.atan(Math.tan(fh / 2) / asp) * 180) / Math.PI);
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
     // near plane: as close as anything gets in this shot
     const dist = pos.distanceTo(look);
@@ -353,7 +390,7 @@ export class Wreckage {
   piece(p, v, kind, size) {
     const P = this.pieces[this.next], i = this.next;
     this.next = (this.next + 1) % this.n;
-    P.on = true; P.wet = p.y < WL; P.p.copy(p); P.v.copy(v); // (born under water: no splash)
+    P.on = true; P.wet = p.y < WL; P.p.copy(p); P.v.copy(v); P.age = 0; // (born under water: no splash)
     P.r.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
     P.w.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(8);
     P.float = kind === 'wood' || kind === 'ice';
@@ -462,6 +499,9 @@ export class Wreckage {
       const P = this.pieces[i];
       if (!P.on) continue;
       dirty = true;
+      // what floats drifts away astern in a minute or so (the ship had way on her still): gone from the pictures
+      P.age += dt;
+      if (P.float && P.age > 45) { P.on = false; (P.ice ? this.iceMesh : m).setMatrixAt(i, _m.makeScale(0, 0, 0)); continue; }
       if (P.p.y < WL) {
         if (!P.wet) { P.wet = true; this.spray.emit(_v.set(P.p.x, WL + 0.1, P.p.z), Math.min(40, 6 + Math.round(P.sc.x * 6)), Math.min(8, 2 + Math.abs(P.v.y) * 0.4), 1.4, null, 0.7); }
         const f = Math.exp(-dt * 2.5);

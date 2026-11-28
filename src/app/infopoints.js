@@ -73,6 +73,8 @@ export class InfoPoints {
   /** @param feet player's feet position, t time in seconds */
   update(dt, t, feet, mode) {
     if (!this.mesh) return;
+    this.mesh.visible = !this.world.sinkMode; // (the night of 14 April is a film: no reading tokens in the pictures)
+    if (!this.mesh.visible) return;
     this._timer += dt;
     if (this._timer >= 0.25) { this._timer = 0; this._scan(feet, mode); }
     // face the viewer + bob the visible tokens
