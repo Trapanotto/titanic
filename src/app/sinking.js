@@ -384,7 +384,7 @@ export class Sinking {
         // (the covers were off long before)
         const b = S.L.boat, sp = st.u.spec;
         if (sp.covered && b.children[0]) { b.remove(b.children[0]); b.add(liveBoat(sp.type || 'std', false)); }
-        S.load = this.crowd.boatLoad(b, LOADS[st.no] ?? 30, st.no === 1 ? 2 : 4);
+        S.load = this.crowd.boatLoad(b, LOADS[st.no] ?? 30, st.no === 1 ? 2 : 4, st.no === 7);
         S.no = st.no;
       }
     }
@@ -748,7 +748,7 @@ export class Sinking {
     P.vignette = 0.62;
     P.grain = 0.028;
     P.bloom = u ? 0.25 : 0.42; P.bloomThreshold = 0.8; P.bloomKnee = 0.7;
-    P.exposure *= u ? 1.05 : 1.15;
+    P.exposure *= (u ? 1.05 : 1.15) * (this.director?.shot?.expo ?? 1);
     if (this.m >= DAWN) { P.contrast = 1.12; P.saturation = 0.95; P.vignette = 0.55; P.grain = 0.022; P.exposure *= 0.5; P.bloom = 0.5; P.lift.setRGB(0.025, 0.015, 0.04); P.gain.setRGB(1.26, 0.92, 0.86); return; }
     if (u) { P.lift.setRGB(0.0, 0.02, 0.03); P.gain.setRGB(0.82, 1.02, 1.06); }
     else { P.lift.setRGB(0.0, 0.008, 0.022); P.gain.setRGB(1.07, 1.0, 0.9); }

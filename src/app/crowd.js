@@ -135,7 +135,7 @@ function crowdMaterial() {
 // colours of coats and dresses (dark serge, tweed, a few light evening dresses), the crew in white jackets
 const COATS = [0x1d2030, 0x2a2622, 0x34302a, 0x1a1a1a, 0x3d3a36, 0x2b3140, 0x4a3a2a, 0x23262b];
 const DRESSES = [0x2c2a3c, 0x5a2530, 0x8c8478, 0x3a4458, 0x6e665a, 0xb8ae9a, 0x2a2a2a, 0x51463e];
-const CREW = 0xbfbcb0, BAND = 0x1c2620;
+const CREW = 0xbfbcb0, BAND = 0x1c2620, MOTHER = 0x8a1e1a, CHILD = 0x55708e;
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _sc = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
 const _Y = new THREE.Vector3(0, 1, 0), _Z = new THREE.Vector3(0, 0, 1), _X = new THREE.Vector3(1, 0, 0);
@@ -160,11 +160,12 @@ class Pool {
     parent.add(this.mesh);
   }
   /** pose i: position, facing (yaw), lean forward, and an extra rotation q (or null) applied outside */
-  put(i, x, y, z, yaw, lean, qOut) {
+  put(i, x, y, z, yaw, lean, qOut, size = 1) {
     _q.setFromAxisAngle(_Y, yaw);
     if (lean) _q.multiply(_q2.setFromAxisAngle(_Z, -lean));
     if (qOut) _q.premultiply(qOut);
-    this.mesh.setMatrixAt(i, _m.compose(_v.set(x, y, z), _q, _sc));
+    this.mesh.setMatrixAt(i, _m.compose(_v.set(x, y, z), _q, _sc.set(size, size, size)));
+    _sc.set(1, 1, 1);
   }
   hide(i) { this.mesh.setMatrixAt(i, _m.makeScale(0, 0, 0)); }
   look(i, mode, rate, flags, phase) {
@@ -221,7 +222,7 @@ export class Crowd {
     const f = TIER.fine ?? 2;
     const N = [240, 380, 560, 800][f] ?? 560;
     this.N = N;
-    this.deck = new Pool(N + 14, sink.scene, 'crowdDeck');
+    this.deck = new Pool(N + 18, sink.scene, 'crowdDeck');
     this.sea = new Pool(N + 8, sink.outside, 'crowdSea');
     this.boatPools = [];
     this.P = [];
@@ -249,6 +250,14 @@ export class Crowd {
       this.deck.colour(i, 0x2d2a26);
       this.stokers.push({ i, x: 62 + Math.random() * 3.4, z: -1 + Math.random() * 8, v: 3.0 + Math.random() * 1.2, yaw: 0 });
     }
+    // one family the film follows: the mother (red coat) and her child go into boat 7, the father stays at the rail
+    this.family = { mother: N + 14, child: N + 15, father: N + 16 };
+    this.deck.colour(N + 14, MOTHER); this.deck.colour(N + 15, CHILD); this.deck.colour(N + 16, 0x1e2230);
+    this.deck.look(N + 14, FIG.idle, 0.8, 3, 1); this.deck.look(N + 15, FIG.idle, 1, 4 + 1, 2); this.deck.look(N + 16, FIG.idle, 0.8, 1, 3);
+    // the wireless operator at his set in the Marconi room
+    this.operator = N + 17;
+    this.deck.colour(N + 17, 0x1b1f2a);
+    this.deck.look(N + 17, FIG.cello, 5, 4, 0);
     this.frontX = 200;
     this.tick = 0;
   }
@@ -398,7 +407,7 @@ export class Crowd {
   }
 
   // ---------------------------------------------------------------- the people in a lifeboat (boat group, boat-local)
-  boatLoad(boat, count, rowers = 4) {
+  boatLoad(boat, count, rowers = 4, family = false) {
     const n = Math.max(rowers + 1, Math.min(44, count));
     const pool = new Pool(n + 6, boat, 'crowdBoat');
     const seats = [];
@@ -416,6 +425,13 @@ export class Crowd {
       pool.look(k, mode, row ? 2.2 : 0.6, 1 + (woman ? 2 : 0), Math.random() * 6);
     }
     for (let k = n; k < n + 6; k++) pool.hide(k);
+    if (family) {
+      // the mother and her child, near the stern of the boat (they are found again at dawn)
+      const k = rowers + 1;
+      pool.put(k, -2.6, 0.04, 0.42, Math.PI, 0, null); pool.colour(k, MOTHER); pool.look(k, FIG.seat, 0.6, 3, 0);
+      pool.put(k + 1, -2.6, 0.3, -0.12, Math.PI, 0, null, 0.62); pool.colour(k + 1, CHILD); pool.look(k + 1, FIG.seat, 0.6, 5, 0);
+      this.familyBoarded = true;
+    }
     pool.dirty();
     const B = { pool, n, free: n, boat };
     this.boatPools.push(B);
@@ -491,6 +507,25 @@ export class Crowd {
       this.deck.put(K.i, K.x, DECK_Y.tank, K.z, run ? K.yaw : 0.4, run ? 0.18 : 0.3, null);
     }
     this.deck.dirty();
+    // the family by boat 7: together at the rail, then mother and child are in the boat and the father stays, waving
+    {
+      const F = this.family, by = DECK_Y.boat, yaw = -Math.PI / 2; // (facing outboard, starboard)
+      const on = m >= 40 && !F.gone;
+      if (on && !this.familyBoarded) {
+        this.deck.put(F.mother, 34.3, by, 9.75, yaw + 0.5, 0, this._qComp(34, 0.85));
+        this.deck.put(F.child, 34.95, by, 9.7, yaw - 0.3, 0, this._qComp(34, 0.85), 0.62);
+      } else { this.deck.hide(F.mother); this.deck.hide(F.child); }
+      if (on) {
+        const waving = this.familyBoarded && m < 80;
+        if (waving !== F.waving) { F.waving = waving; this.deck.look(F.father, waving ? FIG.wave : FIG.idle, waving ? 3 : 0.8, 1); }
+        this.deck.put(F.father, 33.5, by, 9.9, yaw + (this.familyBoarded ? 0 : 0.6), 0, this._qComp(33, 0.85));
+        _v.set(33.5, by + 0.3, 9.9).applyMatrix4(s.TA);
+        if (_v.y < WL + 0.1) { F.gone = true; this.deck.hide(F.father); this._toSea({ i: F.father, jacket: true, woman: false }, _v.setY(WL), false); }
+      } else if (!F.gone) this.deck.hide(F.father);
+      // the operator: at the key until the captain released him (about 02:17)
+      if (m < 137) this.deck.put(this.operator, 51.3, by - 0.36, 0.75, 0, 0.12, this._qComp(51, 0.85));
+      else this.deck.hide(this.operator);
+    }
     // the band plays on until the sea comes over the boat deck forward
     let bandOn = false;
     for (const B of this.band) {
