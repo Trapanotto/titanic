@@ -352,3 +352,6 @@ body.cine .sink-under { background: radial-gradient(ellipse at 50% 40%, rgba(10,
 .cine-fade.title div { opacity: 1; text-shadow: 0 1px 8px #000; }
 .cine-fade.show.title { background: #000; }
 .cine-fade div small { display: block; margin-top: 10px; font-size: 0.62em; letter-spacing: 0.14em; opacity: 0.75; }
+/* titles under the picture (times, what happens) */
+.cine-cap { position: fixed; left: 0; right: 0; bottom: calc(clamp(28px, calc((100vh - 100vw / 2.2) / 2), 11vh) + 18px); z-index: 16; text-align: center; padding: 0 16px; color: #efe3c4; font: 400 clamp(14px, 2.2vw, 21px) Georgia, 'Times New Roman', serif; letter-spacing: 0.1em; text-shadow: 0 1px 10px #000, 0 0 2px #000; opacity: 0; transition: opacity 0.9s; pointer-events: none; }
+.cine-cap.show { opacity: 0.92; }

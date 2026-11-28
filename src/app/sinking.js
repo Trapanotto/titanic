@@ -289,7 +289,8 @@ export class Sinking {
     let minZ = Infinity;
     for (let i = 0; i < P.count; i++) { const x = P.getX(i), z = P.getZ(i); if (Math.abs(x - 520) < 12 && Math.abs(z - 140) < 60 && P.getY(i) > WL - 1) minZ = Math.min(minZ, z); }
     this.bergNear = 140 - (Number.isFinite(minZ) ? minZ : 110);
-    b.material.emissive.setHex(0x2a3440); // a little starlight on the ice (it was a moonless night)
+    b.material.emissive.setHex(0x0c1219); // hardly any light on the ice: a moonless night, the berg a darker shape against the stars
+    b.material.color.setHex(0x8a96a4);
     this.berg = { x: 110 + HIT * SHIP_SPEED, v: SHIP_SPEED, z: 0 };
     // the spur: a shelf of the berg's foot reaching out under water, the part that cut the ship open
     const sg = bergGeometry((TIER.fine ?? 2) >= 2 ? 6 : 4, 56, 30, 9, 7.3, [{ x: 0.2, z: 0, sx: 0.5, sz: 0.5, h: 0.4 }], { strata: 0, oct: 4, deep: 1.3 });
@@ -297,7 +298,7 @@ export class Sinking {
     const SP = sg.attributes.position;
     let top = -1e9, near = 1e9;
     for (let i = 0; i < SP.count; i++) { top = Math.max(top, SP.getY(i)); if (Math.abs(SP.getX(i)) < 6 && Math.abs(SP.getY(i)) < 2.5) near = Math.min(near, SP.getZ(i)); }
-    const sm = new THREE.MeshStandardMaterial({ color: 0x4f97ad, roughness: 0.45, metalness: 0, flatShading: true, emissive: 0x06161e });
+    const sm = new THREE.MeshStandardMaterial({ color: 0x2f6474, roughness: 0.45, metalness: 0, flatShading: true, emissive: 0x020809 });
     sm.name = 'iceSpur';
     this.spur = new THREE.Mesh(sg, sm);
     this.spur.name = 'iceSpur';
@@ -554,8 +555,14 @@ export class Sinking {
     }
     // events
     if (!this.hitDone && this.t >= HIT) this._collide();
-    if (this.t < HIT + 60) this._moveBerg(dt);
-    if (ENGINE.steam > 0 && this.t > HIT) ENGINE.steam = clamp01(1 - Math.max(0, m) / 25); // blowing off for the first 25 minutes
+    if (this.t < HIT + 28) this._moveBerg(dt);
+    else if (!this.bergGone) {
+      // far astern now, out of the pictures (it was soon lost in the dark)
+      this.bergGone = true;
+      this.world.env.berg.mesh.position.set(-1500 - 520, 0, 420 - 140);
+      this.spur.visible = false;
+    }
+    if (ENGINE.steam > 0 && this.t > HIT) ENGINE.steam = clamp01(1 - Math.max(0, m) / 25) * (this.cine ? 0.3 : 1); // blowing off for the first 25 minutes (in the film a thinner plume)
     if (this.ice) for (const I of this.ice) { if (I.t < 1) { I.t += dt * 1.4; const k = clamp01(I.t); I.m.position.y = lerp(I.m.position.y, I.y1, k * k); I.m.position.z = lerp(I.m.position.z, I.z1, k); } }
     this._boats();
     this.interact.boats.sink.timeScale = this.t > HIT + SCRAPE ? rate / BOAT_REF : 1;
@@ -623,10 +630,10 @@ export class Sinking {
     this.world.underwater = under;
     // under water in the film: clearer, greener water, a soft light on the camera (as a film crew would light it)
     const cineUnder = this.cine && under;
-    this.world.underFog = cineUnder ? (this._uf ||= { color: new THREE.Color(0x0a3442), density: 0.026 }) : null;
+    this.world.underFog = cineUnder ? (this._uf ||= { color: new THREE.Color(0x041a22), density: 0.05 }) : null;
     if (Wk) {
       Wk.fill = cineUnder;
-      if (cineUnder && !this.broken) { Wk.glow.color.setHex(0x8fd0e8); Wk.glow.intensity = 160; Wk.glow.position.copy(this.camera.position).add(new THREE.Vector3(0, 5, 0)); }
+      if (cineUnder && !this.broken) { Wk.glow.color.setHex(0x6fb4cc); Wk.glow.intensity = 70; Wk.glow.position.copy(this.camera.position).add(new THREE.Vector3(0, 5, 0)); }
       else if (Wk.glowT <= 0) Wk.glow.color.setHex(0xff8a3a);
       Wk.drift(this.director?.pos || this.camera.position, cineUnder, this.t);
       // a cold fill light from the camera where the shot asks for it (the people on the dark stern)
@@ -638,7 +645,7 @@ export class Sinking {
       // the surface seen from below
       const sf = Wk.surf, cw = this.director?.pos || cam;
       sf.visible = cineUnder;
-      if (cineUnder) { sf.position.set(cw.x, WL - 0.04, cw.z); sf.material.uniforms.uCam.value.copy(cw); sf.material.uniforms.uT.value = this.t; sf.material.uniforms.uLit.value = this.world.power ?? 0; }
+      if (cineUnder) { sf.position.set(cw.x, WL - 0.04, cw.z); sf.material.uniforms.uCam.value.copy(cw); sf.material.uniforms.uT.value = this.t; sf.material.uniforms.uLit.value = this.world.power ?? 0; sf.material.uniforms.uCol.value.copy(this._uf.color); }
       // the lantern of the boat that went back
       if (this.back && m < DAWN && m > END + 0.4 && Wk.glowT <= 0) {
         Wk.glow.color.setHex(0xffc070); Wk.glow.intensity = 90;
@@ -708,6 +715,16 @@ export class Sinking {
     if (this.m > END + 0.6) { this.world.interior.visible = false; this.world.exterior.visible = false; this.shipLive.visible = false; this.interact.boats.root.visible = this.away.length > 0; }
   }
 
+  /** a line of text under the picture, like a title in a film (times, what happens) */
+  caption(text) {
+    let e = this.capEl;
+    if (!e) { e = this.capEl = document.createElement('div'); e.className = 'cine-cap'; document.body.append(e); }
+    e.textContent = text;
+    e.classList.remove('show'); void e.offsetWidth; e.classList.add('show');
+    clearTimeout(this._capT);
+    this._capT = setTimeout(() => e.classList.remove('show'), 3200);
+  }
+
   /** the film's grade: deep blacks, cool shadows, warm lights, grain, a heavy vignette; teal under water */
   _grade(P) {
     if (!this.cine) return;
@@ -717,8 +734,8 @@ export class Sinking {
     P.vignette = 0.62;
     P.grain = 0.028;
     P.bloom = u ? 0.25 : 0.42; P.bloomThreshold = 0.8; P.bloomKnee = 0.7;
-    P.exposure *= u ? 1.25 : 1.15;
-    if (this.m >= DAWN) { P.contrast = 1.12; P.saturation = 0.95; P.vignette = 0.55; P.grain = 0.022; P.exposure *= 0.62; P.bloom = 0.5; P.lift.setRGB(0.025, 0.015, 0.04); P.gain.setRGB(1.2, 0.94, 0.84); return; }
+    P.exposure *= u ? 1.05 : 1.15;
+    if (this.m >= DAWN) { P.contrast = 1.12; P.saturation = 0.95; P.vignette = 0.55; P.grain = 0.022; P.exposure *= 0.5; P.bloom = 0.5; P.lift.setRGB(0.025, 0.015, 0.04); P.gain.setRGB(1.26, 0.92, 0.86); return; }
     if (u) { P.lift.setRGB(0.0, 0.02, 0.03); P.gain.setRGB(0.82, 1.02, 1.06); }
     else { P.lift.setRGB(0.0, 0.008, 0.022); P.gain.setRGB(1.07, 1.0, 0.9); }
   }
@@ -769,8 +786,8 @@ export class Sinking {
 
   _dawn() {
     const W = this.world;
-    W.nightOverride = 0.47;
-    W.sunDirOverride = new THREE.Vector3(0.82, 0.03, -0.56).normalize();
+    W.nightOverride = 0.53;
+    W.sunDirOverride = new THREE.Vector3(0.82, 0.004, -0.56).normalize();
     W.starBoost = 1;
     this.carpathia.position.set(300, WL - 0.4, -330);
     this.carpathia.rotation.y = 2.2;

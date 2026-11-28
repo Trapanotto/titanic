@@ -22,7 +22,7 @@ let _geo = null;
 function figureGeometry() {
   if (_geo) return _geo;
   const parts = [];
-  const C = (h) => new THREE.Color(h), TINT = C(0xffffff), SKIN = C(0xd8b49a), DARK = C(0x18171a), HAT = C(0x221e1c), JACKET = C(0xe9e4d4);
+  const C = (h) => new THREE.Color(h), TINT = C(0xffffff), SKIN = C(0xd8b49a), DARK = C(0x18171a), HAT = C(0x221e1c), JACKET = C(0xb9b3a2);
   const add = (g0, part, col, tint) => {
     const g = g0.index ? g0.toNonIndexed() : g0;
     g.deleteAttribute('uv');
