@@ -222,7 +222,7 @@ export class Sinking {
     let minZ = Infinity;
     for (let i = 0; i < P.count; i++) { const x = P.getX(i), z = P.getZ(i); if (Math.abs(x - 520) < 12 && Math.abs(z - 140) < 60 && P.getY(i) > WL - 1) minZ = Math.min(minZ, z); }
     this.bergNear = 140 - (Number.isFinite(minZ) ? minZ : 110);
-    b.material.emissive.setHex(0x34424f); // a little starlight on the ice (it was a moonless night)
+    b.material.emissive.setHex(0x2a3440); // a little starlight on the ice (it was a moonless night)
     this.berg = { x: 110 + HIT * SHIP_SPEED, v: SHIP_SPEED, z: 0 };
   }
 
