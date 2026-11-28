@@ -298,14 +298,17 @@ void main() {
   // hull mirror image near the ship
   if (R.z * side < 0.0 && az > hw - 0.2 && dHull < 260.0) {
     float t = (az - hw) / max(abs(R.z), 1e-3);
-    float hy = R.y * t, hx = x + R.x * t;
+    // the swell breaks the mirror image up: shifted along the hull a little, and broken into glints
+    float wob = tNoise(vec2(p.x * 0.35 + uTime * 0.25, p.y * 1.6 - uTime * 0.7)) - 0.5;
+    float hy = R.y * t * (1.0 + wob * 0.35), hx = x + R.x * t + wob * (1.2 + t * 0.05);
+    float glint = 0.35 + 1.3 * smoothstep(0.35, 0.8, tNoise(vec2(p.x * 1.1 - uTime * 0.4, p.y * 3.2 + uTime * 0.9)));
     if (abs(hx) < BOW_X && hy < sideTop(hx) && t < 400.0) {
       float lit = max(0.0, side * uSunDir.z) * 0.8 + 0.2;
       float white = step(sideTop(hx) - 8.3, hy) * step(11.9, sideTop(hx));
       vec3 hullC = mix(vec3(0.012, 0.012, 0.014) * (0.4 + uSunI * 0.25 * lit), vec3(0.62, 0.61, 0.58) * (0.15 + uSunI * 0.22 * lit), white) * day;
       hullC += mix(vec3(0.0008, 0.0008, 0.001), vec3(0.03, 0.025, 0.019), white) * uNight;
       float sig = 0.25 + 0.06 * t;
-      hullC += vec3(1.0, 0.7, 0.38) * shipLights(hx, hy, sig) * 1.6 * clamp(0.7 / sig, 0.08, 1.0) * uShipLights;
+      hullC += vec3(1.0, 0.7, 0.38) * shipLights(hx, hy, sig) * 1.6 * clamp(0.7 / sig, 0.08, 1.0) * uShipLights * glint;
       float taper = smoothstep(hw - 3.0, hw - 0.3, hullHW(hx));   // the hull narrows towards bow / stern
       refl = mix(refl, hullC, smoothstep(0.0, 0.6, hy) * smoothstep(sideTop(hx), sideTop(hx) - 0.8, hy) * taper * (1.0 - smoothstep(330.0, 400.0, t)));
     }

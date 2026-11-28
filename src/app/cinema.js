@@ -36,9 +36,13 @@ const SHOTS = [
     cam: (c, k) => c.S(67 + k * 0.6, 33.6, 12.6),
     look: (c, k) => c.berg(13 - 3 * k) },
   // under water: the spur of the berg, the bow coming out of the murk and tearing along it
-  { name: 'Sporn', t: 13.2, dur: 4.3, fov: 54, sway: 0.18, under: true, shake: 0.05,
+  { name: 'Sporn', t: 13.2, dur: 2.5, fov: 54, sway: 0.18, under: true, shake: 0.05,
     cam: (c, k) => c.W(c.cx() + 20 - 4 * k, WL - 4.8 - 0.6 * k, c.hu(c.cx() + 20) + 8.5),
     look: (c) => c.W(c.cx() - 4, WL - 6.4, c.hu(Math.min(126, c.cx() - 4)) - 0.5) },
+  // over the starboard rail of the forecastle, straight down the side: the ice grinding along the plating
+  { name: 'Schrammen', t: 15.7, dur: 1.8, fov: 58, up: 'ship', sway: 0.04, shake: 0.08,
+    cam: (c, k) => c.S(112 - 2 * k, 24.6, 7.4),
+    look: (c) => c.touch() },
   { name: 'Kollision', t: 17.5, dur: 3, fov: (k) => 54 - 8 * k, up: 'ship', sway: 0.05, roll: -0.05, shake: 0.06,
     cam: (c, k) => c.S(64 - k * 5, 47 - 3 * k, -22),
     look: (c, k) => c.S(90 - k * 14, 13, 17) },
@@ -171,8 +175,9 @@ export class Director {
     this.memo = {};
     this.pos = new THREE.Vector3(); this.look = new THREE.Vector3();
     const s = sink, d = this;
+    let c0 = null;
     // helpers for the shots
-    this.c = {
+    this.c = c0 = {
       s,
       get B() { return s.berg; },
       W: (x, y, z) => new THREE.Vector3(x, y, z),
@@ -186,6 +191,7 @@ export class Director {
         return new THREE.Vector3(-1.2, 0.4 + h, 0).applyMatrix4(S.L.boat.matrix); // (a rowing boat hangs in the world group)
       },
       at: (key, fn) => (d.memo[key] ||= fn()),
+      touch: () => { const T0 = s.touch || { x: 90, y: WL + 2 }; const x = Math.max(-120, Math.min(120, T0.x)); return c0.S(x, T0.y, hullHalfWidth(x, T0.y)); },
       boatIn: (h, j = 0) => {
         const S = s.away[Math.min(j, s.away.length - 1)];
         if (!S) return new THREE.Vector3(60, WL + h, 165);

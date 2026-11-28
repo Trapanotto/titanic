@@ -72,6 +72,17 @@ export function bergGeometry(detail, len, wid, height, seed, peaks, o = {}) {
   return g;
 }
 
+// value noise in 3D for the fine surface of the ice (fragment shader)
+const ICE_NOISE = /* glsl */ `
+float iceH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float iceV(vec3 x) {
+  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(iceH(i), iceH(i + vec3(1, 0, 0)), f.x), mix(iceH(i + vec3(0, 1, 0)), iceH(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(iceH(i + vec3(0, 0, 1)), iceH(i + vec3(1, 0, 1)), f.x), mix(iceH(i + vec3(0, 1, 1)), iceH(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+float iceFbm(vec3 p) { return 0.5 * iceV(p) + 0.3 * iceV(p * 2.03 + 3.1) + 0.2 * iceV(p * 4.1 + 7.7); }
+`;
+
 const SNOW = new THREE.Color(1.0, 1.0, 1.0), ICE = new THREE.Color(0.46, 0.66, 0.84), DEEP = new THREE.Color(0.2, 0.4, 0.62);
 const WET = new THREE.Color(0.32, 0.5, 0.6), UNDER = new THREE.Color(0.18, 0.48, 0.55), _c = new THREE.Color();
 /** colour per face (flat): snow where it is flat, glacier blue on steep faces, darker in clefts and strata, wet at the water */
@@ -113,7 +124,7 @@ function brash(cx, cz, rot, count, rnd) {
 
 export function createIceberg() {
   const f = TIER.fine ?? 3, parts = [];
-  const D = [12, 16, 22, 28][f] ?? 22;
+  const D = [14, 20, 30, 38][f] ?? 30;
   // the main berg: about 120 m long, 25 m high, with a sharp peak (survivors compared it to the Rock of Gibraltar)
   const main = bergGeometry(D, 120, 62, 25, 3.1, [
     { x: 0.32, z: 0.05, sx: 0.28, sz: 0.55, h: 0.78 },
@@ -125,6 +136,19 @@ export function createIceberg() {
   main.rotateY(0.45);
   main.translate(520, WL - 0.3, 140);
   parts.push(main);
+  // the near face of the berg where it can touch a hull (above the water, up to C deck): per metre along x and 1.5 m
+  // of height the point nearest the ship – the film (app/sinking.js) slides the berg along the plating with it
+  const bins = new Map(), MP = main.attributes.position;
+  for (let i = 0; i < MP.count; i++) {
+    const y = MP.getY(i);
+    if (y < WL + 0.4 || y > SHIP.waterline + 9.2) continue;
+    const dx = MP.getX(i) - 520, dz = MP.getZ(i) - 140;
+    if (dz > 0) continue;
+    const key = Math.round(dx) * 100 + Math.round(y / 1.5);
+    const b = bins.get(key);
+    if (!b || dz < b[2]) bins.set(key, [dx, y, dz]);
+  }
+  const profile = new Float32Array([...bins.values()].flat());
   const growlers = [
     [432, 96, 9, 6, 2.4, 0.4], [468, 196, 6, 4, 1.5, 1.9], [588, 92, 12, 7, 3.0, 2.7],
     [392, 158, 5, 4, 1.2, 0.9], [610, 214, 8, 5, 2.0, 5.2], [455, 118, 4, 3, 0.9, 3.3], [560, 205, 7, 5, 1.6, 4.1],
@@ -144,20 +168,76 @@ export function createIceberg() {
     name: 'ice', color: 0xffffff, vertexColors: true, roughness: 0.42, metalness: 0, flatShading: true,
     emissive: 0x0b1420, emissiveIntensity: 1, transparent: true, opacity: 0,
   });
-  // the faint glow of the ice in the starlight follows its colour: the snow stands out pale against the blue walls
+  // the faint glow of the ice in the starlight follows its colour: the snow stands out pale against the blue walls.
+  // Close up the faces get a grain of their own (in the berg's own coordinates, so it stays put as the berg moves):
+  // fissures darker and bluer, a crusted, rippled surface that catches the light facet by facet.
   material.onBeforeCompile = (sh) => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= vColor.rgb * vColor.rgb * 1.8;');
+    sh.vertexShader = 'varying vec3 vBergP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBergP = position;');
+    sh.fragmentShader = 'varying vec3 vBergP;\n' + ICE_NOISE + sh.fragmentShader
+      .replace('#include <color_fragment>', `#include <color_fragment>
+  float iceN = iceFbm(vBergP * 0.45), iceF = iceFbm(vBergP * 2.3 + 7.0);
+  float crev = smoothstep(0.08, 0.0, abs(iceFbm(vBergP * vec3(0.9, 0.25, 0.9)) - 0.5) - 0.015);
+  diffuseColor.rgb *= 0.78 + 0.34 * iceN + 0.14 * iceF;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.08, 0.2, 0.32), crev * 0.65);`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  {
+    vec3 q = vBergP * 1.7, e = vec3(0.35, 0.0, 0.0);
+    vec3 gN = vec3(iceFbm(q + e.xyy) - iceFbm(q - e.xyy), iceFbm(q + e.yxy) - iceFbm(q - e.yxy), iceFbm(q + e.yyx) - iceFbm(q - e.yyx));
+    normal = normalize(normal - (viewMatrix * vec4(gN, 0.0)).xyz * 1.6);
+  }`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= vColor.rgb * vColor.rgb * 1.8;');
   };
+  material.customProgramCacheKey = () => 'iceberg2';
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'iceberg';
+  // the swell breaking white along the foot of the main berg: a ring following its outline at the waterline
+  const NA = 96, rad = new Float32Array(NA);
+  for (let i = 0; i < MP.count; i++) {
+    if (Math.abs(MP.getY(i) - WL) > 1.2) continue;
+    const dx = MP.getX(i) - 520, dz = MP.getZ(i) - 140, a = Math.floor((((Math.atan2(dz, dx) / (Math.PI * 2)) + 1) % 1) * NA) % NA;
+    rad[a] = Math.max(rad[a], Math.hypot(dx, dz));
+  }
+  for (let k = 0; k < 3; k++) for (let a = 0; a < NA; a++) if (!rad[a]) rad[a] = Math.max(rad[(a + NA - 1) % NA], rad[(a + 1) % NA]);
+  const rp = [], ru = [];
+  for (let a = 0; a <= NA; a++) {
+    const ang = (a / NA) * Math.PI * 2, r = rad[a % NA] || 30;
+    for (const [o, u] of [[-0.6, 0], [3.2, 1]]) { rp.push(520 + Math.cos(ang) * (r + o), WL + 0.06, 140 + Math.sin(ang) * (r + o)); ru.push((a / NA) * 24, u); }
+  }
+  const ri = [];
+  for (let a = 0; a < NA; a++) { const i = a * 2; ri.push(i, i + 1, i + 2, i + 1, i + 3, i + 2); }
+  const rg = new THREE.BufferGeometry();
+  rg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3));
+  rg.setAttribute('uv', new THREE.Float32BufferAttribute(ru, 2));
+  rg.setIndex(ri);
+  const surfU = { uT: { value: 0 }, uK: { value: 0 } };
+  const surf = new THREE.Mesh(rg, new THREE.ShaderMaterial({
+    name: 'bergSurf', uniforms: surfU, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    vertexShader: 'varying vec2 vU; void main() { vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `varying vec2 vU; uniform float uT, uK;
+      float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+      void main() {
+        float w = n(vec2(vU.x * 3.0 + uT * 0.3, vU.y * 4.0 - uT * 0.8)) * 0.6 + n(vec2(vU.x * 9.0 - uT * 0.5, vU.y * 9.0)) * 0.4;
+        float edge = (1.0 - smoothstep(0.0, 1.0, vU.y)) * smoothstep(0.0, 0.12, vU.y + 0.05);
+        float a = smoothstep(0.45, 0.8, w) * edge * uK;
+        gl_FragColor = vec4(vec3(0.62, 0.7, 0.76), a * 0.55);
+      }`,
+  }));
+  surf.name = 'bergSurf';
+  surf.frustumCulled = false;
+  surf.renderOrder = 3;
+  mesh.add(surf);
   mesh.visible = false;
   mesh.castShadow = false; mesh.receiveShadow = false;
   mesh.userData.noMerge = true;
   return {
     mesh,
+    profile,
     update(n) {
       mesh.visible = n > 0.01;
       material.opacity = n;
+      surfU.uT.value = performance.now() / 1000;
+      surfU.uK.value = n;
     },
   };
 }

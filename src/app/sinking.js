@@ -312,13 +312,26 @@ export class Sinking {
     if (hit) B.v *= Math.exp(-dt / 25); // the ship carries her way for a while after the engines were stopped
     if (B.x > -360) B.x -= B.v * dt;
     const x = B.x, hwAt = (xx) => hullHalfWidth(Math.max(-130, Math.min(125, xx)), WL);
-    let z = hwAt(Math.min(x, 120)) + 0.4 + this.bergNear + Math.max(0, x - 120) * 0.07; // she turns to port: the berg slides along starboard
+    // where the berg touches: the point of its near face that needs it farthest out to clear the hull (z of the berg's
+    // centre so that this point lies 0.1 m into the plating – the ice grinds along the side)
+    const Pf = this.world.env.berg.profile;
+    let zc = -1e9, cxw = x, cyw = WL + 1;
+    for (let i = 0; i < Pf.length; i += 3) {
+      const hx = x + Pf[i];
+      if (hx < -133 || hx > 133) continue;
+      const need = hullHalfWidth(hx, Pf[i + 1]) - 0.1 - Pf[i + 2];
+      if (need > zc) { zc = need; cxw = hx; cyw = Pf[i + 1]; }
+    }
+    if (zc < -1e8) zc = hwAt(Math.min(x, 120)) + 0.4 + this.bergNear;
+    this.touch = { x: cxw, y: cyw };
+    // before the blow she is still turning to port: the berg comes in from farther out, and touches at 23:40
+    let z = zc + Math.max(0, HIT - this.t) * 1.1;
     if (x < 10) z += (10 - x) * 0.14;                                                   // and falls away astern
     B.z = z;
     this.world.env.berg.mesh.position.set(x - 520, 0, z - 140);
     // the spur rides with the berg; its near face presses 0.6 m into the plating where it is
     const cx = (this.contactX = x + 12), hu = hullHalfWidth(Math.max(-130, Math.min(128, cx)), WL - 6);
-    const away = z - (hwAt(Math.min(x, 120)) + 0.4 + this.bergNear);
+    const away = Math.max(0, z - zc);
     this.spur.position.set(x + 30, WL - 3.2 - this.spurTop, hu - 0.6 + this.spurNear + away);
     this.spur.rotation.y = 0.05;
     // ice tumbling onto the forward well deck as the berg passes it
@@ -614,8 +627,9 @@ export class Sinking {
       }
       if (!this.calved && this.t > HIT + 0.8) { this.calved = true; Wk.calve(this.berg, hullHalfWidth(Math.min(this.berg.x, 120), WL)); }
       if (this.t > HIT && this.t < HIT + SCRAPE && Math.random() < 0.6) {
-        const cx = Math.max(-40, Math.min(118, this.berg.x));
-        Wk.ice(new THREE.Vector3(cx, WL + 0.5, hullHalfWidth(cx, WL) + 0.4).applyMatrix4(this.TA));
+        const T0 = this.touch || { x: this.berg.x, y: WL + 1 }, cx = Math.max(-120, Math.min(126, T0.x));
+        Wk.ice(new THREE.Vector3(cx, T0.y, hullHalfWidth(cx, T0.y) + 0.3).applyMatrix4(this.TA));
+        if (Math.random() < 0.5) Wk.sparks.emit(new THREE.Vector3(cx, T0.y, hullHalfWidth(cx, T0.y) + 0.2).applyMatrix4(this.TA), 6, 4, 0.6, null, 0.8);
       }
       if (this.broken && !this.slammed && m >= 157.55) { this.slammed = true; Wk.slam(); this.shake = 2; }
       if (this.broken && m > 158.1 && m < 159.7 && Math.random() < dt * 14) Wk.slide();
