@@ -437,6 +437,12 @@ export const DAVIT_PIVOT = [0.42, 1.22];
  * Working copy of a boat station for the app: the boat with its lower blocks and each davit arm are groups of their
  * own (not baked), the falls are drawn by the app. Returns the parts and the measures the animation needs.
  */
+/** an open boat (no cover) for a working station (the film: the covers come off before the people get in) */
+export function liveBoat(type, covered) {
+  LIVE = 'L';
+  try { return makeBoat(type, covered); } finally { LIVE = ''; }
+}
+
 export function liveStation(spec) {
   LIVE = 'L';
   try { return liveStation1(spec); } finally { LIVE = ''; }

@@ -243,9 +243,9 @@ export async function build(world) {
     const dirKey = n < 0.5 ? 0 : 1;
     const tx = Math.round(cam.x / SHADOW_STEP) * SHADOW_STEP, tz = Math.round(cam.z / SHADOW_STEP) * SHADOW_STEP;
     let need = false;
-    if (tx !== lastTx || tz !== lastTz || dirKey !== lastDir) {
+    if (tx !== lastTx || tz !== lastTz || dirKey !== lastDir || world.sunDirOverride) {
       lastTx = tx; lastTz = tz; lastDir = dirKey;
-      dir.copy(dirKey ? STAR_DIR : SUN_DIR);
+      dir.copy(dirKey ? STAR_DIR : (world.sunDirOverride || SUN_DIR));
       right.crossVectors(UP, dir).normalize();
       upv.crossVectors(dir, right).normalize();
       tgtV.set(tx, Math.min(Math.max(cam.y, 12), 34), tz);
@@ -551,7 +551,7 @@ export async function build(world) {
     if (P) {
       for (const k of NUM_KEYS) P[k] = cur[k];
       for (const k of COL_KEYS) P[k].copy(cur[k]);
-      P.sunDir.copy(SUN_DIR);
+      P.sunDir.copy(world.sunDirOverride || SUN_DIR);
       P.sunColor.setRGB(1.0, 0.86, 0.66).multiplyScalar(1 - n);
       P.rays *= (1 - ins) * (1 - n);
       world.gradeHook?.(P); // (the night of 14 April as a film: its own grade)
@@ -583,6 +583,9 @@ export async function build(world) {
     }
 
     nightLin = approach(nightLin, nightTarget, dt / 2.0);
+    if (world.nightOverride !== undefined && world.nightOverride !== null) nightLin = world.nightOverride; // (the film: first light)
+    const SD = world.sunDirOverride || SUN_DIR;
+    shared.uSunDir.value.copy(SD);
     insideLin = approach(insideLin, world.state.inside ? 1 : 0, dt / 1.0);
     const n = smooth(nightLin), ins = smooth(insideLin);
     situation(camPos);
@@ -611,7 +614,7 @@ export async function build(world) {
     lightingUniforms.uShipAmb.value.setRGB(0.046, 0.036, 0.026).multiplyScalar(n * (1 - ins) * pw);
     // world.updateVisibility hides the exterior where nothing of the outside can be seen (closed hull below C deck):
     // then sky, sea, smoke, iceberg and the lamp sprites cannot be seen either
-    const out = world.exterior.visible !== false;
+    const out = world.exterior.visible !== false || !!world.shipGone; // (the film after the sinking: sea and sky without the ship)
     const under = world.underwater ?? (!world.state.inside && camPos.y < SHIP.waterline + 0.05);
     halos.points.visible = out && !under && n > 0.01;
     halos.material.uniforms.uK.value = n * 6 * pw;
@@ -639,7 +642,7 @@ export async function build(world) {
     if (out) ocean.update(camW, time, n, sunI, pxScale);
     if (out) ocean.uniforms.uShipLights.value *= pw; // (no reflections of the ship's lights after the blackout)
     if (smoke.points.visible) smoke.update(dt, n, cam, pxScale);
-    if (out) berg.update(n); else berg.mesh.visible = false;
+    if (out) berg.update(world.sinkMode ? 1 : n); else berg.mesh.visible = false;
     dust.points.visible = TIER.particles !== false && ins > 0.01;
     if (dust.points.visible) {
       const U = dust.uniforms;

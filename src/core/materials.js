@@ -140,7 +140,7 @@ const WORLDPOS_VERT = /* glsl */ `
   }`;
 
 /** Adds the exterior lamp volume (night) to a lit material as extra indirect light (affected by AO maps). */
-function shipLampPatch(sh) {
+export function shipLampPatch(sh) {
   Object.assign(sh.uniforms, lightingUniforms);
   sh.vertexShader = 'varying vec3 vTitW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>' + WORLDPOS_VERT);
   sh.fragmentShader = sh.fragmentShader

@@ -342,3 +342,11 @@ body.cine #ui, body.cine #start { display: none !important; }
 .cine-quit:hover { color: #efe3c4; border-color: rgba(239, 227, 196, 0.6); }
 body.cine .sink-clock { top: 6px; font-size: 22px; }
 body.cine .sink-under { background: radial-gradient(ellipse at 50% 40%, rgba(10, 60, 70, 0.0), rgba(0, 10, 16, 0.55)); }
+.sink-end .s { font-size: clamp(15px, 2.4vw, 20px); letter-spacing: 0.04em; opacity: 0.85; text-align: center; padding: 0 16px; }
+.sink-end .t { font-size: clamp(30px, 6vw, 56px); }
+/* the cut to first light: to black, a title */
+.cine-fade { position: fixed; inset: 0; z-index: 14; display: flex; align-items: center; justify-content: center; background: #000; opacity: 0; transition: opacity 1.4s, background 2s; pointer-events: none; }
+.cine-fade.show { opacity: 1; }
+.cine-fade div { color: #efe3c4; font: 400 clamp(15px, 2.6vw, 24px) Georgia, 'Times New Roman', serif; letter-spacing: 0.08em; opacity: 0; transition: opacity 1.6s; text-align: center; padding: 0 16px; }
+.cine-fade.title { opacity: 1; background: transparent; }
+.cine-fade.title div { opacity: 1; text-shadow: 0 1px 8px #000; }

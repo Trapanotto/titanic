@@ -19,6 +19,37 @@ const WALTZ = [
   ['G', [[79, 1], [78, 1], [76, 1]]], ['D', [[78, 2], [74, 1]]], ['A7', [[76, 2], [73, 1]]], ['D', [[74, 3]]],
 ];
 const BEAT = 0.42;
+
+// --- the band on the boat deck in the night of 14 April: ragtime to keep spirits up, waltzes, and at the end the hymn
+// a rag of our own (C major, 2/4, quarter = 1 beat): bars of [chord, melody [midi, beats]], 0 = rest
+const RCH = {
+  C: { b: 48, c: [64, 67, 72] }, F: { b: 41, c: [65, 69, 72] }, G7: { b: 43, c: [65, 67, 71] },
+  A7: { b: 45, c: [64, 67, 73] }, D7: { b: 50, c: [66, 69, 72] },
+};
+const RAG = [
+  ['C', [[72, 0.5], [76, 0.25], [79, 0.5], [76, 0.25], [84, 0.5]]], ['C', [[83, 0.25], [84, 0.25], [81, 0.5], [79, 1]]],
+  ['A7', [[76, 0.5], [73, 0.25], [76, 0.5], [79, 0.25], [81, 0.5]]], ['D7', [[78, 0.5], [81, 0.25], [78, 0.25], [74, 1]]],
+  ['G7', [[79, 0.25], [77, 0.25], [74, 0.5], [71, 0.25], [74, 0.25], [77, 0.5]]], ['G7', [[79, 0.5], [77, 0.25], [76, 0.25], [74, 1]]],
+  ['C', [[76, 0.25], [79, 0.25], [84, 0.5], [83, 0.25], [84, 0.25], [88, 0.5]]], ['C', [[84, 1], [72, 0.5], [0, 0.5]]],
+  ['F', [[81, 0.5], [77, 0.25], [81, 0.5], [84, 0.25], [81, 0.5]]], ['F', [[81, 0.25], [82, 0.25], [81, 0.5], [77, 1]]],
+  ['C', [[79, 0.5], [76, 0.25], [79, 0.5], [84, 0.25], [83, 0.5]]], ['A7', [[81, 0.5], [79, 0.25], [76, 0.25], [73, 1]]],
+  ['D7', [[74, 0.25], [78, 0.25], [81, 0.5], [84, 0.25], [81, 0.25], [78, 0.5]]], ['G7', [[79, 0.5], [77, 0.25], [74, 0.25], [71, 1]]],
+  ['C', [[72, 0.25], [76, 0.25], [79, 0.5], [84, 0.5], [79, 0.5]]], ['C', [[72, 1], [0, 1]]],
+];
+const RAG_BEAT = 0.29;
+// "Nearer, My God, to Thee" (Bethany, Lowell Mason 1856; G major, 6/4): bars of [[chords per half bar], melody]
+const HCH = {
+  G: { b: 43, c: [59, 62, 67] }, C: { b: 48, c: [60, 64, 67] }, D: { b: 50, c: [62, 66, 69] }, D7: { b: 50, c: [60, 66, 69] }, Em: { b: 52, c: [59, 64, 67] },
+};
+const HL1 = [[71, 2], [69, 1], [67, 2], [67, 1]], HL2 = [[64, 3], [62, 3]];
+const HYMN = [
+  [['G', 'G'], HL1], [['C', 'G'], HL2], [['G', 'D'], [[67, 2], [71, 1], [69, 3]]], [['D', 'D'], [[69, 6]]],
+  [['G', 'G'], HL1], [['C', 'G'], HL2], [['G', 'D7'], [[67, 2], [71, 1], [69, 3]]], [['G', 'G'], [[67, 6]]],
+  [['G', 'C'], [[74, 2], [74, 1], [76, 2], [74, 1]]], [['G', 'Em'], [[71, 3], [67, 3]]],
+  [['D', 'G'], [[74, 2], [72, 1], [71, 2], [71, 1]]], [['G', 'D'], [[71, 3], [69, 3]]],
+  [['G', 'G'], HL1], [['C', 'G'], HL2], [['G', 'D7'], [[67, 2], [71, 1], [69, 3]]], [['G', 'G'], [[67, 6]]],
+];
+const HYMN_BEAT = 0.6;
 const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -145,6 +176,18 @@ export class Sound {
     this._chain(this._osc('sine', 98), this._gain(0.25), dyn);
 
     this.music = out('music');
+    // a crowd, far off: voices (sawtooth through a vowel formant), each swelling and falling on its own
+    this.voiceBus = this._gain(0);
+    this._chain(this.voiceBus, this._filter('lowpass', 2400, 0.6), this.master);
+    this.voices = [];
+    for (let i = 0; i < 9; i++) {
+      const o = this._osc('sawtooth', 200 + Math.random() * 260), f = this._filter('bandpass', 700 + Math.random() * 700, 3.5), g = this._gain(0);
+      const vib = this._osc('sine', 4.5 + Math.random() * 2), vg = this._gain(4);
+      vib.connect(vg); vg.connect(o.frequency);
+      this._chain(o, f, g, this.voiceBus);
+      this.voices.push({ o, f, g });
+    }
+    this._chain(this._loop(this.brown, 1.1), this._filter('bandpass', 420, 0.9), this._gain(0.5), this.voiceBus); // the murmur under them
     this.fx = this._gain(1);
     this.fx.connect(this.master);
   }
@@ -193,10 +236,29 @@ export class Sound {
     const M = this.band || MUSIC, my = M.y ?? DECK_Y[M.deck];
     const md = Math.hypot(pos.x - M.x, pos.z - M.z);
     const mk = this.band === null ? 0 : Math.abs(h - my) < (M.y !== undefined ? 6 : 2.2) && (M.y !== undefined || st.inside) ? clamp01(1 - md / M.range) : 0;
-    set(this.music, 0.5 * mk * mk);
-    if (mk > 0) {
+    // (the film: the band is heard over the pictures, as a score; nearer when the camera is with them)
+    const mv = Math.max(mk * mk, this.band ? (this.bandScore ?? 0) : 0);
+    set(this.music, 0.5 * mv);
+    if (mv > 0) {
+      const tune = this.band?.tune || 'waltz';
+      if (tune !== this._tune) { this._tune = tune; this._bar = 0; }
       if (this._barAt < t) this._barAt = t + 0.1;
-      while (this._barAt < t + 0.5) { this._playBar(this._bar, this._barAt); this._barAt += 3 * BEAT; this._bar = (this._bar + 1) % WALTZ.length; }
+      while (this._barAt < t + 0.5) {
+        if (tune === 'rag') { this._playRag(this._bar, this._barAt); this._barAt += 2 * RAG_BEAT; this._bar = (this._bar + 1) % RAG.length; }
+        else if (tune === 'hymn') { this._playHymn(this._bar, this._barAt); this._barAt += 6 * HYMN_BEAT; this._bar = (this._bar + 1) % HYMN.length; }
+        else { this._playBar(this._bar % WALTZ.length, this._barAt); this._barAt += 3 * BEAT; this._bar = (this._bar + 1) % WALTZ.length; }
+      }
+    }
+    // the crowd
+    const vl = this.crowdLevel ?? 0;
+    this.voiceBus.gain.setTargetAtTime(vl * 0.05, t, 0.6);
+    if (vl > 0) for (const V of this.voices) {
+      if (Math.random() < 0.25) {
+        const on = Math.random() < 0.25 + 0.5 * vl;
+        V.g.gain.setTargetAtTime(on ? 0.3 + Math.random() * 0.7 : 0, t, on ? 0.15 : 0.4);
+        V.o.frequency.setTargetAtTime((this.crowdPitch ?? 1) * (220 + Math.random() * 300), t, 0.25 + Math.random() * 0.4);
+        V.f.frequency.setTargetAtTime(650 + Math.random() * 900, t, 0.3);
+      }
     }
   }
 
@@ -236,6 +298,35 @@ export class Sound {
     for (const [n, beats] of mel) {
       this._tone(m, hz(n), t, beats * BEAT - 0.06, 0.11, { type: 'sawtooth', cutoff: 2400, attack: 0.07, sustain: true, release: 0.12, vibrato: true }); // violin
       t += beats * BEAT;
+    }
+  }
+
+  /** a bar of the rag: bass and chord (cello and piano, oom-pah), the melody on the violin, short and bright */
+  _playRag(i, at) {
+    const [ch, mel] = RAG[i], k = RCH[ch], m = this.music, B = RAG_BEAT;
+    this._tone(m, hz(k.b), at, 0.3, 0.3, { type: 'triangle' });
+    this._tone(m, hz(k.b + 7), at + B, 0.3, 0.26, { type: 'triangle' });
+    for (const b of [0.5, 1.5]) for (const n of k.c) this._tone(m, hz(n), at + b * B, 0.16, 0.06, { type: 'triangle' });
+    let t = at;
+    for (const [n, beats] of mel) {
+      if (n) this._tone(m, hz(n), t, beats * B * 0.78, 0.1, { type: 'sawtooth', cutoff: 2600, attack: 0.02, sustain: true, release: 0.06, vibrato: beats >= 0.5 });
+      t += beats * B;
+    }
+  }
+
+  /** a bar of the hymn: slow, legato – cello and violas holding the chords, the melody on the violins */
+  _playHymn(i, at) {
+    const [chs, mel] = HYMN[i], m = this.music, B = HYMN_BEAT, half = 3 * B;
+    chs.forEach((ch, h) => {
+      const k = HCH[ch], t0 = at + h * half;
+      this._tone(m, hz(k.b), t0, half - 0.1, 0.22, { type: 'sawtooth', cutoff: 700, attack: 0.25, sustain: true, release: 0.3 });
+      for (const n of k.c) this._tone(m, hz(n), t0, half - 0.1, 0.035, { type: 'sawtooth', cutoff: 1500, attack: 0.3, sustain: true, release: 0.35, vibrato: true });
+    });
+    let t = at;
+    for (const [n, beats] of mel) {
+      this._tone(m, hz(n + 12), t, beats * B - 0.05, 0.12, { type: 'sawtooth', cutoff: 2200, attack: 0.12, sustain: true, release: 0.25, vibrato: true });
+      this._tone(m, hz(n), t, beats * B - 0.05, 0.06, { type: 'sawtooth', cutoff: 1600, attack: 0.15, sustain: true, release: 0.25, vibrato: true });
+      t += beats * B;
     }
   }
 
@@ -457,6 +548,10 @@ export class Sound {
     this._burst(this.fx, t, up * 0.6, 0.05, 'bandpass', 1400, 1.2);
     this._burst(this.fx, t + up, 0.5, 0.5, 'lowpass', 300, 0.7, this.brown);
     this._burst(this.fx, t + up, 0.05, 0.16, 'bandpass', 900, 2, this.brown);
+    // the report: a heavy thud rolling over the sea, then the stars crackling as they burn
+    this._burst(this.fx, t + up, 1.6, 0.9, 'lowpass', 140, 0.8, this.brown);
+    this._burst(this.fx, t + up + 0.02, 0.12, 0.45, 'bandpass', 600, 1.5);
+    for (let i = 0; i < 26; i++) this._burst(this.fx, t + up + 0.3 + Math.random() * 2.2, 0.02, 0.05 + Math.random() * 0.08, 'bandpass', 2500 + Math.random() * 3000, 4);
   }
 
   /** steel giving way: groaning, the crack of plates, the thunder of things falling inside */

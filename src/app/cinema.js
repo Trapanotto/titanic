@@ -40,42 +40,98 @@ const SHOTS = [
   { name: 'Riss', t: 20.5, dur: 4.5, fov: 48, sway: 0.08, under: true,
     cam: (c, k) => c.S(95.5 - 1.5 * k, 5.2 - 0.3 * k, c.hu(95) + 5.6 - 2.2 * ease(k)),
     look: (c, k) => c.S(100.5 + k, 5.0, c.hu(100) - 0.4) },
-  { name: 'Vorschiff', t: 25, dur: 30, fov: 52, up: 'ship', sway: 0.03,
-    cam: (c, k) => c.S(68 + k * 3, 36.5 - k * 1.5, 10.5 - k * 2),
-    look: (c, k) => c.S(88, 20, 4 - k) },
-  { name: 'Weite', m: 20, dur: 30, fov: 38, sway: 0.3,
-    cam: (c, k) => c.orbit(0.75 + 0.75 * ease(k), 250 - 30 * k, 44 - 14 * k),
+  // inside: the sea bursting through the plating into boiler room 6, the stokers running for the door
+  { name: 'Kesselraum', t: 24.5, dur: 4.5, fov: 60, up: 'ship', sway: 0.06, need: 'boilerReady', inside: true,
+    cam: (c, k) => c.S(64.9 - 0.8 * k, 4.5, -4.5),
+    look: (c, k) => c.S(62.6, 3.7 + k * 0.4, 9) },
+  { name: 'Eis an Deck', m: 0.3, dur: 7.7, fov: 50, up: 'ship', sway: 0.04,
+    cam: (c, k) => c.S(99.5 - k, 25.2, -5.5),
+    look: (c, k) => c.S(85, 20.2, 2 + k) },
+  { name: 'Weite', m: 8, dur: 12, fov: 38, sway: 0.3,
+    cam: (c, k) => c.orbit(0.75 + 0.6 * ease(k), 240 - 30 * k, 40 - 12 * k),
     look: (c) => c.S(5, 16, 0) },
-  { name: 'Boot 7', m: 50, dur: 24, fov: 46, sway: 0.12,
+  { name: 'Schwimmwesten', m: 20, dur: 10, fov: 52, up: 'ship', sway: 0.05,
+    cam: (c, k) => c.S(21.5 + 2.5 * k, 30.1, 11.4),
+    look: (c, k) => c.S(46, 28.9, 8.4 - k) },
+  { name: 'Kapelle', m: 30, dur: 10, fov: 42, up: 'ship', sway: 0.03, band: true,
+    cam: (c, k) => c.S(53.6 - 0.9 * k, 29.6, 10.0),
+    look: (c) => c.S(47.8, 29.2, 9.2) },
+  { name: 'Bug', m: 40, dur: 10, fov: 40, sway: 0.25,
+    cam: (c, k) => c.W(178 - 12 * k, WL + 2.4, 64 - 4 * k),
+    look: (c) => c.S(92, 14, 0) },
+  { name: 'Boot 7', m: 50, dur: 12, fov: 46, sway: 0.12,
     cam: (c, k) => c.S(14 + 8 * k, 15 - k, 44),
     look: (c, k) => c.S(34, 21 - 5 * ease(k), 13) },
-  { name: 'Raketen', m: 74, dur: 14, fov: 52, sway: 0.25,
+  { name: 'Beladen', m: 62, dur: 11, fov: 54, up: 'ship', sway: 0.05,
+    cam: (c, k) => c.S(35.5 + 2 * k, 34.2, 5.2),
+    look: (c) => c.S(44.5, 28.4, 12.2) },
+  { name: 'Rakete', m: 73, dur: 7, fov: 62, up: 'ship', sway: 0.05,
+    cam: (c, k) => c.S(61.2, 29.7, 8.2 - 0.4 * k),
+    look: (c, k) => c.S(76, 30 + 95 * smooth(k * 1.6), -3) },
+  { name: 'Raketen', m: 80, dur: 8, fov: 52, sway: 0.25,
     cam: (c, k) => c.W(150 - 30 * k, WL + 4, 250 - 10 * k),
     look: (c, k) => c.S(55, 85 + 10 * k, 0) },
-  { name: 'Aus dem Boot', m: 88, dur: 22, fov: 44, sway: 0.35, boat: true,
+  { name: 'Aus dem Boot', m: 88, dur: 12, fov: 44, sway: 0.35, boat: true,
     cam: (c) => c.boat(1.6),
     look: (c) => c.S(10, 17, 0) },
-  { name: 'Von oben', m: 110, dur: 22, fov: 40, sway: 0.2,
-    cam: (c, k) => c.orbit(-0.7 + 1.1 * ease(k), 235 - 30 * k, 95 - 35 * k),
+  { name: 'Panik', m: 100, dur: 10, fov: 50, up: 'ship', sway: 0.07,
+    cam: (c, k) => c.S(-27 + 2 * k, 30.0, 10.6),
+    look: (c) => c.S(12, 29.0, 8.5) },
+  { name: 'Von oben', m: 110, dur: 14, fov: 40, sway: 0.2,
+    cam: (c, k) => c.orbit(-0.7 + 0.9 * ease(k), 225 - 25 * k, 90 - 30 * k),
     look: (c) => c.S(25, 10, 0) },
-  { name: 'Bootsdeck', m: 132, dur: 18, fov: 56, up: 'ship', sway: 0.04,
+  // under water at the bow: the lit portholes of the flooded forward decks
+  { name: 'Unter dem Bug', m: 124, dur: 6, fov: 56, sway: 0.15, under: true,
+    cam: (c, k) => c.S(113 - 4 * k, 12.5 - k, 21),
+    look: (c, k) => c.S(99 - 3 * k, 15.5, 9) },
+  { name: 'Choral', m: 130, dur: 10, fov: 46, up: 'ship', sway: 0.03, band: true,
+    cam: (c, k) => c.S(53.6 - 1.4 * k, 29.5, 11.3),
+    look: (c) => c.S(47.4, 29.4, 9.0) },
+  { name: 'Bootsdeck', m: 140, dur: 8, fov: 56, up: 'ship', sway: 0.04,
     cam: (c, k) => c.S(14 + 6 * k, 30.2, 9.2),
     look: (c, k) => c.S(80, 27 - 3 * k, 2) },
-  { name: 'Backbord', m: 150, dur: 4.6, fov: 36, sway: 0.25,
+  { name: 'Heck', m: 148, dur: 3.5, fov: 54, up: 'ship', sway: 0.05,
+    cam: (c, k) => c.S(-103.5 - 1.5 * k, 24.4, 5.5),
+    look: (c) => c.S(-126, 24.2, -1.5) },
+  { name: 'Backbord', m: 151.5, dur: 3.1, fov: 36, sway: 0.25,
     cam: (c, k) => c.W(-40 + 25 * k, WL + 3.2, -235),
     look: (c) => c.S(0, 18, 0) },
-  { name: 'Schornstein', m: 154.6, dur: 2.4, fov: 44, sway: 0.2, fixed: true,
+  { name: 'Schornstein', m: 154.6, dur: 1.2, fov: 44, sway: 0.2, fixed: true,
     cam: (c, k) => c.at('fun', () => c.S(FUNNELS[0].x, 32, 0).add(_v.set(46, 0, 70))).clone().setY(WL + 5 + 2 * k),
     look: (c) => c.S(FUNNELS[0].x - 2, 40, 6) },
+  { name: 'Gedränge', m: 155.8, dur: 1.2, fov: 50, up: 'ship', sway: 0.08,
+    cam: (c, k) => c.S(-88 - 3 * k, 33.5, -3 + 2 * k),
+    look: (c) => c.S(-118, 23, 0.5) },
   { name: 'Bruch', m: 157, dur: 1.6, fov: 42, sway: 0.15, fixed: true,
     cam: (c, k) => c.at('brk', () => c.S(-12, 0, 0).setY(WL + 9).add(_v.set(0, 0, 88))).clone().add(_v.set(-6 * k, -2 * k, 0)),
     look: (c, k) => c.at('brkL', () => c.S(2, 0, 0).setY(WL + 8)).clone().add(_v.set(0, 6 * k, 0)) },
-  { name: 'Heck', m: 158.6, dur: 1.6, fov: 46, sway: 0.15,
-    cam: (c, k) => c.W(-40 + 12 * k, WL + 2.2, 150),
-    look: (c, k) => c.W(c.s.P0.x, 36 - 12 * k, 0) },
-  { name: 'Danach', m: 160.2, dur: 6, fov: 50, sway: 0.35, boat: true,
+  { name: 'Heck steigt', m: 158.6, dur: 0.35, fov: 46, sway: 0.15,
+    cam: (c, k) => c.W(-40 + 3 * k, WL + 2.2, 150),
+    look: (c) => c.W(c.s.P0.x, 36, 0) },
+  // close: the stern standing up, people holding on to the rails, falling
+  { name: 'Absturz', m: 158.95, dur: 0.6, fov: 44, sway: 0.2, fixed: true, fill: 9000,
+    cam: (c, k) => c.at('fallC', () => c.S(-112, 24, 0).add(_v.set(40, 0, 36)).setY(WL + 5)).clone().add(_v.set(0, 2 * k, 0)),
+    look: (c) => c.S(-112, 25, 0) },
+  { name: 'Versinken', m: 159.55, dur: 0.65, fov: 46, sway: 0.15,
+    cam: (c, k) => c.W(-36 + 9 * k, WL + 2.2, 150),
+    look: (c, k) => c.W(c.s.P0.x, 30 - 12 * k, 0) },
+  { name: 'Danach', m: 160.2, dur: 1.8, fov: 50, sway: 0.35, boat: true,
     cam: (c) => c.boat(1.5),
-    look: (c, k) => c.W(0, WL + 2 + 60 * ease(k), 0) },
+    look: (c, k) => c.W(0, WL + 2 + 30 * ease(k), 0) },
+  // the people in the water, the cries; one boat goes back with a lantern
+  { name: 'Im Wasser', m: 162, dur: 4, fov: 50, sway: 0.3,
+    cam: (c, k) => c.sea().clone().add(_v.set(16 - 4 * k, 1.1, 13 - 2 * k)),
+    look: (c) => c.sea().clone().add(_v.set(0, 0.3, 0)) },
+  { name: 'Zurück', m: 166, dur: 6, fov: 44, sway: 0.3,
+    cam: (c, k) => c.sea().clone().add(_v.set(-9 + 2 * k, 1.3, -10)),
+    look: (c) => c.backBoat().clone().add(_v.set(0, 1, 0)) },
+  // first light
+  { name: 'Morgengrauen', m: 268, dur: 6, fov: 40, sway: 0.3,
+    cam: (c, k) => c.carp().clone().add(_v.set(-250 + 20 * k, 2.6, 175)),
+    look: (c, k) => c.carp().clone().add(_v.set(-30 * k, 14, 0)) },
+  { name: 'Carpathia', m: 274, dur: 7, fov: 42, sway: 0.25,
+    cam: (c, k) => c.carp().clone().add(_v.set(-62 + 14 * k, 2.4, 66)),
+    look: (c) => c.carp().clone().add(_v.set(-8, 9, 6)) },
 ];
 
 export class Director {
@@ -102,6 +158,9 @@ export class Director {
       at: (key, fn) => (d.memo[key] ||= fn()),
       cx: () => s.contactX ?? 140,                                     // where the spur grinds along the hull now
       hu: (x) => hullHalfWidth(Math.max(-130, Math.min(128, x)), WL - 6), // hull half-width 6 m below the water
+      sea: () => (d.memo.sea ||= (() => { const v = new THREE.Vector3(); s.crowd?.seaCentre(v); v.y = WL; return v; })()),
+      backBoat: () => (s.back ? s.back.S.L.boat.position : d.c.sea()),
+      carp: () => s.carpathia.position,
     };
   }
 
@@ -109,7 +168,7 @@ export class Director {
   _pick() {
     const s = this.s;
     let i = 0;
-    for (let j = 0; j < SHOTS.length; j++) { const h = SHOTS[j]; if (h.t !== undefined ? s.t >= h.t : s.m >= h.m) i = j; }
+    for (let j = 0; j < SHOTS.length; j++) { const h = SHOTS[j]; if (h.need && !s[h.need]) continue; if (h.t !== undefined ? s.t >= h.t : s.m >= h.m) i = j; }
     return i;
   }
 
@@ -138,6 +197,7 @@ export class Director {
     s.world.cineNear = h.up === 'ship' ? 0.3 : Math.min(4, Math.max(0.5, dist * 0.012));
     this.pos.copy(pos); this.look.copy(look);
     this.under = !!h.under;
+    this.shot = h;
     return cut;
   }
 }
@@ -160,7 +220,8 @@ function dot() {
 
 /** a pool of points: spray (white) or sparks (glowing) */
 class Particles {
-  constructor(n, { color, size, additive, gravity, drag, life, rise = false, opacity }) {
+  constructor(n, { color, size, additive, gravity, drag, life, rise = false, opacity, floor = WL - 0.3 }) {
+    this.floor = floor;
     this.n = n; this.g = gravity; this.drag = drag; this.life = life; this.rise = rise;
     this.p = new Float32Array(n * 3).fill(-1e4); this.v = new Float32Array(n * 3); this.t = new Float32Array(n);
     this.next = 0;
@@ -191,6 +252,18 @@ class Particles {
     this.alive = this.n;
   }
 
+  /** count particles flying out from p in every direction (a rocket's stars) */
+  burst(p, count, speed) {
+    for (let k = 0; k < count; k++) {
+      const i = this.next; this.next = (this.next + 1) % this.n;
+      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u), sp = speed * (0.75 + Math.random() * 0.4);
+      this.p[i * 3] = p.x; this.p[i * 3 + 1] = p.y; this.p[i * 3 + 2] = p.z;
+      this.v[i * 3] = r * Math.cos(a) * sp; this.v[i * 3 + 1] = u * sp + 2; this.v[i * 3 + 2] = r * Math.sin(a) * sp;
+      this.t[i] = this.life * (0.6 + Math.random() * 0.5);
+    }
+    this.alive = this.n;
+  }
+
   update(dt) {
     if (!this.alive) return;
     let any = 0;
@@ -201,7 +274,7 @@ class Particles {
       const j = i * 3;
       v[j] *= f; v[j + 2] *= f; v[j + 1] = v[j + 1] * f - this.g * dt;
       p[j] += v[j] * dt; p[j + 1] += v[j + 1] * dt; p[j + 2] += v[j + 2] * dt;
-      if (this.t[i] <= 0 || (this.rise ? p[j + 1] > WL - 0.15 : p[j + 1] < WL - 0.3)) { this.t[i] = 0; p[j + 1] = -1e4; } else any = 1;
+      if (this.t[i] <= 0 || (this.rise ? p[j + 1] > WL - 0.15 : p[j + 1] < this.floor)) { this.t[i] = 0; p[j + 1] = -1e4; } else any = 1;
     }
     this.attr.needsUpdate = true;
     if (!any) this.alive = 0;
@@ -254,8 +327,18 @@ export class Wreckage {
     this.snow = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0x9fc4cc, size: 0.08, map: dot(), sizeAttenuation: true, transparent: true, opacity: 0.7, depthWrite: false }));
     this.snow.frustumCulled = false;
     this.snow.visible = false;
-    sink.outside.add(this.mesh, this.iceMesh, this.spray.mesh, this.sparks.mesh, this.bubbles.mesh, this.snow);
-    sink.scene.add(this.glow); // (in ship coordinates: it lights the hull in every pass)
+    // distress rockets: the stars of the burst, the trail going up; the flash lights the whole ship for a moment
+    this.stars = new Particles(fine >= 2 ? 2400 : 1200, { color: 0xfff2d8, size: 2.6, additive: true, gravity: 3.2, drag: 1.1, life: 4.6 });
+    this.trail = new Particles(fine >= 2 ? 900 : 450, { color: 0xffd9a0, size: 0.9, additive: true, gravity: 3, drag: 0.6, life: 1.3 });
+    this.flash = new THREE.PointLight(0xfff0dc, 0, 0, 2);
+    // the sea bursting in through the plating (inside the hull, under the waterline)
+    this.jets = new Particles(fine >= 2 ? 1600 : 800, { color: 0xc8dce4, size: 0.3, additive: false, gravity: 9.8, drag: 0.4, life: 0.9, floor: -50, opacity: 0.75 });
+    this.flashT = 0;
+    sink.outside.add(this.mesh, this.iceMesh, this.spray.mesh, this.sparks.mesh, this.bubbles.mesh, this.snow, this.stars.mesh, this.trail.mesh, this.jets.mesh);
+    sink.scene.add(this.glow, this.flash); // (in ship coordinates: they light the hull in every pass)
+    // the surface of the sea seen from below: a rippling mirror, brighter straight up (Snell's window)
+    this.surf = underSurface();
+    sink.outside.add(this.surf);
     // the torn edges of the two halves (drawn after them, without the cut: renderScene in sinking.js)
     this.fxBow = new THREE.Scene(); this.fxStern = new THREE.Scene();
     const em = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide });
@@ -398,6 +481,14 @@ export class Wreckage {
     this.spray.update(dt);
     this.sparks.update(dt);
     this.bubbles.update(dt);
+    this.stars.update(dt);
+    this.trail.update(dt);
+    this.jets.update(dt);
+    if (this.flashT > 0) {
+      this.flashT = Math.max(0, this.flashT - dt);
+      const k = this.flashT / 3.2;
+      this.flash.intensity = 90000 * k * k * (0.85 + 0.15 * Math.random());
+    } else this.flash.intensity = 0;
     if (this.glowT > 0) {
       this.glowT = Math.max(0, this.glowT - dt);
       const k = this.glowT / 3;
@@ -472,11 +563,12 @@ export class HullDamage {
     sink.shipLive.add(this.g);
     const hole = new THREE.MeshBasicMaterial({ color: 0x020304, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
     hole.name = 'rent';
-    const plate = new THREE.MeshStandardMaterial({ color: 0x6a2a1c, roughness: 0.6, metalness: 0.35, side: THREE.DoubleSide });
+    const plate = new THREE.MeshStandardMaterial({ color: 0x6a2a1c, roughness: 0.6, metalness: 0.35, side: THREE.DoubleSide, flatShading: true });
     plate.name = 'rentPlate';
-    const bright = new THREE.MeshStandardMaterial({ color: 0x8c8780, roughness: 0.35, metalness: 0.8, side: THREE.DoubleSide }); // torn edges: bare steel
+    const bright = new THREE.MeshStandardMaterial({ color: 0x8c8780, roughness: 0.35, metalness: 0.8, side: THREE.DoubleSide, flatShading: true }); // torn edges: bare steel
     bright.name = 'rentSteel';
-    const plateGeo = new THREE.BoxGeometry(1, 1, 0.035).translate(0, 0.5, 0); // hinged at its lower edge
+    // the torn plates: crumpled, curled outward, ragged at the free edge (hinged at the lower edge)
+    const plateGeos = [0, 1, 2, 3].map((v) => crumpled(v));
     let sd = 4711;
     const rnd = () => ((sd = (Math.imul(sd, 1664525) + 1013904223) >>> 0) / 4294967296);
     this.rents = RENTS.map(([x0, len, yc]) => {
@@ -500,7 +592,7 @@ export class HullDamage {
       const flaps = [];
       for (let i = 0; i < n; i += 1 + Math.floor(rnd() * 2)) {
         const x = x0 - (len * (i + 0.5)) / n, up = rnd() < 0.55 ? 1 : -1, y = yc + up * hgt[i];
-        const m = new THREE.Mesh(plateGeo, rnd() < 0.25 ? bright : plate);
+        const m = new THREE.Mesh(plateGeos[Math.floor(rnd() * 4)], rnd() < 0.25 ? bright : plate);
         const w = 0.7 + rnd() * 1.1, h = 0.6 + rnd() * 1.1;
         m.scale.set(w, h, 1);
         m.position.set(x, y, hullHalfWidth(x, y) + 0.05);
@@ -544,4 +636,55 @@ export class HullDamage {
     const x = R.x0 - Math.random() * R.len * R.k;
     return out.set(x, R.yc + (Math.random() - 0.5) * 0.6, hullHalfWidth(x, R.yc) + 0.3);
   }
+}
+
+/** a torn plate (1 x 1, hinged at y 0): crumpled, curling outward towards its free edge, the edge itself ragged */
+function crumpled(seed) {
+  let sd = 977 + seed * 131;
+  const rnd = () => ((sd = (Math.imul(sd, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const g = new THREE.PlaneGeometry(1, 1, 6, 6).translate(0, 0.5, 0), P = g.attributes.position;
+  const ph = [rnd() * 6, rnd() * 6, rnd() * 6];
+  for (let i = 0; i < P.count; i++) {
+    const x = P.getX(i), y = P.getY(i);
+    let z = 0.32 * y * y + 0.05 * Math.sin(x * 9 + ph[0]) * y + 0.06 * Math.sin(y * 11 + x * 4 + ph[1]) * y + (rnd() - 0.5) * 0.05 * y;
+    let yy = y;
+    if (y > 0.99) yy = y - rnd() * 0.45;                       // ragged free edge
+    if (Math.abs(x) > 0.49 && y > 0.3) yy -= rnd() * 0.15;
+    z += 0.08 * Math.sin(x * 3.1 + ph[2]) * y;
+    P.setXYZ(i, x * (1 - 0.15 * y * rnd()), yy, z);
+  }
+  g.deleteAttribute('uv');
+  g.computeVertexNormals();
+  return g;
+}
+
+/** the underside of the sea surface: rippling, dark, brighter in the circle straight above the camera */
+function underSurface() {
+  const m = new THREE.ShaderMaterial({
+    uniforms: { uT: { value: 0 }, uCam: { value: new THREE.Vector3() }, uCol: { value: new THREE.Color(0x0a3442) }, uLit: { value: 0 } },
+    side: THREE.DoubleSide, depthWrite: false, transparent: true,
+    vertexShader: `varying vec3 vW; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `
+      uniform float uT, uLit; uniform vec3 uCam, uCol; varying vec3 vW;
+      float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+      void main() {
+        vec3 d = vW - uCam; float r = length(d.xz), dep = max(0.5, uCam.y < vW.y ? vW.y - uCam.y : 0.5);
+        float ang = atan(r, dep);                                        // angle off the vertical
+        float win = 1.0 - smoothstep(0.72, 0.86, ang);                   // Snell's window (48.6 deg)
+        vec2 p = vW.xz * 0.35;
+        float rip = n(p + vec2(uT * 0.25, uT * 0.18)) * 0.6 + n(p * 2.3 - vec2(uT * 0.4, -uT * 0.2)) * 0.4;
+        float caus = pow(1.0 - abs(rip * 2.0 - 1.0), 6.0);
+        vec3 col = uCol * (0.9 + 0.6 * rip) + vec3(0.06, 0.12, 0.13) * win * (0.6 + 0.8 * caus) + vec3(0.5, 0.42, 0.3) * uLit * win * caus;
+        float far = 1.0 - exp(-length(d) * 0.026);                       // into the murk
+        gl_FragColor = vec4(mix(col, uCol, far), 1.0);
+      }`,
+  });
+  m.name = 'underSurface';
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(400, 400, 1, 1).rotateX(-Math.PI / 2), m);
+  mesh.name = 'underSurface';
+  mesh.frustumCulled = false;
+  mesh.visible = false;
+  mesh.renderOrder = 1;
+  return mesh;
 }
