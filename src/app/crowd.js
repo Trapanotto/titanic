@@ -135,7 +135,7 @@ function crowdMaterial() {
 // colours of coats and dresses (dark serge, tweed, a few light evening dresses), the crew in white jackets
 const COATS = [0x1d2030, 0x2a2622, 0x34302a, 0x1a1a1a, 0x3d3a36, 0x2b3140, 0x4a3a2a, 0x23262b];
 const DRESSES = [0x2c2a3c, 0x3b3236, 0x6c675f, 0x353b47, 0x5a564f, 0x8a8478, 0x2a2a2a, 0x463f3a];
-const CREW = 0xbfbcb0, BAND = 0x1c2620, MOTHER = 0x8a1e1a, CHILD = 0x55708e;
+const CREW = 0xbfbcb0, BAND = 0x1c2620, MOTHER = 0xa8201a, CHILD = 0x55708e;
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _sc = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
 const _Y = new THREE.Vector3(0, 1, 0), _Z = new THREE.Vector3(0, 0, 1), _X = new THREE.Vector3(1, 0, 0);
@@ -492,7 +492,7 @@ export class Crowd {
       _v.set(P.x, P.y + 0.3, P.z).applyMatrix4(T);
       if (_v.y < WL + 0.1) { _v.y = WL; this._toSea(P, _v, false); continue; }
       if (steep > 24) {
-        const k = (steep - 24) / 60, rate = P.cling ? 0.05 + 0.2 * k : 0.3 + 1.2 * k;
+        const k = (steep - 24) / 60, rate = P.cling ? 0.1 + 0.4 * k : 0.5 + 2 * k;
         if (Math.random() < dt * rate) this._toSea(P, _v, true);
       }
     }

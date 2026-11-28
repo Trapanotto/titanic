@@ -636,6 +636,10 @@ export class Sinking {
       Wk.update(dt);
     }
     if (this.crowd && m < DAWN) this.crowd.update(dt, m);
+    if (Wk && m > 160 && m < 163.5 && Math.random() < 0.6) {
+      const p = new THREE.Vector3(this.P0.x - 40 + Math.random() * 50, WL + 0.1, (Math.random() - 0.5) * 22);
+      Wk.spray.emit(p, 6, 2.5, 1, null, 0.8);
+    }
     this.damage.g.visible = !this.director?.shot?.inside;
     this.world.noOutside = !!this.director?.shot?.inside; // (from inside the boiler room the plates outside would show through)
     this._updateFloods();
@@ -645,15 +649,19 @@ export class Sinking {
     this.world.underwater = under;
     // under water in the film: clearer, greener water, a soft light on the camera (as a film crew would light it)
     const cineUnder = this.cine && under;
-    this.world.underFog = cineUnder ? (this._uf ||= { color: new THREE.Color(0x020c12), density: 0.07 }) : null;
+    this.world.underFog = cineUnder ? (this._uf ||= { color: new THREE.Color(0x02080d), density: 0.11 }) : null;
     if (Wk) {
       Wk.fill = cineUnder;
-      if (cineUnder && !this.broken) { Wk.glow.color.setHex(0x5a9cb4); Wk.glow.intensity = 45; Wk.glow.position.copy(this.camera.position).add(new THREE.Vector3(0, 5, 0)); }
+      if (cineUnder && !this.broken) {
+        const ga = this.director?.shot?.glowAt;
+        Wk.glow.color.setHex(ga ? 0x99ccff : 0x5a9cb4); Wk.glow.intensity = ga ? 45 : 45;
+        if (ga) Wk.glow.position.set(ga[0], ga[1], ga[2]); else Wk.glow.position.copy(this.camera.position).add(new THREE.Vector3(0, 5, 0));
+      }
       else if (Wk.glowT <= 0) Wk.glow.color.setHex(0xff8a3a);
       Wk.drift(this.director?.pos || this.camera.position, cineUnder, this.t);
       // a cold fill light from the camera where the shot asks for it (the people on the dark stern)
       const fill = this.director?.shot?.fill;
-      if (fill && Wk.flashT <= 0) { Wk.flash.color.setHex(this.director.shot.fillCol ?? 0xa8bcdc); Wk.flash.intensity = fill; const fp = Wk.flash.position.copy(this.camera.position).applyMatrix4(this.TA); fp.y += 8;
+      if (fill && Wk.flashT <= 0) { Wk.flash.color.setHex(this.director.shot.fillCol ?? 0xa8bcdc); Wk.flash.intensity = fill; const fp = Wk.flash.position.copy(this.camera.position).applyMatrix4(this.TA); fp.y += this.director.shot.fillUp ?? 8;
         fp.applyMatrix4(this.broken && this.m < END + 0.6 && this.director.shot.name !== 'Bruch' ? (this._TBi ||= new THREE.Matrix4()).copy(this.TB).invert() : this.TAi); // (the stern's pass: in its own frame)
       }
       else if (Wk.flashT > 0) Wk.flash.color.setHex(0xfff0dc);
@@ -745,12 +753,13 @@ export class Sinking {
     if (!this.cine) return;
     const u = this.world.underwater;
     P.contrast = u ? 1.12 : 1.2;
-    P.saturation = u ? 1.05 : 0.9;
+    P.saturation = u ? 1.05 : 0.8;
     P.vignette = 0.62;
     P.grain = 0.028;
     P.bloom = u ? 0.25 : 0.42; P.bloomThreshold = 0.8; P.bloomKnee = 0.7;
     P.exposure *= (u ? 1.05 : 1.15) * (this.director?.shot?.expo ?? 1);
-    if (this.m >= DAWN) { P.contrast = 1.12; P.saturation = 0.95; P.vignette = 0.55; P.grain = 0.022; P.exposure *= 0.4; P.bloom = 0.5; P.lift.setRGB(0.025, 0.015, 0.04); P.gain.setRGB(1.36, 0.9, 0.74); return; }
+    if (this.m >= DAWN) { P.contrast = 1.12; P.saturation = 0.9; P.vignette = 0.55; P.grain = 0.022; P.exposure *= 0.42; P.bloom = 0.5; P.lift.setRGB(0.08, 0.06, 0.12); P.gain.setRGB(1.0, 0.78, 0.62); return; }
+    if (this.director?.shot?.cold) { P.exposure *= 0.7; P.contrast = 1.25; P.gain.setRGB(0.75, 0.85, 1.0); P.lift.setRGB(0, 0.005, 0.02); return; }
     if (u) { P.lift.setRGB(0.0, 0.02, 0.03); P.gain.setRGB(0.82, 1.02, 1.06); }
     else { P.lift.setRGB(0.0, 0.008, 0.022); P.gain.setRGB(1.07, 1.0, 0.9); }
   }
