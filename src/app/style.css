@@ -341,3 +341,4 @@ body.cine #ui, body.cine #start { display: none !important; }
 .cine-quit { position: fixed; right: 14px; bottom: 10px; z-index: 21; padding: 5px 12px; font: 400 12.5px Georgia, 'Times New Roman', serif; letter-spacing: 0.08em; color: rgba(239, 227, 196, 0.75); background: transparent; border: 1px solid rgba(239, 227, 196, 0.3); border-radius: 3px; cursor: pointer; }
 .cine-quit:hover { color: #efe3c4; border-color: rgba(239, 227, 196, 0.6); }
 body.cine .sink-clock { top: 6px; font-size: 22px; }
+body.cine .sink-under { background: radial-gradient(ellipse at 50% 40%, rgba(10, 60, 70, 0.0), rgba(0, 10, 16, 0.55)); }

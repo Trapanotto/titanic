@@ -554,6 +554,7 @@ export async function build(world) {
       P.sunDir.copy(SUN_DIR);
       P.sunColor.setRGB(1.0, 0.86, 0.66).multiplyScalar(1 - n);
       P.rays *= (1 - ins) * (1 - n);
+      world.gradeHook?.(P); // (the night of 14 April as a film: its own grade)
     } else if (renderer) {
       renderer.toneMappingExposure = cur.exposure;
     }
@@ -664,6 +665,7 @@ export async function build(world) {
     if (under) {
       fog.color.lerpColors(fogUnderDay, fogUnderNight, n);
       fog.density = world.sinkMode ? 0.12 : 0.045; // (the night of 14 April: dark, murky water)
+      if (world.underFog) { fog.color.copy(world.underFog.color); fog.density = world.underFog.density; } // (the film: clearer water)
       background.copy(fog.color);
     }
     if (envDay) {

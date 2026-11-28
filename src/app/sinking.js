@@ -11,13 +11,14 @@ import { ENGINE } from '../core/engine.js';
 import { mats } from '../core/materials.js';
 import { TIER } from '../core/tier.js';
 import { SHIP_SPEED } from '../environment/ocean.js';
-import { Director, Wreckage } from './cinema.js';
+import { Director, Wreckage, HullDamage } from './cinema.js';
+import { bergGeometry } from '../environment/iceberg.js';
 
 const WL = SHIP.waterline, ROOF = DECK_Y.roof + 0.5, D2R = Math.PI / 180;
 const XB = 1.0;                 // the hull breaks here: between the third (x 12) and the fourth funnel (x -10)
 const P_BREAK = new THREE.Vector3(XB, 4, 0);
 const HIT = 15;                 // s of real time from the first sight of the iceberg to the collision (23:40)
-const SCRAPE = 8;               // s of real time while the berg grinds along (then the clock runs compressed)
+const SCRAPE = 14;              // s of real time while the berg grinds along (then the clock runs compressed)
 const END = 160;                // 02:20, minutes after 23:40
 // minutes of the night per second: 'fast' = the whole night in about two minutes (15 s approach, 8 s scraping,
 // 77 s to 02:14, 20 s for the last six minutes), 'slow' about 20 minutes
@@ -104,6 +105,9 @@ export class Sinking {
     this._iceberg();
     this.director = new Director(this);
     this.wreck = new Wreckage(this);
+    this.damage = new HullDamage(this);
+    this.contactX = 200;
+    W.gradeHook = (P) => this._grade(P);
     W.sinkHold = true;             // no deck streaming: the camera wanders over the whole ship
     if (this.ui.controls) this.ui.controls.noLock = true;
     document.body.classList.add('cine');
@@ -238,6 +242,19 @@ export class Sinking {
     this.bergNear = 140 - (Number.isFinite(minZ) ? minZ : 110);
     b.material.emissive.setHex(0x2a3440); // a little starlight on the ice (it was a moonless night)
     this.berg = { x: 110 + HIT * SHIP_SPEED, v: SHIP_SPEED, z: 0 };
+    // the spur: a shelf of the berg's foot reaching out under water, the part that cut the ship open
+    const sg = bergGeometry((TIER.fine ?? 2) >= 2 ? 6 : 4, 56, 30, 9, 7.3, [{ x: 0.2, z: 0, sx: 0.5, sz: 0.5, h: 0.4 }], { strata: 0, oct: 4, deep: 1.3 });
+    sg.deleteAttribute('color');
+    const SP = sg.attributes.position;
+    let top = -1e9, near = 1e9;
+    for (let i = 0; i < SP.count; i++) { top = Math.max(top, SP.getY(i)); if (Math.abs(SP.getX(i)) < 6 && Math.abs(SP.getY(i)) < 2.5) near = Math.min(near, SP.getZ(i)); }
+    const sm = new THREE.MeshStandardMaterial({ color: 0x4f97ad, roughness: 0.45, metalness: 0, flatShading: true, emissive: 0x06161e });
+    sm.name = 'iceSpur';
+    this.spur = new THREE.Mesh(sg, sm);
+    this.spur.name = 'iceSpur';
+    this.spur.frustumCulled = false;
+    this.spurTop = top; this.spurNear = -near;
+    this.outside.add(this.spur);
   }
 
   _moveBerg(dt) {
@@ -249,6 +266,11 @@ export class Sinking {
     if (x < 10) z += (10 - x) * 0.14;                                                   // and falls away astern
     B.z = z;
     this.world.env.berg.mesh.position.set(x - 520, 0, z - 140);
+    // the spur rides with the berg; its near face presses 0.6 m into the plating where it is
+    const cx = (this.contactX = x + 12), hu = hullHalfWidth(Math.max(-130, Math.min(128, cx)), WL - 6);
+    const away = z - (hwAt(Math.min(x, 120)) + 0.4 + this.bergNear);
+    this.spur.position.set(x + 30, WL - 3.2 - this.spurTop, hu - 0.6 + this.spurNear + away);
+    this.spur.rotation.y = 0.05;
     // ice tumbling onto the forward well deck as the berg passes it
     if (!this.iced && hit && x < 92) this._ice();
   }
@@ -452,6 +474,17 @@ export class Sinking {
     // the wreckage: ice off the berg while she grinds along it, the stern falling back, things sliding off her decks
     const Wk = this.wreck;
     if (Wk) {
+      // the spur at work: steel and air torn out of the plating, the rents opening one by one, the sea pouring in
+      const cxS = this.contactX;
+      if (this.t > HIT - 0.6 && cxS > 56 && cxS < 128) {
+        const hu = hullHalfWidth(cxS, WL - 6);
+        Wk.grind(new THREE.Vector3(cxS, WL - 5.5 - Math.random() * 2, hu + 0.3).applyMatrix4(this.TA));
+        if (Math.random() < dt * 6) this.shake = Math.max(this.shake || 0, 1.2);
+      }
+      const opened = this.damage.update(dt, cxS);
+      for (const R0 of opened) { this.sound.groan?.(1.2); Wk.bubbles.emit(new THREE.Vector3(R0.x0, R0.yc, hullHalfWidth(R0.x0, R0.yc) + 0.5).applyMatrix4(this.TA), 60, 4, 1, null, 1.4); }
+      if (m < 45) for (const R0 of this.damage.rents) if (R0.open && Math.random() < dt * 22) Wk.inflow(this.damage.mouth(R0, new THREE.Vector3()).applyMatrix4(this.TA));
+      if (!this.calved && this.t > HIT + 0.8) { this.calved = true; Wk.calve(this.berg, hullHalfWidth(Math.min(this.berg.x, 120), WL)); }
       if (this.t > HIT && this.t < HIT + SCRAPE && Math.random() < 0.6) {
         const cx = Math.max(-40, Math.min(118, this.berg.x));
         Wk.ice(new THREE.Vector3(cx, WL + 0.5, hullHalfWidth(cx, WL) + 0.4).applyMatrix4(this.TA));
@@ -465,6 +498,15 @@ export class Sinking {
     const cam = this.camera.position, wy = cam.clone().applyMatrix4(this.TA).y;
     const under = this.drift ? this.drift.p.y < WL - 0.05 : wy < this.waterAt(cam) - 0.02;
     this.world.underwater = under;
+    // under water in the film: clearer, greener water, a soft light on the camera (as a film crew would light it)
+    const cineUnder = this.cine && under;
+    this.world.underFog = cineUnder ? (this._uf ||= { color: new THREE.Color(0x0a3442), density: 0.026 }) : null;
+    if (Wk) {
+      Wk.fill = cineUnder;
+      if (cineUnder && !this.broken) { Wk.glow.color.setHex(0x8fd0e8); Wk.glow.intensity = 160; Wk.glow.position.copy(this.camera.position).add(new THREE.Vector3(0, 5, 0)); }
+      else if (Wk.glowT <= 0) Wk.glow.color.setHex(0xff8a3a);
+      Wk.drift(this.director?.pos || this.camera.position, cineUnder, this.t);
+    }
     const Rv = this.cine ? null : this.interact.boats.rider;
     this.world.viewLabel = this.drift ? ['Nordatlantik', under ? 'Unter Wasser' : 'Im Wasser'] : Rv && Rv.S.away ? ['Rettungsboot', 'auf dem Nordatlantik'] : null;
     this.underEl.classList.toggle('show', under);
@@ -524,6 +566,20 @@ export class Sinking {
     cam.updateMatrixWorld();
     // the wreck is far below: stop drawing it
     if (this.m > END + 0.6) { this.world.interior.visible = false; this.world.exterior.visible = false; this.shipLive.visible = false; this.interact.boats.root.visible = this.away.length > 0; }
+  }
+
+  /** the film's grade: deep blacks, cool shadows, warm lights, grain, a heavy vignette; teal under water */
+  _grade(P) {
+    if (!this.cine) return;
+    const u = this.world.underwater;
+    P.contrast = u ? 1.12 : 1.2;
+    P.saturation = u ? 1.05 : 0.9;
+    P.vignette = 0.62;
+    P.grain = 0.028;
+    P.bloom = u ? 0.25 : 0.42; P.bloomThreshold = 0.8; P.bloomKnee = 0.7;
+    P.exposure *= u ? 1.25 : 1.15;
+    if (u) { P.lift.setRGB(0.0, 0.02, 0.03); P.gain.setRGB(0.82, 1.02, 1.06); }
+    else { P.lift.setRGB(0.0, 0.008, 0.022); P.gain.setRGB(1.07, 1.0, 0.9); }
   }
 
   // ------------------------------------------------------------------ drawing: after the break the stern is a second pass

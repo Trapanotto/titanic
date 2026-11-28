@@ -42,7 +42,7 @@ function ridged(x, y, z, oct) {
  * Displaced icosphere. len/wid = full extents (m), height above water (m), peaks = gaussian bumps of the top.
  * Vertices are displaced by functions of their position only, so the faces stay closed.
  */
-function bergGeometry(detail, len, wid, height, seed, peaks, o = {}) {
+export function bergGeometry(detail, len, wid, height, seed, peaks, o = {}) {
   const g = new THREE.IcosahedronGeometry(1, detail); // non-indexed -> flat shading
   const p = g.attributes.position;
   const oct = o.oct ?? 5, strata = o.strata ?? height / 7;
@@ -50,7 +50,7 @@ function bergGeometry(detail, len, wid, height, seed, peaks, o = {}) {
     const ux = p.getX(i), uy = p.getY(i), uz = p.getZ(i);
     const n = fbm(ux * 1.9 + seed, uy * 1.9, uz * 1.9, oct);
     const r = ridged(ux * 3.1 + seed * 0.7, uy * 3.1 + 11, uz * 3.1, Math.max(2, oct - 1));
-    const rad = (1 + 0.5 * n + 0.18 * (r - 0.5)) * (1 - 0.32 * Math.max(uy, 0) ** 2);
+    const rad = (1 + 0.5 * n + 0.18 * (r - 0.5)) * (1 - 0.32 * Math.max(uy, 0) ** 2) * (1 + (o.belly ?? 0) * Math.sin(Math.max(-uy, 0) * Math.PI));
     let y;
     if (uy > 0) {
       let prof = 0.42;
@@ -61,7 +61,7 @@ function bergGeometry(detail, len, wid, height, seed, peaks, o = {}) {
       // a notch cut by the swell just above the water
       if (y < 1.6) y *= 0.9;
     } else {
-      y = uy * height * 0.42 * (1 + 0.3 * n);
+      y = uy * height * 0.42 * (o.deep ?? 1) * (1 + 0.3 * n);
     }
     const notch = uy > 0 && uy < 0.12 ? 0.9 : 1;
     p.setXYZ(i, ux * len * 0.5 * rad * notch, y, uz * wid * 0.5 * rad * notch);
@@ -121,7 +121,7 @@ export function createIceberg() {
     { x: -0.5, z: 0.2, sx: 0.22, sz: 0.5, h: 0.42 },
     { x: -0.05, z: -0.4, sx: 0.25, sz: 0.3, h: 0.22 },
     { x: 0.6, z: 0.3, sx: 0.12, sz: 0.2, h: 0.25 },
-  ], { oct: f >= 2 ? 6 : 4 });
+  ], { oct: f >= 2 ? 6 : 4, deep: 2.6, belly: 0.3 }); // (most of it under water: a broad, deep foot)
   main.rotateY(0.45);
   main.translate(520, WL - 0.3, 140);
   parts.push(main);

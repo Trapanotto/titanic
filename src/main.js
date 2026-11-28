@@ -226,6 +226,7 @@ function frame(now) {
   // after the start: upload the remaining baked chunks in ~3 ms slices (frees their CPU copies)
   if (!contextLost) { try { world.uploadStep(renderer, 3); } catch (e) { if (loopErrors++ < 5) console.error('[app] upload', e); } }
   if (streamer?.blocking) return; // the player's deck is being built behind the veil
+  if (debug.hold) return;          // (tests: the clock is driven by debug.frame alone)
   step(dt);
   autoQuality(raw);
 }

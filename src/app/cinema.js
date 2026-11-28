@@ -21,16 +21,26 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Eule
 // cam / look: world points (c.S = a point of the ship, moving with it; c.W = a fixed point in the sea).
 // up 'ship': the camera stands on deck and tilts with her; otherwise the horizon stays level.
 const SHOTS = [
-  { name: 'Krähennest', t: 0, dur: 6, fov: 46, up: 'ship', sway: 0.04,
+  { name: 'Krähennest', t: 0, dur: 5, fov: 46, up: 'ship', sway: 0.04,
     cam: (c, k) => c.S(99.5, 39.6 - k * 0.3, 0.6),
     look: (c, k) => c.S(420, 24, 0).lerp(c.berg(10), smooth(k * 1.4)) },
-  { name: 'Vom Meer', t: 6, dur: 9, fov: 42, sway: 0.25,
-    cam: (c, k) => c.W(c.B.x + 36 - k * 8, WL + 5.5, -62 + k * 6),
+  { name: 'Vom Meer', t: 5, dur: 5, fov: 40, sway: 0.25,
+    cam: (c, k) => c.W(c.B.x + 30 - k * 6, WL + 4.5, -48 + k * 6),
     look: (c, k) => c.S(126, 16, 0).lerp(c.berg(8), 0.35 - 0.2 * k) },
-  { name: 'Kollision', t: 15, dur: 8, fov: 50, up: 'ship', sway: 0.05,
-    cam: (c, k) => c.S(64 - k * 6, 47, -22),
-    look: (c, k) => c.S(96 - k * 26, 13, 17) },
-  { name: 'Vorschiff', m: 0.15, dur: 20, fov: 52, up: 'ship', sway: 0.03,
+  { name: 'Brücke', t: 10, dur: 3.2, fov: 32, up: 'ship', sway: 0.03,
+    cam: (c, k) => c.S(67 + k * 0.6, 33.6, 12.6),
+    look: (c, k) => c.berg(13 - 3 * k) },
+  // under water: the spur of the berg, the bow coming out of the murk and tearing along it
+  { name: 'Sporn', t: 13.2, dur: 4.3, fov: 54, sway: 0.18, under: true,
+    cam: (c, k) => c.W(c.cx() + 20 - 4 * k, WL - 4.8 - 0.6 * k, c.hu(c.cx() + 20) + 8.5),
+    look: (c) => c.W(c.cx() - 4, WL - 6.4, c.hu(Math.min(126, c.cx() - 4)) - 0.5) },
+  { name: 'Kollision', t: 17.5, dur: 3, fov: 50, up: 'ship', sway: 0.05,
+    cam: (c, k) => c.S(64 - k * 3, 47, -22),
+    look: (c, k) => c.S(90 - k * 14, 13, 17) },
+  { name: 'Riss', t: 20.5, dur: 4.5, fov: 48, sway: 0.08, under: true,
+    cam: (c, k) => c.S(95.5 - 1.5 * k, 5.2 - 0.3 * k, c.hu(95) + 5.6 - 2.2 * ease(k)),
+    look: (c, k) => c.S(100.5 + k, 5.0, c.hu(100) - 0.4) },
+  { name: 'Vorschiff', t: 25, dur: 30, fov: 52, up: 'ship', sway: 0.03,
     cam: (c, k) => c.S(68 + k * 3, 36.5 - k * 1.5, 10.5 - k * 2),
     look: (c, k) => c.S(88, 20, 4 - k) },
   { name: 'Weite', m: 20, dur: 30, fov: 38, sway: 0.3,
@@ -90,6 +100,8 @@ export class Director {
         return new THREE.Vector3(-1.2, 0.4 + h, 0).applyMatrix4(S.L.boat.matrix); // (a rowing boat hangs in the world group)
       },
       at: (key, fn) => (d.memo[key] ||= fn()),
+      cx: () => s.contactX ?? 140,                                     // where the spur grinds along the hull now
+      hu: (x) => hullHalfWidth(Math.max(-130, Math.min(128, x)), WL - 6), // hull half-width 6 m below the water
     };
   }
 
@@ -125,16 +137,31 @@ export class Director {
     const dist = pos.distanceTo(look);
     s.world.cineNear = h.up === 'ship' ? 0.3 : Math.min(4, Math.max(0.5, dist * 0.012));
     this.pos.copy(pos); this.look.copy(look);
+    this.under = !!h.under;
     return cut;
   }
 }
 
 // ------------------------------------------------------------------ wreckage
 
+let _dot = null;
+/** a soft round dot for every particle (square points look like pixels) */
+function dot() {
+  if (_dot) return _dot;
+  const n = 32, d = new Uint8Array(n * n * 4);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const r = Math.hypot(x + 0.5 - n / 2, y + 0.5 - n / 2) / (n / 2), a = Math.max(0, 1 - r) ** 1.6;
+    const i = (y * n + x) * 4; d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = Math.round(a * 255);
+  }
+  _dot = new THREE.DataTexture(d, n, n, THREE.RGBAFormat);
+  _dot.needsUpdate = true; _dot.magFilter = _dot.minFilter = THREE.LinearFilter;
+  return _dot;
+}
+
 /** a pool of points: spray (white) or sparks (glowing) */
 class Particles {
-  constructor(n, { color, size, additive, gravity, drag, life }) {
-    this.n = n; this.g = gravity; this.drag = drag; this.life = life;
+  constructor(n, { color, size, additive, gravity, drag, life, rise = false, opacity }) {
+    this.n = n; this.g = gravity; this.drag = drag; this.life = life; this.rise = rise;
     this.p = new Float32Array(n * 3).fill(-1e4); this.v = new Float32Array(n * 3); this.t = new Float32Array(n);
     this.next = 0;
     const geo = new THREE.BufferGeometry();
@@ -142,7 +169,7 @@ class Particles {
     this.attr.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('position', this.attr);
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
-    this.mat = new THREE.PointsMaterial({ color, size, sizeAttenuation: true, transparent: true, opacity: additive ? 1 : 0.8, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, fog: !additive });
+    this.mat = new THREE.PointsMaterial({ color, size, map: dot(), alphaTest: 0.02, sizeAttenuation: true, transparent: true, opacity: opacity ?? (additive ? 1 : 0.8), depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, fog: !additive });
     this.mesh = new THREE.Points(geo, this.mat);
     this.mesh.frustumCulled = false;
     this.alive = 0;
@@ -156,7 +183,8 @@ class Particles {
       let vx = Math.cos(a) * spread, vz = Math.sin(a) * spread, vy = up * (0.4 + u);
       if (dir) { vx += dir.x; vz += dir.z; vy += dir.y; }
       const sp = speed * (0.3 + Math.random() * 0.9);
-      this.p[i * 3] = p.x + (Math.random() - 0.5) * 1.5; this.p[i * 3 + 1] = p.y; this.p[i * 3 + 2] = p.z + (Math.random() - 0.5) * 1.5;
+      const jit = this.rise ? 0.6 : 1.5;
+      this.p[i * 3] = p.x + (Math.random() - 0.5) * jit; this.p[i * 3 + 1] = p.y + (Math.random() - 0.5) * jit; this.p[i * 3 + 2] = p.z + (Math.random() - 0.5) * jit;
       this.v[i * 3] = vx * sp; this.v[i * 3 + 1] = vy * sp; this.v[i * 3 + 2] = vz * sp;
       this.t[i] = this.life * (0.5 + Math.random() * 0.7);
     }
@@ -173,7 +201,7 @@ class Particles {
       const j = i * 3;
       v[j] *= f; v[j + 2] *= f; v[j + 1] = v[j + 1] * f - this.g * dt;
       p[j] += v[j] * dt; p[j + 1] += v[j + 1] * dt; p[j + 2] += v[j + 2] * dt;
-      if (this.t[i] <= 0 || p[j + 1] < WL - 0.3) { this.t[i] = 0; p[j + 1] = -1e4; } else any = 1;
+      if (this.t[i] <= 0 || (this.rise ? p[j + 1] > WL - 0.15 : p[j + 1] < WL - 0.3)) { this.t[i] = 0; p[j + 1] = -1e4; } else any = 1;
     }
     this.attr.needsUpdate = true;
     if (!any) this.alive = 0;
@@ -195,10 +223,17 @@ export class Wreckage {
     this.mesh.name = 'debris';
     this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const im = new THREE.MeshStandardMaterial({ color: 0xc4e0ee, roughness: 0.3, metalness: 0, flatShading: true, emissive: 0x0a1c26 });
+    im.name = 'iceDebris';
+    this.iceMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.62, 0), im, this.n);
+    this.iceMesh.name = 'iceDebris';
+    this.iceMesh.frustumCulled = false;
+    this.iceMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.pieces = [];
     for (let i = 0; i < this.n; i++) {
       this.pieces.push({ on: false, p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), sc: new THREE.Vector3(1, 1, 1), float: false, wet: false });
       this.mesh.setMatrixAt(i, _m.makeScale(0, 0, 0));
+      this.iceMesh.setMatrixAt(i, _m);
       this.mesh.setColorAt(i, STEEL);
     }
     this.next = 0;
@@ -207,7 +242,19 @@ export class Wreckage {
     // the glow of the tearing steel (present from the start: a light added later would recompile every shader)
     this.glow = new THREE.PointLight(0xff8a3a, 0, 140, 1.5);
     this.glowT = 0;
-    sink.outside.add(this.mesh, this.spray.mesh, this.sparks.mesh);
+    this.bubbles = new Particles(fine >= 2 ? 1600 : 700, { color: 0xd8f0ff, size: 0.16, additive: true, gravity: -2.2, drag: 1.6, life: 4, rise: true, opacity: 0.55 });
+    // specks drifting in the water (only seen under water): give the murk depth and the camera motion a reference
+    const ns = fine >= 2 ? 900 : 400, sp = new Float32Array(ns * 3);
+    for (let i = 0; i < ns * 3; i++) sp[i] = Math.random();
+    this.snowBase = sp;
+    const sg = new THREE.BufferGeometry();
+    this.snowAttr = new THREE.BufferAttribute(new Float32Array(ns * 3), 3);
+    sg.setAttribute('position', this.snowAttr);
+    sg.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
+    this.snow = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0x9fc4cc, size: 0.08, map: dot(), sizeAttenuation: true, transparent: true, opacity: 0.7, depthWrite: false }));
+    this.snow.frustumCulled = false;
+    this.snow.visible = false;
+    sink.outside.add(this.mesh, this.iceMesh, this.spray.mesh, this.sparks.mesh, this.bubbles.mesh, this.snow);
     sink.scene.add(this.glow); // (in ship coordinates: it lights the hull in every pass)
     // the torn edges of the two halves (drawn after them, without the cut: renderScene in sinking.js)
     this.fxBow = new THREE.Scene(); this.fxStern = new THREE.Scene();
@@ -223,12 +270,15 @@ export class Wreckage {
   piece(p, v, kind, size) {
     const P = this.pieces[this.next], i = this.next;
     this.next = (this.next + 1) % this.n;
-    P.on = true; P.wet = false; P.p.copy(p); P.v.copy(v);
+    P.on = true; P.wet = p.y < WL; P.p.copy(p); P.v.copy(v); // (born under water: no splash)
     P.r.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
     P.w.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(8);
     P.float = kind === 'wood' || kind === 'ice';
+    P.ice = kind === 'ice';
+    // (a piece lives in one of the two meshes: hide it in the other)
+    (P.ice ? this.mesh : this.iceMesh).setMatrixAt(i, _m.makeScale(0, 0, 0));
     if (kind === 'wood') P.sc.set(size * (0.6 + Math.random()), size * 0.12, size * (0.25 + Math.random() * 0.3));
-    else if (kind === 'ice') P.sc.set(size, size * (0.5 + Math.random() * 0.5), size * (0.6 + Math.random() * 0.5));
+    else if (kind === 'ice') P.sc.set(size * (0.8 + Math.random() * 0.5), size * (0.5 + Math.random() * 0.5), size * (0.6 + Math.random() * 0.6));
     else P.sc.set(size * (0.7 + Math.random() * 0.8), size * 0.04 + 0.02, size * (0.5 + Math.random() * 0.6));
     this.mesh.setColorAt(i, kind === 'wood' ? WOOD : kind === 'ice' ? ICE : kind === 'hull' ? (Math.random() < 0.3 ? RED : HULL) : Math.random() < 0.2 ? WHITE : STEEL);
     this.mesh.instanceColor.needsUpdate = true;
@@ -240,6 +290,40 @@ export class Wreckage {
   ice(p) {
     if (Math.random() < 0.5) this.piece(_v.set(p.x, p.y + Math.random() * 6, p.z), _s.set(-2 + Math.random() * 3, 1 + Math.random() * 2, 1 + Math.random() * 2.5), 'ice', 0.4 + Math.random() * 0.9);
     this.spray.emit(_v.set(p.x, WL + 0.2, p.z), 3, 5, 1.2, null, 0.6);
+  }
+
+  /** steel and air where the spur cuts the plating (world point of contact, under water) */
+  grind(p) {
+    this.bubbles.emit(p, 26, 3.2, 1.2, _s.set(1.2, 0.2, 0.8), 1.1);
+    if (Math.random() < 0.35) this.piece(_v.copy(p), _s.set(1 + Math.random() * 3, -0.5 - Math.random(), 1 + Math.random() * 2), 'hull', 0.25 + Math.random() * 0.6);
+    if (Math.random() < 0.25) this.piece(_v.copy(p).add(_s.set(0, 0, 1.5)), _s.set(Math.random() * 2, 0.5, 2), 'ice', 0.5 + Math.random() * 0.8);
+  }
+
+  /** the sea forcing its way into an opened compartment: streaks of air drawn into the rent */
+  inflow(p) {
+    this.bubbles.emit(p, 10, 2.6, 0.15, _s.set(0, 0.05, -1.8), 0.5);
+  }
+
+  /** whole blocks of ice break off the berg's shoulder and come down beside the ship */
+  calve(B, hull) {
+    for (let k = 0; k < 7; k++) {
+      const p = _v.set(B.x - 10 + Math.random() * 25, WL + 14 + Math.random() * 10, hull + 5 + Math.random() * 8);
+      this.piece(p, _s.set(-1 - Math.random() * 2, Math.random() * 2, -2 - Math.random() * 3), 'ice', 1.6 + Math.random() * 2.2);
+    }
+  }
+
+  /** the specks: wrapped round the camera (world point) */
+  drift(cam, on, t) {
+    this.snow.visible = on;
+    if (!on) return;
+    const b = this.snowBase, a = this.snowAttr.array, S = 28;
+    for (let i = 0; i < a.length; i += 3) {
+      const wrap = (u, c, off) => { const v = u * S + off; return c + ((((v - c) % S) + S * 1.5) % S) - S / 2; };
+      a[i] = wrap(b[i], cam.x, Math.sin(t * 0.1 + i) * 0.3);
+      a[i + 1] = Math.min(WL - 0.3, wrap(b[i + 1], cam.y, t * 0.05));
+      a[i + 2] = wrap(b[i + 2], cam.z, 0);
+    }
+    this.snowAttr.needsUpdate = true;
   }
 
   /** the forward funnel hits the sea */
@@ -302,22 +386,23 @@ export class Wreckage {
         P.w.multiplyScalar(f);
         if (P.float) P.v.y += (Math.min(4, (WL - 0.05 - P.p.y) * 14) - 0) * dt;
         else P.v.y = Math.max(P.v.y - 2 * dt, -1.6);
-        if (!P.float && P.p.y < WL - 40) { P.on = false; m.setMatrixAt(i, _m.makeScale(0, 0, 0)); continue; }
+        if (!P.float && P.p.y < WL - 40) { P.on = false; (P.ice ? this.iceMesh : m).setMatrixAt(i, _m.makeScale(0, 0, 0)); continue; }
       } else P.v.y -= 9.8 * dt;
       if (P.float && P.wet && P.p.y > WL - 0.6) { P.v.y *= Math.exp(-dt * 4); P.w.multiplyScalar(Math.exp(-dt * 3)); } // riding the swell
       P.p.addScaledVector(P.v, dt);
       P.r.addScaledVector(P.w, dt);
       _q.setFromEuler(_e.set(P.r.x, P.r.y, P.r.z));
-      m.setMatrixAt(i, _m.compose(P.p, _q, P.sc));
+      (P.ice ? this.iceMesh : m).setMatrixAt(i, _m.compose(P.p, _q, P.sc));
     }
-    if (dirty) m.instanceMatrix.needsUpdate = true;
+    if (dirty) { m.instanceMatrix.needsUpdate = true; this.iceMesh.instanceMatrix.needsUpdate = true; }
     this.spray.update(dt);
     this.sparks.update(dt);
+    this.bubbles.update(dt);
     if (this.glowT > 0) {
       this.glowT = Math.max(0, this.glowT - dt);
       const k = this.glowT / 3;
       this.glow.intensity = 2600 * k * k * (0.7 + 0.3 * Math.random());
-    } else this.glow.intensity = 0;
+    } else if (!this.fill) this.glow.intensity = 0;
   }
 }
 
@@ -371,4 +456,92 @@ function tornEdge(x, dir, seed) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.computeVertexNormals();
   return g;
+}
+
+// ------------------------------------------------------------------ the damage the ice did
+
+// the openings along the starboard bow (ship x of their forward end, length m, height of the middle above the keel):
+// not one long gash but a row of sprung seams and torn plates over about 90 m, 4 to 7 m below the waterline
+const RENTS = [[124, 2.6, 5.6], [119.5, 4.5, 4.8], [112, 2.2, 5.4], [106.5, 7.5, 4.6], [96.5, 3.8, 5.2], [90, 6, 4.4], [81.5, 2.8, 5.0], [76, 5.5, 4.2], [67.5, 4, 4.8], [61, 3, 4.5]];
+
+export class HullDamage {
+  constructor(sink) {
+    this.s = sink;
+    this.g = new THREE.Group();
+    this.g.name = 'hullDamage';
+    sink.shipLive.add(this.g);
+    const hole = new THREE.MeshBasicMaterial({ color: 0x020304, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    hole.name = 'rent';
+    const plate = new THREE.MeshStandardMaterial({ color: 0x6a2a1c, roughness: 0.6, metalness: 0.35, side: THREE.DoubleSide });
+    plate.name = 'rentPlate';
+    const bright = new THREE.MeshStandardMaterial({ color: 0x8c8780, roughness: 0.35, metalness: 0.8, side: THREE.DoubleSide }); // torn edges: bare steel
+    bright.name = 'rentSteel';
+    const plateGeo = new THREE.BoxGeometry(1, 1, 0.035).translate(0, 0.5, 0); // hinged at its lower edge
+    let sd = 4711;
+    const rnd = () => ((sd = (Math.imul(sd, 1664525) + 1013904223) >>> 0) / 4294967296);
+    this.rents = RENTS.map(([x0, len, yc]) => {
+      const grp = new THREE.Group();
+      grp.visible = false;
+      // the black gap: a ragged strip following the curve of the plating
+      const pos = [], n = Math.max(3, Math.round(len / 0.35));
+      const hgt = [];
+      for (let i = 0; i <= n; i++) { const u = i / n; hgt.push((0.15 + 0.85 * Math.sin(u * Math.PI) ** 0.6) * (0.6 + 0.8 * rnd())); }
+      for (let i = 0; i < n; i++) {
+        const xa = x0 - (len * i) / n, xb = x0 - (len * (i + 1)) / n;
+        const pt = (x, y) => [x, y, hullHalfWidth(x, y) + 0.04];
+        const a0 = pt(xa, yc - hgt[i]), a1 = pt(xa, yc + hgt[i]), b0 = pt(xb, yc - hgt[i + 1]), b1 = pt(xb, yc + hgt[i + 1]);
+        pos.push(...a0, ...b0, ...b1, ...a0, ...b1, ...a1);
+      }
+      const hg = new THREE.BufferGeometry();
+      hg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      const holeMesh = new THREE.Mesh(hg, hole);
+      grp.add(holeMesh);
+      // the plates on either side, torn and bent outward by the ice (hinged at the edge of the gap)
+      const flaps = [];
+      for (let i = 0; i < n; i += 1 + Math.floor(rnd() * 2)) {
+        const x = x0 - (len * (i + 0.5)) / n, up = rnd() < 0.55 ? 1 : -1, y = yc + up * hgt[i];
+        const m = new THREE.Mesh(plateGeo, rnd() < 0.25 ? bright : plate);
+        const w = 0.7 + rnd() * 1.1, h = 0.6 + rnd() * 1.1;
+        m.scale.set(w, h, 1);
+        m.position.set(x, y, hullHalfWidth(x, y) + 0.05);
+        m.rotation.set(0, Math.atan2(hullHalfWidth(x - 1, y) - hullHalfWidth(x + 1, y), 2) * 0.5, up > 0 ? 0 : Math.PI); // (along the flare of the bow)
+        m.userData = { up, a: 0.35 + rnd() * 0.9, tw: (rnd() - 0.5) * 0.5 };
+        grp.add(m);
+        flaps.push(m);
+      }
+      this.g.add(grp);
+      return { x0, len, yc, grp, holeMesh, flaps, k: 0, open: false, t: 0 };
+    });
+  }
+
+  /** contactX: ship x where the spur cuts now; returns the rents that opened this frame */
+  update(dt, contactX) {
+    const opened = [];
+    for (const R of this.rents) {
+      if (!R.open && contactX <= R.x0 + 0.5) { R.open = true; R.grp.visible = true; opened.push(R); }
+      if (!R.open || R.k >= 1) continue;
+      // the rent runs aft with the ice; the plates spring out
+      R.t += dt;
+      R.k = Math.min(1, R.t / Math.max(0.3, R.len / 11));
+      const e = 1 - (1 - R.k) ** 3;
+      R.holeMesh.scale.set(1, 1, 1);
+      R.holeMesh.position.x = 0;
+      R.grp.scale.x = 1;
+      for (const m of R.flaps) {
+        const u = m.userData, on = (R.x0 - m.position.x) / R.len <= R.k + 0.05;
+        m.visible = on;
+        // rotate about the hinge: outward (+z) and twisted
+        const a = u.a * e;
+        m.rotation.x = u.up > 0 ? a : -a;
+        m.rotation.z = (u.up > 0 ? 0 : Math.PI) + u.tw * e;
+      }
+    }
+    return opened;
+  }
+
+  /** a point in the mouth of an open rent (ship coordinates), for the inflow */
+  mouth(R, out) {
+    const x = R.x0 - Math.random() * R.len * R.k;
+    return out.set(x, R.yc + (Math.random() - 0.5) * 0.6, hullHalfWidth(x, R.yc) + 0.3);
+  }
 }
