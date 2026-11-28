@@ -22,7 +22,7 @@ let _geo = null;
 function figureGeometry() {
   if (_geo) return _geo;
   const parts = [];
-  const C = (h) => new THREE.Color(h), TINT = C(0xffffff), SKIN = C(0xd8b49a), DARK = C(0x18171a), HAT = C(0x221e1c), JACKET = C(0xb9b3a2);
+  const C = (h) => new THREE.Color(h), TINT = C(0xffffff), SKIN = C(0xb08a70), DARK = C(0x18171a), HAT = C(0x221e1c), JACKET = C(0xbdb59c);
   const add = (g0, part, col, tint) => {
     const g = g0.index ? g0.toNonIndexed() : g0;
     g.deleteAttribute('uv');
@@ -46,23 +46,26 @@ function figureGeometry() {
     add(cyl(0.048, 0.042, 0.3, 6, 0.93, 1, 0, s * 0.265), A, TINT, 1);                 // forearm
     add(ball(0.045, 5, 4, 0, 0.75, s * 0.265, 0.8, 1.3, 0.9), A, SKIN, 0);             // hand
   }
-  add(cyl(0.235, 0.2, 0.58, 8, 1.15, 0.6), 0, TINT, 1);                                // body: broad shoulders, the waist
-  add(ball(0.235, 8, 3, 0, 1.42, 0, 0.6, 0.35, 1, Math.PI / 2), 0, TINT, 1);           // round of the shoulders
-  add(cyl(0.2, 0.25, 0.36, 8, 0.7, 0.62), 0, TINT, 1);                                 // skirts of the coat
-  add(box(0.02, 0.2, 0.1, 0.135, 1.33, 0), 0, SHIRT, 0);                               // shirt front, collar
-  add(cyl(0.048, 0.054, 0.1, 6, 1.5), 1, SKIN, 0);                                     // neck
-  add(ball(0.1, 8, 6, 0.012, 1.62, 0, 1, 1.15, 0.9), 1, SKIN, 0);                      // head
-  add(ball(0.104, 8, 3, -0.008, 1.64, 0, 1, 1.1, 0.92, Math.PI * 0.55), 1, HAIR, 0);   // hair
-  add(ball(0.11, 7, 3, 0, 1.69, 0, 1, 1, 0.95, Math.PI / 2), 6, HAT, 0);               // men: bowler or cap
-  add(cyl(0.165, 0.165, 0.016, 10, 1.69, 1), 6, HAT, 0);
-  add(cyl(0.2, 0.36, 0.92, 10, 0.48, 0.8), 8, TINT, 1);                                // women: long skirt
-  add(ball(0.11, 7, 4, -0.07, 1.64, 0, 0.8, 0.8, 0.8), 9, HAIR, 0);                    // and their hair up
-  add(cyl(0.25, 0.25, 0.022, 12, 1.73, 1), 9, HAT, 0);                                 // a broad hat
-  add(cyl(0.1, 0.12, 0.08, 7, 1.78, 1), 9, HAT, 0);
-  add(box(0.08, 0.44, 0.38, 0.15, 1.2, 0), 7, JACKET, 0);                              // cork life jacket, front and back
-  add(box(0.08, 0.44, 0.38, -0.15, 1.2, 0), 7, JACKET, 0);
-  add(box(0.3, 0.06, 0.12, 0, 1.44, -0.13), 7, JACKET, 0);
-  add(box(0.3, 0.06, 0.12, 0, 1.44, 0.13), 7, JACKET, 0);
+  add(cyl(0.19, 0.15, 0.58, 8, 1.15, 0.62), 0, TINT, 1);                               // body: a tapering coat
+  add(ball(0.21, 8, 3, 0, 1.42, 0, 0.6, 0.32, 1, Math.PI / 2), 0, TINT, 1);            // round of the shoulders (0.42 m)
+  add(cyl(0.16, 0.23, 0.55, 8, 0.6, 0.66), 0, TINT, 1);                                // skirts of the coat, to the knee
+  add(box(0.02, 0.2, 0.1, 0.115, 1.33, 0), 0, SHIRT, 0);                               // shirt front, collar
+  add(cyl(0.05, 0.05, 0.1, 6, 1.5), 1, SKIN, 0);                                       // neck
+  add(ball(0.11, 10, 7, 0.01, 1.63, 0, 0.92, 1.12, 1.0), 1, SKIN, 0);                  // head
+  add(box(0.03, 0.035, 0.022, 0.108, 1.615, 0).rotateZ(0), 1, SKIN, 0);                // nose
+  add(ball(0.112, 8, 3, -0.01, 1.655, 0, 0.94, 1.08, 1.02, Math.PI * 0.55), 1, HAIR, 0); // hair
+  add(ball(0.1, 8, 3, 0, 1.71, 0, 1, 1, 0.95, Math.PI / 2), 6, HAT, 0);                // men: bowler
+  add(cyl(0.15, 0.15, 0.014, 12, 1.71, 1), 6, HAT, 0);                                 // and its brim
+  add(cyl(0.18, 0.3, 0.92, 10, 0.48, 0.8), 8, TINT, 1);                                // women: long skirt, to the ankle
+  add(ball(0.11, 7, 4, -0.07, 1.66, 0, 0.8, 0.8, 0.8), 9, HAIR, 0);                    // and their hair up
+  add(cyl(0.22, 0.22, 0.02, 12, 1.75, 1), 9, HAT, 0);                                  // a broad hat
+  add(cyl(0.1, 0.12, 0.08, 7, 1.8, 1), 9, HAT, 0);
+  // cork life jacket: two slabs before and behind (the blocks drawn in the shader), shoulder straps, a belt
+  add(box(0.05, 0.38, 0.3, 0.135, 1.2, 0), 7, JACKET, 0);
+  add(box(0.05, 0.38, 0.3, -0.135, 1.2, 0), 7, JACKET, 0);
+  add(box(0.28, 0.04, 0.07, 0, 1.42, -0.11), 7, JACKET, 0);
+  add(box(0.28, 0.04, 0.07, 0, 1.42, 0.11), 7, JACKET, 0);
+  add(cyl(0.185, 0.185, 0.035, 10, 1.08, 0.78), 7, C(0x6b5a44), 0);
   _geo = mergeGeometries(parts, false);
   for (const g of parts) g.dispose();
   _geo.computeBoundingSphere();
@@ -75,6 +78,7 @@ attribute float aPart;
 attribute float aTint;
 attribute vec4 aAnim;
 uniform float uT;
+varying vec4 vFP;
 mat3 figRZ(float a) { float c = cos(a), s = sin(a); return mat3(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0); }
 mat3 figRX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
 `;
@@ -103,7 +107,7 @@ const POSE = /* glsl */ `
     else if (fM < 2.5) { if (s > 0.0) b = -s * (2.55 + 0.4 * sin(fPh * 1.7)); else { a = 0.4; b = -s * (1.2 + 0.5 * sin(fPh * 1.7 + 1.0)); } }
     else if (fM < 3.5) { a = 2.7 + 0.08 * sin(fPh); b = -s * 0.25; }
     else if (fM < 4.5) a = 0.35;
-    else if (fM < 5.5) { b = -s * (1.25 + 0.35 * sin(fPh)); a = 0.3 * sin(fPh + s); }
+    else if (fM < 5.5) { b = -s * (0.45 + 0.25 * sin(fPh * 0.5)); a = 0.9 + 0.4 * sin(fPh * 0.5 + s); }
     else if (fM < 6.5) { if (s < 0.0) { a = 1.25; b = -s * 0.9; } else { a = 1.0 + 0.2 * sin(fPh); b = -s * (0.5 + 0.45 * sin(fPh)); } }
     else if (fM < 7.5) { a = 0.95; if (s > 0.0) b = -s * (0.35 + 0.35 * sin(fPh)); }
     else if (fM < 8.5) { a = 2.3 + 0.7 * sin(fPh * 2.1 + s); b = -s * 0.9; }
@@ -111,7 +115,15 @@ const POSE = /* glsl */ `
     else { a = 0.8; if (s > 0.0) b = -s * (0.3 + 0.3 * sin(fPh)); }
     fR = figRZ(a) * figRX(b);
   }
+  // the head turns now and then (not while running)
+  if ((fP > 0.5 && fP < 1.5) || (fP > 5.5 && fP < 6.5) || fP > 8.5) {
+    float tq = (fM > 0.5 && fM < 1.5) ? 0.0 : sin(uT * 0.33 + aAnim.x * 2.7) * sin(uT * 0.11 + aAnim.x) * 0.7;
+    float c = cos(tq), sn = sin(tq);
+    fR = mat3(c, 0.0, -sn, 0.0, 1.0, 0.0, sn, 0.0, c);
+    fPiv = vec3(0.0, 1.5, 0.0);
+  }
   if (fHide) { fR = mat3(0.0); fPiv = vec3(0.0, 1.1, 0.0); }
+  vFP = vec4(position, fP);
 `;
 
 let _mat = null;
@@ -124,18 +136,25 @@ function crowdMaterial() {
     sh.vertexShader = HEAD + sh.vertexShader
       .replace('#include <beginnormal_vertex>', POSE + '\n  vec3 objectNormal = fHide ? normal : fR * normal;\n  #ifdef USE_TANGENT\n  vec3 objectTangent = vec3( tangent.xyz );\n  #endif')
       .replace('#include <begin_vertex>', 'vec3 transformed = fPiv + fR * (position - fPiv);')
-      .replace('#include <color_vertex>', '#if defined( USE_COLOR ) && defined( USE_INSTANCING_COLOR )\n  vColor = color * mix(vec3(1.0), instanceColor.rgb, aTint);\n#elif defined( USE_COLOR )\n  vColor = color;\n#endif');
+      .replace('#include <color_vertex>', '#if defined( USE_COLOR ) && defined( USE_INSTANCING_COLOR )\n  vColor = color * mix(vec3(1.0), instanceColor.rgb, aTint);\n  if (aPart > 0.5 && aPart < 1.5) vColor *= 0.92 + 0.16 * fract(aAnim.x * 3.7);\n#elif defined( USE_COLOR )\n  vColor = color;\n#endif');
+    sh.fragmentShader = 'varying vec4 vFP;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+  if (vFP.w > 0.5 && vFP.w < 1.5 && vFP.x > 0.06) {   // eye sockets and the shadow of the brows
+    float ey = smoothstep(0.022, 0.0, abs(vFP.y - 1.645)) * smoothstep(0.024, 0.006, abs(abs(vFP.z) - 0.036));
+    diffuseColor.rgb *= 1.0 - 0.45 * ey;
+  }
+  if (vFP.w > 6.5 && vFP.w < 7.5) diffuseColor.rgb *= 1.0 - 0.3 * step(0.85, fract(vFP.y * 8.0)) - 0.2 * step(0.88, fract(vFP.z * 7.0 + 0.5));`);
     shipLampPatch(sh);
   };
-  m.customProgramCacheKey = () => 'crowd1';
+  m.customProgramCacheKey = () => 'crowd2';
   _mat = m;
   return m;
 }
 
 // colours of coats and dresses (dark serge, tweed, a few light evening dresses), the crew in white jackets
-const COATS = [0x1d2030, 0x2a2622, 0x34302a, 0x1a1a1a, 0x3d3a36, 0x2b3140, 0x4a3a2a, 0x23262b];
+const COATS = [0x1c1c22, 0x2a2630, 0x23232a, 0x1a1a1a, 0x2e2c30, 0x262a32];
+const COATS3 = [0x3a3428, 0x4a3e30, 0x3f382e, 0x342f29, 0x463c33];
 const DRESSES = [0x2c2a3c, 0x3b3236, 0x6c675f, 0x353b47, 0x5a564f, 0x8a8478, 0x2a2a2a, 0x463f3a];
-const CREW = 0xbfbcb0, BAND = 0x1c2620, MOTHER = 0xa8201a, CHILD = 0x55708e;
+const CREW = 0x1a2030, BAND = 0x1c2620, MOTHER = 0xa8201a, CHILD = 0x55708e;
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _sc = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
 const _Y = new THREE.Vector3(0, 1, 0), _Z = new THREE.Vector3(0, 0, 1), _X = new THREE.Vector3(1, 0, 0);
@@ -235,7 +254,8 @@ export class Crowd {
         m0: Math.random() < 0.06 ? -1 : 5 + Math.pow(Math.random(), 1.4) * 90, sea: -1,
       };
       if (third && P.m0 > 0) P.m0 = 18 + Math.pow(Math.random(), 1.2) * 95; // (steerage came up later, many through the aft well deck)
-      this.deck.colour(i, crew ? CREW : woman ? pick(DRESSES) : pick(COATS));
+      this.deck.colour(i, crew ? CREW : woman ? pick(DRESSES) : pick(third ? COATS3 : COATS));
+      P.size = 0.94 + Math.random() * 0.12;
       this.P.push(P);
     }
     // the ice on the forward well deck: a handful of steerage passengers came out to play with it
@@ -428,9 +448,10 @@ export class Crowd {
     if (family) {
       // the mother and her child, near the stern of the boat (they are found again at dawn)
       const k = rowers + 1;
-      pool.put(k, -2.6, 0.04, 0.42, Math.PI, 0, null); pool.colour(k, MOTHER); pool.look(k, FIG.seat, 0.6, 3, 0);
-      pool.put(k + 1, -2.6, 0.3, -0.12, Math.PI, 0, null, 0.62); pool.colour(k + 1, CHILD); pool.look(k + 1, FIG.seat, 0.6, 5, 0);
-      this.familyBoarded = true;
+      pool.hide(k); pool.hide(k + 1);
+      pool.colour(k, MOTHER); pool.look(k, FIG.seat, 0.6, 3, 0);
+      pool.colour(k + 1, CHILD); pool.look(k + 1, FIG.seat, 0.6, 5, 0);
+      this.famBoat = { pool, k };
     }
     pool.dirty();
     const B = { pool, n, free: n, boat };
@@ -486,7 +507,7 @@ export class Crowd {
       const flags = (P.jacket ? 1 : 0) + (P.woman ? 2 : 0);
       if (mode !== P.mode || rate !== P.rate) { P.mode = mode; P.rate = rate; this.deck.look(P.i, mode, rate, flags); }
       const lean = moving ? Math.min(0.22, P.v * 0.045) : 0;
-      this.deck.put(P.i, P.x, P.y, P.z, P.yaw, lean, this._qComp(P.x, P.mode === FIG.cling ? 0.35 : 0.85));
+      this.deck.put(P.i, P.x, P.y, P.z, P.yaw, lean, this._qComp(P.x, P.mode === FIG.cling ? 0.35 : 0.85), P.size);
       // the sea reaches them, or (the stern rising) they lose their hold and fall
       const T = s.broken && P.x < s.XB ? s.TB : s.TA;
       _v.set(P.x, P.y + 0.3, P.z).applyMatrix4(T);
@@ -508,6 +529,13 @@ export class Crowd {
     }
     this.deck.dirty();
     // the family by boat 7: together at the rail, then mother and child are in the boat and the father stays, waving
+    if (this.famBoat && !this.familyBoarded && m >= 54) {
+      const { pool, k } = this.famBoat;
+      pool.put(k, -2.6, 0.04, 0.42, Math.PI, 0, null);
+      pool.put(k + 1, -2.6, 0.3, -0.12, Math.PI, 0, null, 0.62);
+      pool.dirty();
+      this.familyBoarded = true;
+    }
     {
       const F = this.family, by = DECK_Y.boat, yaw = -Math.PI / 2; // (facing outboard, starboard)
       const on = m >= 40 && !F.gone;
@@ -518,7 +546,7 @@ export class Crowd {
       if (on) {
         const waving = this.familyBoarded && m < 80;
         if (waving !== F.waving) { F.waving = waving; this.deck.look(F.father, waving ? FIG.wave : FIG.idle, waving ? 3 : 0.8, 1); }
-        const fz = this.familyBoarded ? 12.7 : 9.9; // (after they are in the boat: at the rail itself)
+        const fz = this.familyBoarded ? 13.4 : 9.9; // (after they are in the boat: at the rail itself)
         this.deck.put(F.father, 33.5, by, fz, yaw + (this.familyBoarded ? 0 : 0.6), 0, this._qComp(33, 0.85));
         _v.set(33.5, by + 0.3, fz).applyMatrix4(s.TA);
         if (_v.y < WL + 0.1) { F.gone = true; this.deck.hide(F.father); this._toSea({ i: F.father, jacket: true, woman: false }, _v.setY(WL), false); }

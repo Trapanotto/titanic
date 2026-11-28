@@ -115,6 +115,7 @@ export class Sinking {
     this.wreck = new Wreckage(this);
     this.damage = new HullDamage(this);
     this.crowd = new Crowd(this);
+    if (this.cine) mats.hullRed?.color?.setHex(0x4a2620);
     this.carpathia = createCarpathia();
     this.iceField = createIceField();
     this.outside.add(this.carpathia, this.iceField);
@@ -377,7 +378,7 @@ export class Sinking {
         else if (S && S.phase !== 'stowed' && S.phase !== 'out') st.lowered = true;
       }
       // the people climb in while the boat hangs at the rail, some minutes before it is lowered
-      if (st.swung && !st.loaded && this.m >= st.launch - 9 && this.crowd) {
+      if (st.swung && !st.loaded && this.m >= st.launch - 18 && this.crowd) {
         const S = B.live.get(st.u) || (st.u.spec.out ? B._start(st.u) : null);
         if (!S) continue;
         st.loaded = true;
@@ -575,7 +576,7 @@ export class Sinking {
       this.world.env.berg.mesh.position.set(-1500 - 520, 0, 420 - 140);
       this.spur.visible = false;
     }
-    if (ENGINE.steam > 0 && this.t > HIT) ENGINE.steam = clamp01(1 - Math.max(0, m) / 25) * (this.cine ? 0.3 : 1); // blowing off for the first 25 minutes (in the film a thinner plume)
+    if (ENGINE.steam > 0 && this.t > HIT) ENGINE.steam = clamp01(1 - Math.max(0, m) / 25) * (this.cine ? 0.1 : 1); // blowing off for the first 25 minutes (in the film a thinner plume)
     if (this.ice) for (const I of this.ice) { if (I.t < 1) { I.t += dt * 1.4; const k = clamp01(I.t); I.m.position.y = lerp(I.m.position.y, I.y1, k * k); I.m.position.z = lerp(I.m.position.z, I.z1, k); } }
     this._boats();
     this.interact.boats.sink.timeScale = this.t > HIT + SCRAPE ? rate / BOAT_REF : 1;
@@ -654,7 +655,7 @@ export class Sinking {
       Wk.fill = cineUnder;
       if (cineUnder && !this.broken) {
         const ga = this.director?.shot?.glowAt;
-        Wk.glow.color.setHex(ga ? 0x99ccff : 0x5a9cb4); Wk.glow.intensity = ga ? 45 : 45;
+        Wk.glow.color.setHex(ga ? 0x8fb4d8 : 0x5a9cb4); Wk.glow.intensity = ga ? 45 : 45;
         if (ga) Wk.glow.position.set(ga[0], ga[1], ga[2]); else Wk.glow.position.copy(this.camera.position).add(new THREE.Vector3(0, 5, 0));
       }
       else if (Wk.glowT <= 0) Wk.glow.color.setHex(0xff8a3a);
@@ -758,7 +759,7 @@ export class Sinking {
     P.grain = 0.028;
     P.bloom = u ? 0.25 : 0.42; P.bloomThreshold = 0.8; P.bloomKnee = 0.7;
     P.exposure *= (u ? 1.05 : 1.15) * (this.director?.shot?.expo ?? 1);
-    if (this.m >= DAWN) { P.contrast = 1.12; P.saturation = 0.9; P.vignette = 0.55; P.grain = 0.022; P.exposure *= 0.42; P.bloom = 0.5; P.lift.setRGB(0.08, 0.06, 0.12); P.gain.setRGB(1.0, 0.78, 0.62); return; }
+    if (this.m >= DAWN) { P.contrast = 1.2; P.saturation = 0.7; P.vignette = 0.35; P.grain = 0.022; P.exposure *= 0.5; P.bloom = 0.5; P.lift.setRGB(0.051, 0.059, 0.094); P.gain.setRGB(1.0, 0.81, 0.66); return; }
     if (this.director?.shot?.cold) { P.exposure *= 0.7; P.contrast = 1.25; P.gain.setRGB(0.75, 0.85, 1.0); P.lift.setRGB(0, 0.005, 0.02); return; }
     if (u) { P.lift.setRGB(0.0, 0.02, 0.03); P.gain.setRGB(0.82, 1.02, 1.06); }
     else { P.lift.setRGB(0.0, 0.008, 0.022); P.gain.setRGB(1.07, 1.0, 0.9); }

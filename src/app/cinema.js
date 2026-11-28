@@ -26,16 +26,15 @@ const SHOTS = [
   { name: 'Nacht', t: 0, dur: 3.5, fov: (k) => 50 - 8 * k, sway: 0.3,
     cam: (c, k) => c.S(175 - 50 * ease(k), 44 - 18 * ease(k), 62 - 22 * ease(k)),
     look: (c, k) => c.S(50 - 10 * k, 18, 0) },
-  { name: 'Krähennest', t: 3.5, dur: 3, fov: (k) => 26 - 8 * ease(k), up: 'ship', sway: 0.03, expo: 1.3, cap: '23:39 · «Eisberg genau voraus!»',
-    cam: (c, k) => c.S(97.4, 40.9 - k * 0.2, -0.9),
-    look: (c) => c.berg(8) },
+  { name: 'Krähennest', t: 3.5, dur: 3, fov: (k) => 40 - 10 * ease(k), up: 'ship', sway: 0.03, expo: 1.3, cap: '23:39 · «Eisberg genau voraus!»',
+    cam: (c, k) => c.S(96.3, 41.3 - k * 0.2, -0.5),
+    look: (c) => c.berg(5) },
   { name: 'Bugwelle', t: 6.5, dur: 3.5, fov: 60, up: 'ship', sway: 0.05, roll: 0.06,
     cam: (c, k) => c.S(116 - 4 * k, 17, 13.5),
     look: (c, k) => c.S(136, 15, 0).lerp(c.berg(6), 0.15 + 0.25 * k) },
-  { name: 'Brücke', t: 10, dur: 3.5, fov: (k) => 40 - 8 * ease(k), up: 'ship', sway: 0.02,
-    cam: (c, k) => c.S(68.6 - 0.4 * k, 32.4, 0.8),
-    look: (c, k) => c.berg(18 - 3 * k) },
-  // under water: the spur of the berg, the bow coming out of the murk and tearing along it
+  { name: 'Brücke', t: 10, dur: 3.5, fov: 45, up: 'ship', sway: 0.02, fill: 30, fillCol: 0xffb070, fillUp: 0.5,
+    cam: (c, k) => c.S(67.5 - 0.3 * k, 30.3, -1.5),
+    look: (c, k) => c.berg(10 - 2 * k) },
   // over the starboard rail of the forecastle, straight down the side: the ice grinding along the plating
   { name: 'Schrammen', t: 13.5, dur: 4, fov: 58, up: 'ship', sway: 0.04, shake: 0.08,
     cam: (c, k) => c.S(112 - 2 * k, 24.6, 7.4),
@@ -48,14 +47,14 @@ const SHOTS = [
     look: (c, k) => c.S(85 - k, 6, 5.5) },
   // inside: the sea bursting through the plating into boiler room 6, the stokers running for the door
   { name: 'Kesselraum', t: 23.1, dur: 5.9, fov: 60, up: 'ship', sway: 0.06, need: 'boilerReady', inside: true, shake: 0.04, roll: 0.05,
-    cam: (c, k) => c.S(65.2 - 0.6 * k, 3.4, -5.5),
-    look: (c, k) => c.S(60.6, 3.0 + 0.3 * k, 3.5) },
+    cam: (c, k) => c.S(64.9 - 0.8 * k, 4.5, -4.5),
+    look: (c, k) => c.S(62.6, 3.7 + 0.4 * k, 9) },
   // ---- the night (minutes after 23:40; 2 minutes of the night pass in a second)
   { name: 'Eis an Deck', m: 0.3, dur: 5.7, fov: 50, up: 'ship', sway: 0.04,
     cam: (c, k) => c.S(99.5 - k, 27.8 - 2.8 * ease(k), -5.5),
     look: (c, k) => c.S(85, 20.2, 2 + k) },
   // the Marconi room: the operator at the key, the call for help going out
-  { name: 'Funkraum', m: 6, dur: 4.5, fov: (k) => 44 - 8 * ease(k), up: 'ship', sway: 0.02, inside: true, expo: 0.2, cap: '00:15 · Der Funker sendet CQD', morse: true,
+  { name: 'Funkraum', m: 6, dur: 4.5, fov: (k) => 35 - 5 * ease(k), up: 'ship', sway: 0.02, inside: true, expo: 0.6, fill: 40, fillCol: 0xffb860, fillUp: 0.4, cap: '00:15 · Der Funker sendet CQD', morse: true,
     cam: (c, k) => c.S(50.7 + 0.3 * k, 30.0, -0.2),
     look: (c) => c.S(52.05, 29.25, 0.8) },
   { name: 'Weite', m: 10.5, dur: 3.5, fov: 36, sway: 0.3,
@@ -80,19 +79,20 @@ const SHOTS = [
     cam: (c, k) => c.S(25 + 3 * k, 34.2, 5),
     look: (c) => c.S(33.5, 28.4, 12.4) },
   // the family the film follows: at the rail by boat 7, in the light of a deck lamp
-  { name: 'Abschied', m: 50, dur: 5, fov: (k) => 28 - 3 * ease(k), up: 'ship', sway: 0.02, fill: 60, fillCol: 0xffc890,
+  { name: 'Abschied', m: 50, dur: 4, fov: 38, up: 'ship', sway: 0.02, fill: 60, fillCol: 0xffc890, fillUp: 0.5,
     cam: (c, k) => c.S(31 + 0.3 * k, 29.0, 9.0),
-    look: (c) => c.S(34.3, 29.5, 9.75) },
-  { name: 'Boot 7', m: 55, dur: 8, fov: 46, sway: 0.12, cap: '00:45 · Das erste Rettungsboot',
+    look: (c) => c.S(34.3, 29.75, 9.75) },
+  { name: 'Boot 7', m: 54, dur: 9, fov: 46, sway: 0.12, cap: '00:45 · Das erste Rettungsboot',
     cam: (c, k) => c.S(14 + 8 * k, 15 - k, 44),
     look: (c, k) => c.S(34, 21 - 5 * ease(k), 13) },
   { name: 'Kapelle von hinten', m: 63, dur: 4, fov: 42, up: 'ship', sway: 0.03, band: true,
     cam: (c, k) => c.S(43.6 - 1.2 * k, 30.8, 10.3),
     look: (c) => c.S(53, 29.8, 8.6) },
   // from beside the boat going down: the father at the rail above, waving
-  { name: 'Vater', near: 0.15, m: 67, dur: 5, fov: 14, sway: 0.05, fill: 300, fillCol: 0xffd9a0,
-    cam: (c) => c.S(33, 15, 18),
-    look: (c) => c.S(33.5, 30, 12.7) },
+  // over the father's shoulder at the rail, down to the boat going away below: the red coat
+  { name: 'Vater', near: 0.12, m: 67, dur: 5, fov: 34, up: 'ship', sway: 0.03,
+    cam: (c, k) => c.S(32.6, 30.5, 12.6 + 0.2 * k),
+    look: (c) => c.inBoat(7, -2.6, 1.0, 0.4) },
   { name: 'Rakete', m: 72, dur: 8, fov: 50, up: 'ship', sway: 0.05, cap: 'Notraketen',
     cam: (c, k) => c.S(60, 29.9, -8),
     look: (c, k) => c.S(70, 40 + 80 * smooth(k * 1.4), -4) },
@@ -127,9 +127,9 @@ const SHOTS = [
   { name: 'Heck', m: 149, dur: 3, fov: 54, up: 'ship', sway: 0.05, shake: 0.03,
     cam: (c, k) => c.S(-103.5 - 1.5 * k, 24.4, 5.5),
     look: (c) => c.S(-126, 24.2, -1.5) },
-  { name: 'Wasser an Deck', m: 152, dur: 2.6, fov: 40, up: 'ship', sway: 0.05, shake: 0.03, cap: '02:15',
-    cam: (c, k) => c.S(62 - 2 * k, 29.5, 9.6),
-    look: (c) => c.S(80, 28.2, 7) },
+  { name: 'Wasser an Deck', m: 152, dur: 2.6, fov: 34, up: 'ship', sway: 0.04, shake: 0.03, cap: '02:15',
+    cam: (c, k) => c.S(52 + 2 * k, 28.8, 9.5),
+    look: (c) => c.S(78, 27.6, 7) },
   { name: 'Schornstein', m: 154.6, dur: 1.2, fov: 60, up: 'ship', sway: 0.06, shake: 0.06,
     cam: (c, k) => c.S(40 - k, 30.0, 10.4),
     look: (c, k) => c.S(56, 42 - 10 * k, 5) },
@@ -139,33 +139,33 @@ const SHOTS = [
   { name: 'Lichter', m: 156.4, dur: 0.6, fov: 34, sway: 0.3,
     cam: (c) => c.boat(1.4, 1),
     look: (c) => c.S(0, 20, 0) },
-  { name: 'Bruch', m: 157, dur: 1.6, fov: 32, sway: 0.12, fixed: true, shake: 0.06, expo: 1.4,
-    cam: (c, k) => c.at('brk', () => c.S(-5, 0, 0).setY(14).add(_v.set(0, 0, 70))).clone().add(_v.set(-3 * k, 0, 0)),
-    look: (c, k) => c.at('brkL', () => c.S(-10, 0, 0).setY(18)).clone().add(_v.set(0, 4 * k, 0)) },
-  { name: 'Heck steigt', m: 158.6, dur: 0.35, fov: 46, sway: 0.15, fill: 40000,
-    cam: (c, k) => c.W(-40 + 3 * k, WL + 2.2, 150),
-    look: (c) => c.W(c.s.P0.x, 36, 0) },
+  { name: 'Bruch', m: 157, dur: 1.6, fov: 26, sway: 0.12, fixed: true, shake: 0.15, expo: 1.25,
+    cam: (c, k) => c.at('brk', () => c.S(-15, 0, 0).setY(WL + 1.3).add(_v.set(0, 0, 95))).clone().add(_v.set(-2 * k, 0, 0)),
+    look: (c, k) => c.at('brkL', () => c.S(-6, 20, 0)).clone().add(_v.set(0, 3 * k, 0)) },
+  { name: 'Heck steigt', m: 158.6, dur: 0.35, fov: 20, sway: 0.15,
+    cam: (c, k) => c.W(-55 + 3 * k, WL + 0.8, 130),
+    look: (c) => c.S(-110, 30, 0) },
   // close: the stern standing up, people holding on to the rails, falling
   { name: 'Absturz', m: 158.95, dur: 0.6, fov: 30, sway: 0.2, fixed: true, fill: 9000, fillUp: 60, cold: true,
     cam: (c, k) => c.at('fallC', () => c.S(-112, 24, 0).add(_v.set(46, 0, 40)).setY(WL + 1.5)).clone().add(_v.set(0, 1.5 * k, 0)),
     look: (c) => c.S(-112, 27, 0) },
-  { name: 'Danach', m: 159.55, dur: 2.45, fov: 40, sway: 0.3,
+  { name: 'Danach', m: 159.55, dur: 1.0, fov: 40, sway: 0.3,
     cam: (c, k) => c.W(26 - 4 * k, WL + 0.6, 30),
     look: (c) => c.W(c.s.P0.x - 20, WL + 0.5, 0) },
   // the people in the water, the cries; one boat goes back with a lantern
-  { name: 'Im Wasser', m: 162, dur: 4, fov: 54, sway: 0.3, cap: '02:20', fill: 260, fillCol: 0xffc890,
-    cam: (c, k) => c.sea().clone().add(_v.set(7 - 2 * k, 0.55, 6 - k)),
+  { name: 'Im Wasser', m: 160.55, dur: 5.45, fov: 40, sway: 0.3, cap: '02:20', fill: 260, fillCol: 0xffc890,
+    cam: (c, k) => c.sea().clone().add(_v.set(7 - 2 * k, 0.3, 8 - k)),
     look: (c) => c.sea().clone().add(_v.set(0, 0.3, 0)) },
   { name: 'Zurück', m: 166, dur: 6, fov: 44, sway: 0.3,
     cam: (c, k) => c.sea().clone().add(_v.set(-9 + 2 * k, 1.3, -10)),
     look: (c) => c.backBoat().clone().add(_v.set(0, 1, 0)) },
   // first light
-  { name: 'Morgengrauen', near: 0.15, m: 268, dur: 6, fov: 22, sway: 0.3,
-    cam: (c) => c.boatIn(1.3, 5),
-    look: (c, k) => c.carp().clone().add(_v.set(-10 * k, 14, 0)) },
-  { name: 'Gerettet', near: 0.15, m: 274, dur: 7, fov: (k) => 50 - 8 * ease(k), sway: 0.2,
-    cam: (c) => c.inBoat(7, -4.4, 1.75, -0.2),
-    look: (c) => c.inBoat(7, 2, 3.2, 0.3) },
+  { name: 'Morgengrauen', near: 0.12, m: 268, dur: 6, fov: 32, sway: 0.3,
+    cam: (c) => c.inBoat(7, -4, 1.5, -0.6),
+    look: (c, k) => c.carp().clone().add(_v.set(-10 - 8 * k, 12, 0)) },
+  { name: 'Gerettet', near: 0.12, m: 274, dur: 7, fov: 40, sway: 0.2,
+    cam: (c) => c.inBoat(7, 3.5, 1.3, 0),
+    look: (c, k) => c.carp().clone().add(_v.set(-16, 16 + 4 * k, 9.75)) },
 ];
 
 export class Director {
@@ -478,8 +478,8 @@ export class Wreckage {
       this.piece(p, out, y > DECK_Y.B ? 'wood' : Math.abs(z) > hw - 1.5 ? 'hull' : 'steel', 0.6 + Math.random() * 2.2);
     }
     this.glow.position.set(s.XB, DECK_Y.D, 0);
-    this.glowT = 3;
-    for (let k = 0; k < 8; k++) {
+    this.glowT = 6;
+    for (let k = 0; k < 14; k++) {
       const y = 4 + Math.random() * 22, p = _v.set(s.XB, y, (Math.random() - 0.5) * 22).applyMatrix4(s.TA);
       this.sparks.emit(p, Math.round(this.sparks.n / 10), 9, 1.3, null, 1);
     }
@@ -547,7 +547,7 @@ export class Wreckage {
     } else this.flash.intensity = 0;
     if (this.glowT > 0) {
       this.glowT = Math.max(0, this.glowT - dt);
-      const k = this.glowT / 3;
+      const k = this.glowT / 6;
       this.glow.intensity = 7000 * k * k * (0.7 + 0.3 * Math.random());
     } else if (!this.fill) this.glow.intensity = 0;
   }
