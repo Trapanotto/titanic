@@ -124,9 +124,9 @@ export class UI {
       setTimeout(() => { this.loadingEl.hidden = true; }, 900);
     }
     this.root.classList.add('live');
-    // desktop: a start button with the three things one needs to know; phones and tablets go straight in
+    // the start screen (tour or the night of 14 April) on every device; ?untergang=1 goes straight into the night
     const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-    if (this.noLock || coarse || this.controls?.touch) this.entered = true;
+    if (this.noLock || /[?&]untergang=/.test(location.search)) this.entered = true;
     if (coarse || this.controls?.touch) this.enableTouch();
     this._refreshOverlay();
   }
