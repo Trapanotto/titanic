@@ -136,8 +136,9 @@ function crowdMaterial() {
     sh.vertexShader = HEAD + sh.vertexShader
       .replace('#include <beginnormal_vertex>', POSE + '\n  vec3 objectNormal = fHide ? normal : fR * normal;\n  #ifdef USE_TANGENT\n  vec3 objectTangent = vec3( tangent.xyz );\n  #endif')
       .replace('#include <begin_vertex>', 'vec3 transformed = fPiv + fR * (position - fPiv);')
-      .replace('#include <color_vertex>', '#if defined( USE_COLOR ) && defined( USE_INSTANCING_COLOR )\n  vColor = color * mix(vec3(1.0), instanceColor.rgb, aTint);\n  if (aPart > 0.5 && aPart < 1.5) vColor *= 0.92 + 0.16 * fract(aAnim.x * 3.7);\n#elif defined( USE_COLOR )\n  vColor = color;\n#endif');
-    sh.fragmentShader = 'varying vec4 vFP;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      .replace('#include <color_vertex>', '#if defined( USE_COLOR ) && defined( USE_INSTANCING_COLOR )\n  vColor = color * mix(vec3(1.0), instanceColor.rgb, aTint);\n  if (aPart > 0.5 && aPart < 1.5) { float st = fract(aAnim.x * 3.7); vColor *= st < 0.33 ? vec3(1.27, 1.33, 1.38) : st < 0.66 ? vec3(1.14, 1.11, 1.09) : vec3(0.95, 0.89, 0.82); }\n#elif defined( USE_COLOR )\n  vColor = color;\n#endif');
+    sh.fragmentShader = 'varying vec4 vFP;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  totalEmissiveRadiance += pow(1.0 - max(dot(normal, normalize(vViewPosition)), 0.0), 3.0) * 0.035 * vec3(0.75, 0.82, 1.0);`).replace('#include <color_fragment>', `#include <color_fragment>
   if (vFP.w > 0.5 && vFP.w < 1.5 && vFP.x > 0.06) {   // eye sockets and the shadow of the brows
     float ey = smoothstep(0.022, 0.0, abs(vFP.y - 1.645)) * smoothstep(0.024, 0.006, abs(abs(vFP.z) - 0.036));
     diffuseColor.rgb *= 1.0 - 0.45 * ey;
@@ -145,7 +146,7 @@ function crowdMaterial() {
   if (vFP.w > 6.5 && vFP.w < 7.5) diffuseColor.rgb *= 1.0 - 0.3 * step(0.85, fract(vFP.y * 8.0)) - 0.2 * step(0.88, fract(vFP.z * 7.0 + 0.5));`);
     shipLampPatch(sh);
   };
-  m.customProgramCacheKey = () => 'crowd2';
+  m.customProgramCacheKey = () => 'crowd3';
   _mat = m;
   return m;
 }
@@ -241,7 +242,7 @@ export class Crowd {
     const f = TIER.fine ?? 2;
     const N = [240, 380, 560, 800][f] ?? 560;
     this.N = N;
-    this.deck = new Pool(N + 18, sink.scene, 'crowdDeck');
+    this.deck = new Pool(N + 20, sink.scene, 'crowdDeck');
     this.sea = new Pool(N + 8, sink.outside, 'crowdSea');
     this.boatPools = [];
     this.P = [];
@@ -278,6 +279,9 @@ export class Crowd {
     this.operator = N + 17;
     this.deck.colour(N + 17, 0x1b1f2a);
     this.deck.look(N + 17, FIG.cello, 5, 4, 0);
+    // two officers in the wheelhouse (silhouettes against the windows)
+    this.officers = [N + 18, N + 19];
+    for (const i of this.officers) { this.deck.colour(i, 0x161a26); this.deck.look(i, FIG.idle, 0.6, 0, Math.random() * 5); }
     this.frontX = 200;
     this.tick = 0;
   }
@@ -531,8 +535,8 @@ export class Crowd {
     // the family by boat 7: together at the rail, then mother and child are in the boat and the father stays, waving
     if (this.famBoat && !this.familyBoarded && m >= 54) {
       const { pool, k } = this.famBoat;
-      pool.put(k, -2.6, 0.04, 0.42, Math.PI, 0, null);
-      pool.put(k + 1, -2.6, 0.3, -0.12, Math.PI, 0, null, 0.62);
+      pool.put(k, -2.6, 0.04, 0.42, 0, 0, null);
+      pool.put(k + 1, -2.6, 0.3, -0.12, 0, 0, null, 0.62);
       pool.dirty();
       this.familyBoarded = true;
     }
@@ -551,6 +555,8 @@ export class Crowd {
         _v.set(33.5, by + 0.3, fz).applyMatrix4(s.TA);
         if (_v.y < WL + 0.1) { F.gone = true; this.deck.hide(F.father); this._toSea({ i: F.father, jacket: true, woman: false }, _v.setY(WL), false); }
       } else if (!F.gone) this.deck.hide(F.father);
+      if (m < 20) { this.deck.put(this.officers[0], 69.6, by, -0.6, 0.05, 0, null); this.deck.put(this.officers[1], 70.3, by, 1.3, -0.2, 0, null); }
+      else for (const i of this.officers) this.deck.hide(i);
       // the operator: at the key until the captain released him (about 02:17)
       if (m < 137) this.deck.put(this.operator, 51.3, by - 0.36, 0.75, 0, 0.12, this._qComp(51, 0.85));
       else this.deck.hide(this.operator);

@@ -622,7 +622,7 @@ export class Sinking {
       for (const R0 of opened) { this.sound.groan?.(1.2); Wk.bubbles.emit(new THREE.Vector3(R0.x0, R0.yc, hullHalfWidth(R0.x0, R0.yc) + 0.5).applyMatrix4(this.TA), 60, 4, 1, null, 1.4); }
       if (m < 45) for (const R0 of this.damage.rents) if (R0.open && Math.random() < dt * 22) Wk.inflow(this.damage.mouth(R0, new THREE.Vector3()).applyMatrix4(this.TA));
       // inside boiler room 6: the jets of the sea through the opened seams at the forward end, 2.5 m above the plates
-      if (this.t > 23.4 && this.t < 40) for (let k = 0; k < 6; k++) {
+      if (this.boilerReady && this.t > 23.4 && this.t < 40) for (let k = 0; k < 6; k++) {
         const x = 61.6 + Math.random() * 3.2, y = 3.9 + Math.random() * 0.6, hz = hullHalfWidth(x, y) - 0.5;
         Wk.jets.emit(new THREE.Vector3(x, y, hz).applyMatrix4(this.TA), 8, 3.4, 0.15, new THREE.Vector3(0, 0.1, -2.4).transformDirection(this.TA).multiplyScalar(2.4), 0.25);
       }
@@ -642,7 +642,8 @@ export class Sinking {
       Wk.spray.emit(p, 6, 2.5, 1, null, 0.8);
     }
     this.damage.g.visible = !this.director?.shot?.inside;
-    this.world.noOutside = !!this.director?.shot?.inside; // (from inside the boiler room the plates outside would show through)
+    this.world.noOutside = !!this.director?.shot?.inside;
+    this.outside.visible = !this.world.noOutside; // (from inside the boiler room the plates outside would show through)
     this._updateFloods();
     // under water?
     const cam = this.camera.position, wy = cam.clone().applyMatrix4(this.TA).y;

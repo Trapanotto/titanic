@@ -23,18 +23,15 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Eule
 // up 'ship': the camera stands on deck and tilts with her; otherwise the horizon stays level.
 const SHOTS = [
   // ---- the approach (real seconds)
-  { name: 'Nacht', t: 0, dur: 3.5, fov: (k) => 50 - 8 * k, sway: 0.3,
+  { name: 'Nacht', t: 0, dur: 6.5, fov: (k) => 50 - 8 * k, sway: 0.3,
     cam: (c, k) => c.S(175 - 50 * ease(k), 44 - 18 * ease(k), 62 - 22 * ease(k)),
     look: (c, k) => c.S(50 - 10 * k, 18, 0) },
-  { name: 'Krähennest', t: 3.5, dur: 3, fov: (k) => 40 - 10 * ease(k), up: 'ship', sway: 0.03, expo: 1.3, cap: '23:39 · «Eisberg genau voraus!»',
-    cam: (c, k) => c.S(96.3, 41.3 - k * 0.2, -0.5),
-    look: (c) => c.berg(5) },
-  { name: 'Bugwelle', t: 6.5, dur: 3.5, fov: 60, up: 'ship', sway: 0.05, roll: 0.06,
+  { name: 'Bugwelle', t: 6.5, dur: 3.5, fov: 60, up: 'ship', sway: 0.05, roll: 0.06, cap: '23:39 · «Eisberg genau voraus!»',
     cam: (c, k) => c.S(116 - 4 * k, 17, 13.5),
     look: (c, k) => c.S(136, 15, 0).lerp(c.berg(6), 0.15 + 0.25 * k) },
-  { name: 'Brücke', t: 10, dur: 3.5, fov: 45, up: 'ship', sway: 0.02, fill: 30, fillCol: 0xffb070, fillUp: 0.5,
-    cam: (c, k) => c.S(67.5 - 0.3 * k, 30.3, -1.5),
-    look: (c, k) => c.berg(10 - 2 * k) },
+  { name: 'Brücke', t: 10, dur: 3.5, fov: 45, up: 'ship', sway: 0.02, expo: 0.35, fill: 15, fillCol: 0xffb060, fillUp: 0.3,
+    cam: (c, k) => c.S(67 - 0.3 * k, 30.0, -1.5),
+    look: (c) => c.S(74, 29.6, 0) },
   // over the starboard rail of the forecastle, straight down the side: the ice grinding along the plating
   { name: 'Schrammen', t: 13.5, dur: 4, fov: 58, up: 'ship', sway: 0.04, shake: 0.08,
     cam: (c, k) => c.S(112 - 2 * k, 24.6, 7.4),
@@ -46,17 +43,18 @@ const SHOTS = [
     cam: (c, k) => c.S(95 - 1.5 * k, 5, 9),
     look: (c, k) => c.S(85 - k, 6, 5.5) },
   // inside: the sea bursting through the plating into boiler room 6, the stokers running for the door
-  { name: 'Kesselraum', t: 23.1, dur: 5.9, fov: 60, up: 'ship', sway: 0.06, need: 'boilerReady', inside: true, shake: 0.04, roll: 0.05,
-    cam: (c, k) => c.S(64.9 - 0.8 * k, 4.5, -4.5),
-    look: (c, k) => c.S(62.6, 3.7 + 0.4 * k, 9) },
+  // the ship stopped, steam roaring from the funnels, seen low from the sea at the bow
+  { name: 'Dampf', t: 23.1, dur: 5.9, fov: (k) => 34 - 6 * ease(k), sway: 0.25,
+    cam: (c, k) => c.W(185 - 6 * k, WL + 2.5, 62),
+    look: (c) => c.S(55, 36, 0) },
   // ---- the night (minutes after 23:40; 2 minutes of the night pass in a second)
   { name: 'Eis an Deck', m: 0.3, dur: 5.7, fov: 50, up: 'ship', sway: 0.04,
     cam: (c, k) => c.S(99.5 - k, 27.8 - 2.8 * ease(k), -5.5),
     look: (c, k) => c.S(85, 20.2, 2 + k) },
   // the Marconi room: the operator at the key, the call for help going out
-  { name: 'Funkraum', m: 6, dur: 4.5, fov: (k) => 35 - 5 * ease(k), up: 'ship', sway: 0.02, inside: true, expo: 0.6, fill: 40, fillCol: 0xffb860, fillUp: 0.4, cap: '00:15 · Der Funker sendet CQD', morse: true,
-    cam: (c, k) => c.S(50.7 + 0.3 * k, 30.0, -0.2),
-    look: (c) => c.S(52.05, 29.25, 0.8) },
+  { name: 'Funkraum', m: 6, dur: 4.5, fov: 45, up: 'ship', sway: 0.02, inside: true, expo: 0.45, fill: 25, fillCol: 0xffc27a, fillUp: 0.6, cap: '00:15 · Der Funker sendet CQD', morse: true,
+    cam: (c, k) => c.S(50.0 + 0.2 * k, 30.0, 0.4),
+    look: (c) => c.S(52, 29.5, 1.5) },
   { name: 'Weite', m: 10.5, dur: 3.5, fov: 36, sway: 0.3,
     cam: (c, k) => c.orbit(0.6 + 0.9 * ease(k), 230 - 40 * k, 55 - 20 * k),
     look: (c) => c.S(10, 16, 0) },
@@ -75,14 +73,14 @@ const SHOTS = [
   { name: 'Überflug', m: 37, dur: 7, fov: 46, sway: 0.2, roll: 0.08,
     cam: (c, k) => c.S(-150 + 260 * ease(k), 70 - 10 * k, -40),
     look: (c, k) => c.S(-100 + 220 * ease(k), 20, 0) },
-  { name: 'Beladen', m: 44, dur: 6, fov: 54, up: 'ship', sway: 0.05, cap: 'Frauen und Kinder zuerst',
+  { name: 'Beladen', m: 44, dur: 5, fov: 54, up: 'ship', sway: 0.05, cap: 'Frauen und Kinder zuerst',
     cam: (c, k) => c.S(25 + 3 * k, 34.2, 5),
     look: (c) => c.S(33.5, 28.4, 12.4) },
   // the family the film follows: at the rail by boat 7, in the light of a deck lamp
-  { name: 'Abschied', m: 50, dur: 4, fov: 38, up: 'ship', sway: 0.02, fill: 60, fillCol: 0xffc890, fillUp: 0.5,
-    cam: (c, k) => c.S(31 + 0.3 * k, 29.0, 9.0),
-    look: (c) => c.S(34.3, 29.75, 9.75) },
-  { name: 'Boot 7', m: 54, dur: 9, fov: 46, sway: 0.12, cap: '00:45 · Das erste Rettungsboot',
+  { name: 'Abschied', m: 49, dur: 6, fov: 30, up: 'ship', sway: 0.02, fill: 50, fillCol: 0xffc890, fillUp: 0.5,
+    cam: (c, k) => c.S(32.0 + 0.3 * k, 29.6, 8.2),
+    look: (c) => c.S(34.4, 29.4, 9.8) },
+  { name: 'Boot 7', m: 55, dur: 8, fov: 46, sway: 0.12, cap: '00:45 · Das erste Rettungsboot',
     cam: (c, k) => c.S(14 + 8 * k, 15 - k, 44),
     look: (c, k) => c.S(34, 21 - 5 * ease(k), 13) },
   { name: 'Kapelle von hinten', m: 63, dur: 4, fov: 42, up: 'ship', sway: 0.03, band: true,
@@ -90,9 +88,10 @@ const SHOTS = [
     look: (c) => c.S(53, 29.8, 8.6) },
   // from beside the boat going down: the father at the rail above, waving
   // over the father's shoulder at the rail, down to the boat going away below: the red coat
-  { name: 'Vater', near: 0.12, m: 67, dur: 5, fov: 34, up: 'ship', sway: 0.03,
-    cam: (c, k) => c.S(32.6, 30.5, 12.6 + 0.2 * k),
-    look: (c) => c.inBoat(7, -2.6, 1.0, 0.4) },
+  // over the father's shoulder at the rail, down to the boat going away below: the red coat
+  { name: 'Vater', near: 0.12, m: 67, dur: 5, fov: 36, up: 'ship', sway: 0.03,
+    cam: (c, k) => c.S(31.9, 30.2, 11.9),
+    look: (c) => c.inBoat(7, 0, 0.6, 0) },
   { name: 'Rakete', m: 72, dur: 8, fov: 50, up: 'ship', sway: 0.05, cap: 'Notraketen',
     cam: (c, k) => c.S(60, 29.9, -8),
     look: (c, k) => c.S(70, 40 + 80 * smooth(k * 1.4), -4) },
@@ -102,9 +101,9 @@ const SHOTS = [
   { name: 'Panik', m: 98, dur: 7, fov: 52, up: 'ship', sway: 0.06, shake: 0.05,
     cam: (c, k) => c.S(5 - 28 * ease(k), 30.0, 10.5),
     look: (c, k) => c.S(25 - 28 * ease(k), 29.2, 9) },
-  { name: 'Mutter', near: 0.12, m: 105, dur: 8, fov: 35, sway: 0.25, fill: 40, fillCol: 0xffc070,
-    cam: (c) => c.inBoat(7, -1.8, 1.95, 0.45),
-    look: (c) => c.S(15, 18, 0) },
+  { name: 'Mutter', near: 0.05, m: 105, dur: 8, fov: 30, sway: 0.25, fill: 25, fillCol: 0xffb878, fillUp: 0.5, expo: 1.5,
+    cam: (c) => c.inBoat(7, -0.6, 1.75, 0.2),
+    look: (c) => c.inBoat(7, -2.6, 1.55, 0.42) },
   { name: 'Schlagseite', m: 113, dur: 6, fov: 48, up: 'ship', sway: 0.04, roll: 0.18,
     cam: (c, k) => c.S(20 + 4 * k, 28.9, -11),
     look: (c) => c.S(75, 27.5, -9) },
@@ -139,12 +138,12 @@ const SHOTS = [
   { name: 'Lichter', m: 156.4, dur: 0.6, fov: 34, sway: 0.3,
     cam: (c) => c.boat(1.4, 1),
     look: (c) => c.S(0, 20, 0) },
-  { name: 'Bruch', m: 157, dur: 1.6, fov: 26, sway: 0.12, fixed: true, shake: 0.15, expo: 1.25,
-    cam: (c, k) => c.at('brk', () => c.S(-15, 0, 0).setY(WL + 1.3).add(_v.set(0, 0, 95))).clone().add(_v.set(-2 * k, 0, 0)),
-    look: (c, k) => c.at('brkL', () => c.S(-6, 20, 0)).clone().add(_v.set(0, 3 * k, 0)) },
-  { name: 'Heck steigt', m: 158.6, dur: 0.35, fov: 20, sway: 0.15,
-    cam: (c, k) => c.W(-55 + 3 * k, WL + 0.8, 130),
-    look: (c) => c.S(-110, 30, 0) },
+  { name: 'Bruch', m: 157, dur: 1.6, fov: 30, sway: 0.12, fixed: true, shake: 0.15, expo: 1.25,
+    cam: (c, k) => c.at('brk', () => c.S(10, 0, 0).setY(12).add(_v.set(0, 0, 95))).clone().add(_v.set(-2 * k, 0, 0)),
+    look: (c, k) => c.at('brkL', () => c.S(-5, 20, 0)).clone().add(_v.set(0, 3 * k, 0)) },
+  { name: 'Heck steigt', m: 158.6, dur: 0.35, fov: 40, sway: 0.15, expo: 1.5, fill: 30000, fillUp: 40,
+    cam: (c, k) => c.W(-60 + 3 * k, 11.5, 70),
+    look: (c) => c.S(-110, 40, 0) },
   // close: the stern standing up, people holding on to the rails, falling
   { name: 'Absturz', m: 158.95, dur: 0.6, fov: 30, sway: 0.2, fixed: true, fill: 9000, fillUp: 60, cold: true,
     cam: (c, k) => c.at('fallC', () => c.S(-112, 24, 0).add(_v.set(46, 0, 40)).setY(WL + 1.5)).clone().add(_v.set(0, 1.5 * k, 0)),
@@ -160,12 +159,12 @@ const SHOTS = [
     cam: (c, k) => c.sea().clone().add(_v.set(-9 + 2 * k, 1.3, -10)),
     look: (c) => c.backBoat().clone().add(_v.set(0, 1, 0)) },
   // first light
-  { name: 'Morgengrauen', near: 0.12, m: 268, dur: 6, fov: 32, sway: 0.3,
-    cam: (c) => c.inBoat(7, -4, 1.5, -0.6),
-    look: (c, k) => c.carp().clone().add(_v.set(-10 - 8 * k, 12, 0)) },
-  { name: 'Gerettet', near: 0.12, m: 274, dur: 7, fov: 40, sway: 0.2,
-    cam: (c) => c.inBoat(7, 3.5, 1.3, 0),
-    look: (c, k) => c.carp().clone().add(_v.set(-16, 16 + 4 * k, 9.75)) },
+  { name: 'Morgengrauen', near: 0.1, m: 268, dur: 6, fov: 38, sway: 0.3,
+    cam: (c) => c.inBoat(7, 0, 0, 0).add(_v.set(3, 0.9, 9)),
+    look: (c) => c.inBoat(7, 0, 1.2, 0) },
+  { name: 'Gerettet', near: 0.05, m: 274, dur: 7, fov: 42, sway: 0.2, fill: 25, fillCol: 0xffc9a0,
+    cam: (c) => c.inBoat(7, -4.3, 2.4, 0.3),
+    look: (c, k) => c.inBoat(7, 4.5, 1.5 + 6 * k, -0.2) },
 ];
 
 export class Director {
@@ -387,7 +386,8 @@ export class Wreckage {
     // the sea bursting in through the plating (inside the hull, under the waterline)
     this.jets = new Particles(fine >= 2 ? 1600 : 800, { color: 0xc8dce4, size: 0.3, additive: false, gravity: 9.8, drag: 0.4, life: 0.9, floor: -50, opacity: 0.75 });
     this.flashT = 0;
-    sink.outside.add(this.mesh, this.iceMesh, this.spray.mesh, this.sparks.mesh, this.bubbles.mesh, this.snow, this.stars.mesh, this.trail.mesh, this.jets.mesh);
+    sink.outside.add(this.mesh, this.iceMesh, this.spray.mesh, this.sparks.mesh, this.bubbles.mesh, this.snow, this.stars.mesh, this.trail.mesh);
+    sink.scene.add(this.jets.mesh); // (inside the hull: drawn with the ship, the outside world is hidden there)
     sink.scene.add(this.glow, this.flash); // (in ship coordinates: they light the hull in every pass)
     // the surface of the sea seen from below: a rippling mirror, brighter straight up (Snell's window)
     this.surf = underSurface();
