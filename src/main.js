@@ -146,7 +146,7 @@ function step(dt) {
   time += dt;
   debug.time = time;
   controls.apply();
-  player.update(dt);
+  if (!sinking?.cine || !sinking.active) player.update(dt); // (the night of 14 April is a film: the camera is the director's)
   sinking?.update(dt);
   // Near plane by situation: the depth buffer resolves 1/near times finer. Indoors things come close (0.15 m); on
   // the open decks a little more room is safe; flying away from the ship the near plane follows the distance, so
@@ -161,9 +161,10 @@ function step(dt) {
         near = Math.min(25, Math.max(0.22, 0.3 * Math.hypot(dx, dy, dz)), Math.max(0.22, 0.5 * Math.abs(p.y - 10.5))); // (never cuts into the sea below)
       }
     }
+    if (sinking?.active && world.cineNear) near = world.cineNear;
     if (Math.abs(near - camera.near) > camera.near * 0.04) { camera.near = near; camera.updateProjectionMatrix(); }
   }
-  world.updateVisibility(camera.position, undefined, player.mode === 'walk' ? player.pos.y : undefined);
+  world.updateVisibility(camera.position, undefined, player.mode === 'walk' && !sinking?.active ? player.pos.y : undefined);
   try {
     world.update(dt, time);
     for (let i = 0; i < updates.length; i++) updates[i](dt, time);
@@ -470,7 +471,7 @@ async function main() {
   try {
     // first frame under the loading screen: sync sky/ocean/lights to real start pose, compile shaders, upload textures
     const t0 = performance.now();
-    world.updateVisibility(camera.position, undefined, player.mode === 'walk' ? player.pos.y : undefined);
+    world.updateVisibility(camera.position, undefined, player.mode === 'walk' && !sinking?.active ? player.pos.y : undefined);
     world.update(0, 0);
     for (let i = 0; i < updates.length; i++) updates[i](0, 0);
     // compile in parallel (KHR_parallel_shader_compile) while the loading screen keeps animating

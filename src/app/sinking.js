@@ -11,6 +11,7 @@ import { ENGINE } from '../core/engine.js';
 import { mats } from '../core/materials.js';
 import { TIER } from '../core/tier.js';
 import { SHIP_SPEED } from '../environment/ocean.js';
+import { Director, Wreckage } from './cinema.js';
 
 const WL = SHIP.waterline, ROOF = DECK_Y.roof + 0.5, D2R = Math.PI / 180;
 const XB = 1.0;                 // the hull breaks here: between the third (x 12) and the fourth funnel (x -10)
@@ -75,6 +76,8 @@ export class Sinking {
     this.m = -HIT / 60;            // minutes after 23:40
     this.t = 0;                     // real seconds since the start
     this.speed = 'fast';
+    this.XB = XB;
+    this.cine = true;              // a film: the camera is the director's, nobody walks
   }
 
   // ------------------------------------------------------------------ start
@@ -99,6 +102,11 @@ export class Sinking {
     sc.add(this.shipLive);
     this._floods();
     this._iceberg();
+    this.director = new Director(this);
+    this.wreck = new Wreckage(this);
+    W.sinkHold = true;             // no deck streaming: the camera wanders over the whole ship
+    if (this.ui.controls) this.ui.controls.noLock = true;
+    document.body.classList.add('cine');
     // lifeboats: all in their chocks, driven by the timetable below
     const B = this.interact.boats;
     for (const u of [...B.live.keys()]) B.reset(u);
@@ -114,7 +122,7 @@ export class Sinking {
     this.sound.band = null; // the band plays later, on the boat deck
     // the visitor: at the very bow, looking ahead into the dark
     const p = this.player;
-    p.teleport({ deck: 'B', x: 122, y: DECK_Y.B, z: 2.5, yaw: -0.12 }); // beside the anchor crane, clear view ahead to starboard
+    if (!this.cine) p.teleport({ deck: 'B', x: 122, y: DECK_Y.B, z: 2.5, yaw: -0.12 }); // beside the anchor crane, clear view ahead to starboard
     p.pitch = 0.0;
     this._ui();
     // the clipping variants of every shader for the break, compiled now (no hitch later)
@@ -124,6 +132,11 @@ export class Sinking {
   _ui() {
     const clock = (this.clockEl = document.createElement('div'));
     clock.className = 'sink-clock';
+    for (const c of ['top', 'bottom']) { const b = document.createElement('div'); b.className = 'cine-bar ' + c; document.body.append(b); }
+    const quit = document.createElement('button');
+    quit.type = 'button'; quit.className = 'cine-quit'; quit.textContent = 'Beenden';
+    quit.addEventListener('click', () => { const q = new URLSearchParams(location.search); q.delete('untergang'); location.search = q.toString(); });
+    document.body.append(quit);
     clock.innerHTML = '<span></span><small></small>';
     this.clockT = clock.firstChild; this.clockS = clock.lastChild;
     this.clockS.addEventListener('click', () => this.cycle());
@@ -131,7 +144,7 @@ export class Sinking {
     this.underEl = document.createElement('div');
     this.underEl.className = 'sink-under';
     document.body.append(this.underEl);
-    window.addEventListener('keydown', (e) => { if (e.code === 'KeyU' && !e.repeat && !this.ui.modal) this.cycle(); });
+    window.addEventListener('keydown', (e) => { if ((e.code === 'KeyU' || e.code === 'Space') && !e.repeat && !this.ui.modal) { e.preventDefault(); this.cycle(); } });
   }
 
   cycle() {
@@ -148,6 +161,7 @@ export class Sinking {
         const rt = new THREE.WebGLRenderTarget(1, 1);
         r.setRenderTarget(rt); r.render(new THREE.Scene(), this.camera); r.setRenderTarget(null); // sets the clipping state
         await r.compileAsync(this.scene, this.camera);
+        if (this.wreck) await r.compileAsync(this.wreck.fxBow, this.camera);
         rt.dispose();
       } catch { /* compiled when needed */ } finally { r.clippingPlanes = []; }
     }, 1500);
@@ -355,9 +369,10 @@ export class Sinking {
     this.P0 = P_BREAK.clone().applyMatrix4(this.TA);
     this.sound.groan(7);
     this.shake = 4;
+    this.wreck?.breakUp();
     // whoever is still on board goes into the sea; a boat still on its falls goes down with the ship
     const B = this.interact.boats, R = B.rider;
-    if (!(R && R.S.away)) {
+    if (!this.cine && !(R && R.S.away)) {
       if (R) B.rider = null;
       this._overboard();
     }
@@ -384,6 +399,7 @@ export class Sinking {
 
   update(dt) {
     if (!this.active) return;
+    const W0 = this.world;
     this.t += dt;
     // the night's clock: real time until the scraping is over, then compressed
     let rate = 1 / 60;
@@ -422,17 +438,34 @@ export class Sinking {
       const f = this.funnel; f.t += dt / 2.6;
       const k = clamp01(f.t);
       f.g.rotation.set(k * k * 1.55, 0, -k * k * 0.25); // over to starboard and a little forward
-      if (k >= 1 && !f.splash) { f.splash = true; this.sound.splash(); }
+      if (k >= 1 && !f.splash) {
+        f.splash = true; this.sound.splash();
+        f.g.updateMatrixWorld(true);
+        const top = new THREE.Vector3(0, 18, 0).applyMatrix4(f.g.matrixWorld).applyMatrix4(this.TA); top.y = WL + 0.3;
+        this.wreck?.funnel(top);
+      }
       if (f.t > 1.35) f.g.visible = false;
     }
     this._power();
+    W0.starBoost = m >= 157.2 ? Math.min(4, W0.starBoost + dt * 1.5) : 2.2; // after the lights failed: eyes used to the dark
     if (!this.broken && m >= 157) this._break();
+    // the wreckage: ice off the berg while she grinds along it, the stern falling back, things sliding off her decks
+    const Wk = this.wreck;
+    if (Wk) {
+      if (this.t > HIT && this.t < HIT + SCRAPE && Math.random() < 0.6) {
+        const cx = Math.max(-40, Math.min(118, this.berg.x));
+        Wk.ice(new THREE.Vector3(cx, WL + 0.5, hullHalfWidth(cx, WL) + 0.4).applyMatrix4(this.TA));
+      }
+      if (this.broken && !this.slammed && m >= 157.55) { this.slammed = true; Wk.slam(); this.shake = 2; }
+      if (this.broken && m > 158.1 && m < 159.7 && Math.random() < dt * 14) Wk.slide();
+      Wk.update(dt);
+    }
     this._updateFloods();
     // under water?
     const cam = this.camera.position, wy = cam.clone().applyMatrix4(this.TA).y;
     const under = this.drift ? this.drift.p.y < WL - 0.05 : wy < this.waterAt(cam) - 0.02;
     this.world.underwater = under;
-    const Rv = this.interact.boats.rider;
+    const Rv = this.cine ? null : this.interact.boats.rider;
     this.world.viewLabel = this.drift ? ['Nordatlantik', under ? 'Unter Wasser' : 'Im Wasser'] : Rv && Rv.S.away ? ['Rettungsboot', 'auf dem Nordatlantik'] : null;
     this.underEl.classList.toggle('show', under);
     this.sound.muffle(under);
@@ -440,10 +473,11 @@ export class Sinking {
     if (m >= END && !this.endAt) this.endAt = this.t + 9;
     if (this.endAt && this.t >= this.endAt && !this.endEl) this._end();
     // clock
-    const total = 23 * 3600 + 40 * 60 + m * 60, h = Math.floor(total / 3600) % 24, mi = Math.floor(total / 60) % 60;
+    const total = 23 * 3600 + 40 * 60 + Math.min(m, END) * 60, h = Math.floor(total / 3600) % 24, mi = Math.floor(total / 60) % 60;
     const txt = `${pad(h)}:${pad(mi)}`;
     if (txt !== this._txt) { this._txt = txt; this.clockT.textContent = txt; }
-    const sp = this.t < HIT + SCRAPE ? '' : this.speed === 'pause' ? '❚❚ angehalten (U)' : this.speed === 'slow' ? '▶ langsam (U)' : '▶▶ schnell (U)';
+    const key = this.ui.controls?.touch ? '' : ' (U)';
+    const sp = this.t < HIT + SCRAPE ? '' : this.speed === 'pause' ? '❚❚ angehalten' + key : this.speed === 'slow' ? '▶ langsam' + key : '▶▶ schnell' + key;
     if (sp !== this._sp) { this._sp = sp; this.clockS.textContent = sp; }
   }
 
@@ -451,6 +485,21 @@ export class Sinking {
   lateUpdate(dt) {
     if (!this.active) return;
     const p = this.player, cam = this.camera;
+    if (this.cine) {
+      const cut = this.director.apply(cam, dt);
+      if (this.shake > 0) {
+        this.shake -= dt;
+        const a = Math.min(1, this.shake / 3) * 0.06;
+        cam.position.x += (Math.random() - 0.5) * a; cam.position.y += (Math.random() - 0.5) * a;
+        cam.rotateZ((Math.random() - 0.5) * a * 0.3);
+      }
+      cam.updateMatrixWorld();
+      // the sounds follow the camera
+      p.pos.x = cam.position.x; p.pos.y = cam.position.y - 1.6; p.pos.z = cam.position.z;
+      if (cut) this.world.updateVisibility(cam.position); // (a cut: the right rooms and details at once)
+      if (this.m > END + 0.6) { this.world.interior.visible = false; this.world.exterior.visible = false; this.shipLive.visible = false; this.interact.boats.root.visible = this.away.length > 0; }
+      return;
+    }
     // the horizon stays level in a boat, in the water and in flight; walking on deck one sees it tilt
     const R = this.interact.boats.rider, world = (R && R.S.away) || this.drift || (p.mode === 'fly' && !R);
     if (this.drift) {
@@ -504,6 +553,14 @@ export class Sinking {
       c2.matrix.copy(c2.matrixWorld);
       r.clippingPlanes = [this._pStern ||= new THREE.Plane(new THREE.Vector3(-1, 0, 0), XB)];
       r.render(scene, c2);
+      // 4. the torn edges of both halves, reaching into the gap (not cut)
+      if (this.wreck) {
+        r.clippingPlanes = [];
+        const fb = this.wreck.fxBow, fs = this.wreck.fxStern;
+        fb.fog = fs.fog = scene.fog;
+        r.render(fb, cam);
+        r.render(fs, c2);
+      }
     } finally {
       r.clippingPlanes = [];
       r.autoClear = ac; r.shadowMap.autoUpdate = sh; scene.background = bg;

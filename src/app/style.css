@@ -333,3 +333,11 @@ kbd {
 .sink-end .t { font-size: clamp(40px, 8vw, 72px); letter-spacing: 0.1em; }
 .sink-end .row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
 .sink-end button { padding: 10px 22px; font: 500 15px Georgia, serif; color: #efe3c4; background: rgba(20, 30, 52, 0.8); border: 1px solid rgba(239, 227, 196, 0.5); border-radius: 3px; cursor: pointer; }
+/* the night of 14 April as a film: no HUD, black bars, the clock in the upper bar */
+body.cine #ui, body.cine #start { display: none !important; }
+.cine-bar { position: fixed; left: 0; right: 0; z-index: 15; height: clamp(28px, calc((100vh - 100vw / 2.2) / 2), 11vh); background: #000; pointer-events: none; }
+.cine-bar.top { top: 0; }
+.cine-bar.bottom { bottom: 0; }
+.cine-quit { position: fixed; right: 14px; bottom: 10px; z-index: 21; padding: 5px 12px; font: 400 12.5px Georgia, 'Times New Roman', serif; letter-spacing: 0.08em; color: rgba(239, 227, 196, 0.75); background: transparent; border: 1px solid rgba(239, 227, 196, 0.3); border-radius: 3px; cursor: pointer; }
+.cine-quit:hover { color: #efe3c4; border-color: rgba(239, 227, 196, 0.6); }
+body.cine .sink-clock { top: 6px; font-size: 22px; }
