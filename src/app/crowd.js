@@ -134,7 +134,7 @@ function crowdMaterial() {
 
 // colours of coats and dresses (dark serge, tweed, a few light evening dresses), the crew in white jackets
 const COATS = [0x1d2030, 0x2a2622, 0x34302a, 0x1a1a1a, 0x3d3a36, 0x2b3140, 0x4a3a2a, 0x23262b];
-const DRESSES = [0x2c2a3c, 0x5a2530, 0x8c8478, 0x3a4458, 0x6e665a, 0xb8ae9a, 0x2a2a2a, 0x51463e];
+const DRESSES = [0x2c2a3c, 0x3b3236, 0x6c675f, 0x353b47, 0x5a564f, 0x8a8478, 0x2a2a2a, 0x463f3a];
 const CREW = 0xbfbcb0, BAND = 0x1c2620, MOTHER = 0x8a1e1a, CHILD = 0x55708e;
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _sc = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
@@ -518,8 +518,9 @@ export class Crowd {
       if (on) {
         const waving = this.familyBoarded && m < 80;
         if (waving !== F.waving) { F.waving = waving; this.deck.look(F.father, waving ? FIG.wave : FIG.idle, waving ? 3 : 0.8, 1); }
-        this.deck.put(F.father, 33.5, by, 9.9, yaw + (this.familyBoarded ? 0 : 0.6), 0, this._qComp(33, 0.85));
-        _v.set(33.5, by + 0.3, 9.9).applyMatrix4(s.TA);
+        const fz = this.familyBoarded ? 12.7 : 9.9; // (after they are in the boat: at the rail itself)
+        this.deck.put(F.father, 33.5, by, fz, yaw + (this.familyBoarded ? 0 : 0.6), 0, this._qComp(33, 0.85));
+        _v.set(33.5, by + 0.3, fz).applyMatrix4(s.TA);
         if (_v.y < WL + 0.1) { F.gone = true; this.deck.hide(F.father); this._toSea({ i: F.father, jacket: true, woman: false }, _v.setY(WL), false); }
       } else if (!F.gone) this.deck.hide(F.father);
       // the operator: at the key until the captain released him (about 02:17)

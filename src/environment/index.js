@@ -614,7 +614,7 @@ export async function build(world) {
     lightingUniforms.uShipAmb.value.setRGB(0.046, 0.036, 0.026).multiplyScalar(n * (1 - ins) * pw);
     // world.updateVisibility hides the exterior where nothing of the outside can be seen (closed hull below C deck):
     // then sky, sea, smoke, iceberg and the lamp sprites cannot be seen either
-    const out = world.exterior.visible !== false || !!world.shipGone; // (the film after the sinking: sea and sky without the ship)
+    const out = !world.noOutside && (world.exterior.visible !== false || !!world.shipGone); // (the film after the sinking: sea and sky without the ship)
     const under = world.underwater ?? (!world.state.inside && camPos.y < SHIP.waterline + 0.05);
     halos.points.visible = out && !under && n > 0.01;
     halos.material.uniforms.uK.value = n * 6 * pw;
